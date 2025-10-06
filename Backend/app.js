@@ -6,6 +6,7 @@ const dotenv = require("dotenv");
 const seedDatabase = require("./utils/seed");
 const adminUserRoutes = require("./routes/admin.user.route");
 const adminFeedbackRoutes = require("./routes/admin.feedback.route");
+const kitchenRoutes = require("./routes/kitchen.routes");
 // load env
 dotenv.config();
 
@@ -31,6 +32,9 @@ app.get("/", (req, res) => {
 });
 app.use("/api/admin", adminUserRoutes);
 app.use("/api/admin", adminFeedbackRoutes);
+
+//chef
+app.use("/api/kitchen", kitchenRoutes);
 
 // export app để server.js dùng
 module.exports = app;
