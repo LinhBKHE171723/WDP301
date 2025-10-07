@@ -1,6 +1,8 @@
 const Order = require("../models/Order");
 const OrderItem = require("../models/OrderItem");
 const Item = require("../models/Item");
+const Table = require("../models/Table");
+const User = require("../models/User");
 exports.getConfirmedOrders = async (req, res) => {
   try {
     // 1. Chỉ lấy các order có trạng thái là 'confirmed'
@@ -105,62 +107,6 @@ exports.startPreparingOrder = async (req, res) => {
   }
 };
 
-exports.markItemReady = async (req, res) => {
-  const { orderItemId } = req.params;
-  const userId = req.user.id; // ID của người dùng (Đầu bếp) đang đăng nhập
-
-  try {
-    const orderItem = await OrderItem.findById(orderItemId);
-
-    if (!orderItem) {
-      return res
-        .status(404)
-        .json({ message: "Không tìm thấy món trong Order" });
-    }
-
-    // Kiểm tra trạng thái hợp lệ để chuyển
-    if (orderItem.status === "ready" || orderItem.status === "served") {
-      return res.status(400).json({
-        message: `Món đã ở trạng thái '${orderItem.status}' và không thể hoàn thành lại.`,
-      });
-    }
-
-    // 1. Cập nhật trạng thái OrderItem
-    orderItem.status = "ready";
-    // Tùy chọn: Nếu chưa có, gán assignedChef là người vừa hoàn thành
-    if (!orderItem.assignedChef) {
-      orderItem.assignedChef = userId;
-    }
-    await orderItem.save();
-
-    // 2. Kiểm tra và cập nhật trạng thái Order chính (Nếu TẤT CẢ OrderItem đã 'ready' hoặc 'served', Order chuyển sang 'ready')
-    const parentOrder = await Order.findById(orderItem.orderId).populate(
-      "orderItems"
-    );
-
-    const allItemsDone = parentOrder.orderItems.every(
-      (item) => item.status === "ready" || item.status === "served"
-    );
-
-    if (allItemsDone && parentOrder.status !== "ready") {
-      parentOrder.status = "ready";
-      await parentOrder.save();
-    }
-
-    res.status(200).json({
-      message: `Món (OrderItem ID: ${orderItemId}) đã được đánh dấu HOÀN THÀNH ('ready').`,
-      data: orderItem,
-      orderStatusUpdated: allItemsDone,
-    });
-  } catch (error) {
-    console.error(error);
-    res.status(500).json({
-      message: "Lỗi Server khi xác nhận món hoàn thành",
-      error: error.message,
-    });
-  }
-};
-
 exports.assignChefToItem = async (req, res) => {
   const { orderItemId } = req.params;
   const { chefId } = req.body; // ID của đầu bếp được phân công
@@ -219,61 +165,6 @@ exports.assignChefToItem = async (req, res) => {
   }
 };
 
-exports.assignChefToItem = async (req, res) => {
-  const { orderItemId } = req.params;
-  const { chefId } = req.body; // ID của đầu bếp được phân công
-
-  try {
-    // 1. Kiểm tra OrderItem có tồn tại không
-    const orderItem = await OrderItem.findById(orderItemId);
-    if (!orderItem) {
-      return res
-        .status(404)
-        .json({ message: "Không tìm thấy món trong Order" });
-    }
-
-    // 2. Kiểm tra chefId có hợp lệ và là vai trò 'chef' không
-    const chefToAssign = await User.findById(chefId);
-    if (!chefToAssign || chefToAssign.role !== "chef") {
-      // CHỈ CHẤP NHẬN 'chef'
-      return res.status(400).json({
-        message:
-          "ID người dùng không hợp lệ hoặc không phải là vai trò 'chef'.",
-      });
-    }
-
-    // 3. Kiểm tra trạng thái: Chỉ phân công các món chưa hoàn thành
-    if (orderItem.status === "ready" || orderItem.status === "served") {
-      return res.status(400).json({
-        message: `Món đã hoàn thành/phục vụ và không thể phân công lại.`,
-      });
-    }
-
-    // 4. Cập nhật assignedChef và chuyển trạng thái sang 'preparing' nếu đang là 'pending'
-    orderItem.assignedChef = chefId;
-    if (orderItem.status === "pending") {
-      orderItem.status = "preparing";
-    }
-    await orderItem.save();
-
-    // Lấy lại OrderItem đã populate để phản hồi
-    const populatedItem = await OrderItem.findById(orderItemId)
-      .populate("assignedChef", "name username")
-      .populate("itemId", "name");
-
-    res.status(200).json({
-      message: `Món '${populatedItem.itemId.name}' đã được phân công cho ${chefToAssign.name}.`,
-      data: populatedItem,
-    });
-  } catch (error) {
-    console.error(error);
-    res.status(500).json({
-      message: "Lỗi Server khi phân công món",
-      error: error.message,
-    });
-  }
-};
-
 exports.getMyPreparingItems = async (req, res) => {
   // Lấy ID của chef đang đăng nhập từ middleware
   const myChefId = req.user.id;
@@ -315,6 +206,154 @@ exports.getMyPreparingItems = async (req, res) => {
     console.error(error);
     res.status(500).json({
       message: "Lỗi Server khi lấy danh sách món đang chế biến.",
+      error: error.message,
+    });
+  }
+};
+
+exports.getOrderDetails = async (req, res) => {
+  const { orderId } = req.params;
+
+  try {
+    const order = await Order.findById(orderId)
+      .populate("tableId", "tableNumber") // Lấy số bàn từ Table
+      .populate("servedBy", "name username") // Lấy tên nhân viên phục vụ
+      .populate("userId", "name phone") // Lấy thông tin khách hàng (nếu có)
+      .populate({
+        path: "orderItems",
+        // Lồng ghép 1: Lấy thông tin món ăn từ Item
+        populate: [
+          {
+            path: "itemId",
+            select: "name category price", // Tên, loại, giá món ăn
+          },
+          // Lồng ghép 2: Lấy thông tin Chef được phân công từ User
+          {
+            path: "assignedChef",
+            select: "name username", // Tên và username của Chef
+          },
+        ],
+        select: "quantity note status createdAt", // Số lượng, ghi chú, trạng thái của OrderItem
+      });
+
+    if (!order) {
+      return res.status(404).json({ message: "Không tìm thấy Order" });
+    }
+
+    // Tính toán nhanh tổng quan trạng thái
+    const totalItems = order.orderItems.length;
+    const itemsPending = order.orderItems.filter(
+      (i) => i.status === "pending" || i.status === "preparing"
+    ).length;
+
+    res.status(200).json({
+      message: "Lấy chi tiết Order thành công",
+      data: {
+        orderId: order._id,
+        status: order.status,
+        // Thông tin Bàn
+        tableNumber: order.tableId ? order.tableId.tableNumber : "N/A",
+        // Thông tin Nhân viên
+        servedBy: order.servedBy ? order.servedBy.name : "Chưa gán",
+        // Thông tin Khách hàng (Nếu có)
+        customerName: order.userId ? order.userId.name : "Khách vãng lai",
+
+        totalAmount: order.totalAmount,
+        createdAt: order.createdAt,
+
+        itemSummary: {
+          total: totalItems,
+          remainingToCook: itemsPending,
+        },
+
+        // Danh sách chi tiết món ăn (OrderItem List)
+        orderItems: order.orderItems.map((item) => ({
+          orderItemId: item._id,
+          itemName: item.itemId ? item.itemId.name : "Món đã bị xóa",
+          itemCategory: item.itemId ? item.itemId.category : "N/A",
+          quantity: item.quantity,
+          note: item.note,
+          status: item.status,
+          // THÔNG TIN BẾP VÀ TRẠNG THÁI
+          assignedChef: item.assignedChef
+            ? item.assignedChef.name
+            : "Chưa phân công",
+          isReady: item.status === "ready",
+          isServed: item.status === "served",
+        })),
+      },
+    });
+  } catch (error) {
+    console.error(error);
+    if (error.name === "CastError") {
+      return res.status(400).json({ message: "ID Order không hợp lệ." });
+    }
+    res.status(500).json({
+      message: "Lỗi Server khi lấy chi tiết Order",
+      error: error.message,
+    });
+  }
+};
+
+exports.markItemReady = async (req, res) => {
+  const { orderItemId } = req.params;
+
+  try {
+    const orderItem = await OrderItem.findById(orderItemId);
+
+    if (!orderItem) {
+      return res
+        .status(404)
+        .json({ message: "Không tìm thấy món ăn (OrderItem)." });
+    }
+
+    // 1. Kiểm tra trạng thái hiện tại
+    if (orderItem.status !== "preparing") {
+      return res.status(400).json({
+        message: `Món ăn phải ở trạng thái 'preparing' mới có thể chuyển sang 'ready'. Trạng thái hiện tại: ${orderItem.status}.`,
+      });
+    }
+
+    // 2. Cập nhật trạng thái
+    orderItem.status = "ready";
+    await orderItem.save();
+
+    // 3. (Tùy chọn) Kiểm tra và cập nhật trạng thái Order tổng thể
+    // Khi tất cả OrderItem của Order đó đều là 'ready' hoặc 'served',
+    // Order tổng thể có thể được xem xét chuyển sang 'ready'
+    const order = await Order.findById(orderItem.orderId).populate(
+      "orderItems"
+    );
+
+    const allItemsReadyOrServed = order.orderItems.every(
+      (item) => item.status === "ready" || item.status === "served"
+    );
+
+    if (allItemsReadyOrServed && order.status === "preparing") {
+      order.status = "ready";
+      await order.save();
+    }
+
+    const populatedItem = await OrderItem.findById(orderItemId).populate(
+      "itemId",
+      "name"
+    );
+
+    res.status(200).json({
+      message: `Món '${populatedItem.itemId.name}' đã hoàn thành và sẵn sàng phục vụ.`,
+      data: {
+        orderItemId: orderItem._id,
+        status: orderItem.status,
+        orderStatus: order.status,
+      },
+    });
+  } catch (error) {
+    console.error(error);
+    if (error.name === "CastError") {
+      return res.status(400).json({ message: "ID OrderItem không hợp lệ." });
+    }
+    res.status(500).json({
+      message: "Lỗi Server khi đánh dấu món hoàn thành",
       error: error.message,
     });
   }
