@@ -3,7 +3,7 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  background: linear-gradient(135deg, #4CAF50 0%, #2E7D32 100%);
   padding: 20px;
 }
 
@@ -30,7 +30,7 @@
 }
 
 .qr-icon {
-  color: #667eea;
+  color: #4CAF50;
   margin-bottom: 20px;
   display: flex;
   justify-content: center;
@@ -78,8 +78,8 @@ h1 {
 
 .input-group input:focus {
   outline: none;
-  border-color: #667eea;
-  box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+  border-color: #4CAF50;
+  box-shadow: 0 0 0 3px rgba(76, 175, 80, 0.1);
 }
 
 .input-group input.error {
@@ -96,7 +96,7 @@ h1 {
 
 .submit-btn {
   width: 100%;
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  background: linear-gradient(135deg, #4CAF50 0%, #2E7D32 100%);
   color: white;
   border: none;
   padding: 15px;
@@ -109,7 +109,7 @@ h1 {
 
 .submit-btn:hover {
   transform: translateY(-2px);
-  box-shadow: 0 10px 20px rgba(102, 126, 234, 0.3);
+  box-shadow: 0 10px 20px rgba(76, 175, 80, 0.3);
 }
 
 .submit-btn:active {
@@ -120,7 +120,7 @@ h1 {
   background: #f8f9fa;
   padding: 15px;
   border-radius: 10px;
-  border-left: 4px solid #667eea;
+  border-left: 4px solid #4CAF50;
 }
 
 .help-text p {
