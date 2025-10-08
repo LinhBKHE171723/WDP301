@@ -12,6 +12,9 @@ const MenuView = ({ table, onBack }) => {
   const [showCart, setShowCart] = useState(false);
   const [selectedItem, setSelectedItem] = useState(null);
   const [showItemDetail, setShowItemDetail] = useState(false);
+  const [priceFilter, setPriceFilter] = useState('all');
+  const [itemPriceFilter, setItemPriceFilter] = useState('all');
+  const [categoryFilter, setCategoryFilter] = useState('all');
 
   useEffect(() => {
     fetchData();
@@ -93,6 +96,65 @@ const MenuView = ({ table, onBack }) => {
     return cart.reduce((total, item) => total + (item.price * item.quantity), 0);
   };
 
+  const filterMenusByPrice = (menus) => {
+    switch (priceFilter) {
+      case 'under-100k':
+        return menus.filter(menu => menu.price < 100000);
+      case '100k-200k':
+        return menus.filter(menu => menu.price >= 100000 && menu.price < 200000);
+      case '200k-500k':
+        return menus.filter(menu => menu.price >= 200000 && menu.price < 500000);
+      case '500k-1000k':
+        return menus.filter(menu => menu.price >= 500000 && menu.price < 1000000);
+      case '1000k-2000k':
+        return menus.filter(menu => menu.price >= 1000000 && menu.price < 2000000);
+      case '2000k-5000k':
+        return menus.filter(menu => menu.price >= 2000000 && menu.price < 5000000);
+      case 'over-5000k':
+        return menus.filter(menu => menu.price >= 5000000);
+      default:
+        return menus;
+    }
+  };
+
+  const filterItemsByPriceAndCategory = (items) => {
+    let filteredItems = items;
+
+    // Filter by price
+    switch (itemPriceFilter) {
+      case 'under-50k':
+        filteredItems = filteredItems.filter(item => item.price < 50000);
+        break;
+      case '50k-100k':
+        filteredItems = filteredItems.filter(item => item.price >= 50000 && item.price < 100000);
+        break;
+      case '100k-200k':
+        filteredItems = filteredItems.filter(item => item.price >= 100000 && item.price < 200000);
+        break;
+      case '200k-500k':
+        filteredItems = filteredItems.filter(item => item.price >= 200000 && item.price < 500000);
+        break;
+      case 'over-500k':
+        filteredItems = filteredItems.filter(item => item.price >= 500000);
+        break;
+      default:
+        // No price filter
+        break;
+    }
+
+    // Filter by category
+    if (categoryFilter !== 'all') {
+      filteredItems = filteredItems.filter(item => item.category === categoryFilter);
+    }
+
+    return filteredItems;
+  };
+
+  const getUniqueCategories = (items) => {
+    const categories = [...new Set(items.map(item => item.category))];
+    return categories.filter(category => category); // Remove empty/null categories
+  };
+
   const handleOrder = async () => {
     if (cart.length === 0) return;
 
@@ -168,7 +230,7 @@ const MenuView = ({ table, onBack }) => {
           className={activeTab === 'menus' ? 'active' : ''}
           onClick={() => setActiveTab('menus')}
         >
-          Menu & Combo
+          Combo
         </button>
         <button
           className={activeTab === 'items' ? 'active' : ''}
@@ -180,8 +242,62 @@ const MenuView = ({ table, onBack }) => {
 
       <div className="menu-content">
         {activeTab === 'menus' && (
-          <div className="menu-grid">
-            {menus.map(menu => (
+          <>
+            <div className="price-filter">
+              <h3>Lọc theo giá:</h3>
+              <div className="filter-buttons">
+                <button
+                  className={priceFilter === 'all' ? 'active' : ''}
+                  onClick={() => setPriceFilter('all')}
+                >
+                  Tất cả
+                </button>
+                <button
+                  className={priceFilter === 'under-100k' ? 'active' : ''}
+                  onClick={() => setPriceFilter('under-100k')}
+                >
+                  Dưới 100k
+                </button>
+                <button
+                  className={priceFilter === '100k-200k' ? 'active' : ''}
+                  onClick={() => setPriceFilter('100k-200k')}
+                >
+                  100k - 200k
+                </button>
+                <button
+                  className={priceFilter === '200k-500k' ? 'active' : ''}
+                  onClick={() => setPriceFilter('200k-500k')}
+                >
+                  200k - 500k
+                </button>
+                <button
+                  className={priceFilter === '500k-1000k' ? 'active' : ''}
+                  onClick={() => setPriceFilter('500k-1000k')}
+                >
+                  500k - 1000k
+                </button>
+                <button
+                  className={priceFilter === '1000k-2000k' ? 'active' : ''}
+                  onClick={() => setPriceFilter('1000k-2000k')}
+                >
+                  1000k - 2000k
+                </button>
+                <button
+                  className={priceFilter === '2000k-5000k' ? 'active' : ''}
+                  onClick={() => setPriceFilter('2000k-5000k')}
+                >
+                  2000k - 5000k
+                </button>
+                <button
+                  className={priceFilter === 'over-5000k' ? 'active' : ''}
+                  onClick={() => setPriceFilter('over-5000k')}
+                >
+                  Trên 5000k
+                </button>
+              </div>
+            </div>
+            <div className="menu-grid">
+              {filterMenusByPrice(menus).map(menu => (
               <div key={menu._id} className="menu-card">
                 <div 
                   className="menu-image clickable"
@@ -224,12 +340,48 @@ const MenuView = ({ table, onBack }) => {
                 </div>
               </div>
             ))}
-          </div>
+            </div>
+          </>
         )}
 
         {activeTab === 'items' && (
-          <div className="menu-grid">
-            {items.map(item => (
+          <>
+            <div className="item-filters">
+              <div className="filter-group">
+                <label htmlFor="price-filter">Lọc theo giá:</label>
+                <select
+                  id="price-filter"
+                  value={itemPriceFilter}
+                  onChange={(e) => setItemPriceFilter(e.target.value)}
+                  className="filter-select"
+                >
+                  <option value="all">Tất cả giá</option>
+                  <option value="under-50k">Dưới 50k</option>
+                  <option value="50k-100k">50k - 100k</option>
+                  <option value="100k-200k">100k - 200k</option>
+                  <option value="200k-500k">200k - 500k</option>
+                  <option value="over-500k">Trên 500k</option>
+                </select>
+              </div>
+              
+              <div className="filter-group">
+                <label htmlFor="category-filter">Lọc theo loại:</label>
+                <select
+                  id="category-filter"
+                  value={categoryFilter}
+                  onChange={(e) => setCategoryFilter(e.target.value)}
+                  className="filter-select"
+                >
+                  <option value="all">Tất cả loại</option>
+                  {getUniqueCategories(items).map(category => (
+                    <option key={category} value={category}>{category}</option>
+                  ))}
+                </select>
+              </div>
+            </div>
+            
+            <div className="menu-grid">
+              {filterItemsByPriceAndCategory(items).map(item => (
               <div key={item._id} className="menu-card">
                 <div 
                   className="menu-image clickable"
@@ -273,7 +425,8 @@ const MenuView = ({ table, onBack }) => {
                 </div>
               </div>
             ))}
-          </div>
+            </div>
+          </>
         )}
       </div>
 
