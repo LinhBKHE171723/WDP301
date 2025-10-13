@@ -4,13 +4,19 @@ const cors = require("cors");
 const morgan = require("morgan");
 const dotenv = require("dotenv");
 const seedDatabase = require("./utils/seed");
+// load env
+dotenv.config();
+// import route
 const adminUserRoutes = require("./routes/admin.user.route");
 const adminFeedbackRoutes = require("./routes/admin.feedback.route");
 const kitchenRoutes = require("./routes/kitchen.routes");
-// load env
-dotenv.config();
+const authRoutes = require("./routes/auth.route");
+// import middleware
+const authMiddleware = require("./middlewares/auth.middleware");
 
 const app = express();
+
+
 
 // middlewares
 app.use(cors());
@@ -26,15 +32,32 @@ mongoose
   })
   .catch((err) => console.error(" MongoDB connection error:", err));
 
-// routes
+//2. routes
 app.get("/", (req, res) => {
   res.send("API is running...");
 });
 app.use("/api/admin", adminUserRoutes);
 app.use("/api/admin", adminFeedbackRoutes);
+// api login
+app.use("/api/auth", authRoutes);
 
 //chef
 app.use("/api/kitchen", kitchenRoutes);
 
-// export app để server.js dùng
+// Protected example: get current user
+app.get("/api/users/me", authMiddleware.authenticateUser, (req, res) => {
+  res.json({ user: req.user });
+});
+
+// Example protected role-based route
+app.get("/api/staff/dashboard", authMiddleware.authenticateUser, (req, res) => {
+  if (!["waiter", "admin", "cashier", "chef"].includes(req.user.role))
+    return res.status(403).json({ message: "Forbidden" });
+  res.json({ message: "Welcome to staff dashboard", user: req.user });
+});
+
+// simple health
+app.get("/api/health", (req, res) => res.json({ status: "ok" }));
+
+//3. export app để server.js dùng
 module.exports = app;
