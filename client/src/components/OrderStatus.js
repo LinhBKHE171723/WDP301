@@ -5,10 +5,26 @@ const OrderStatus = ({ orderId, onBack }) => {
   const [order, setOrder] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+  const [lastUpdated, setLastUpdated] = useState(null);
+  const [nextUpdate, setNextUpdate] = useState(5);
 
   useEffect(() => {
     if (orderId) {
       fetchOrderStatus();
+      
+      // Countdown timer cho next update
+      const countdownInterval = setInterval(() => {
+        setNextUpdate(prev => {
+          if (prev <= 1) {
+            fetchOrderStatus();
+            return 5;
+          }
+          return prev - 1;
+        });
+      }, 1000);
+      
+      // Cleanup interval khi component unmount
+      return () => clearInterval(countdownInterval);
     }
   }, [orderId]);
 
@@ -20,6 +36,8 @@ const OrderStatus = ({ orderId, onBack }) => {
 
       if (data.success) {
         setOrder(data.data);
+        setLastUpdated(new Date());
+        setNextUpdate(5); // Reset countdown
       } else {
         setError(data.message || 'Không thể tải thông tin đơn hàng');
       }
@@ -170,8 +188,15 @@ const OrderStatus = ({ orderId, onBack }) => {
         </div>
 
         <div className="actions">
+          <div className="auto-update-info">
+            {lastUpdated && (
+              <span className="last-updated">
+                Cập nhật lần cuối: {lastUpdated.toLocaleTimeString('vi-VN')}
+              </span>
+            )}
+          </div>
           <button onClick={fetchOrderStatus} className="refresh-btn">
-            🔄 Cập nhật trạng thái
+            🔄 Cập nhật ngay
           </button>
         </div>
       </div>

@@ -239,3 +239,21 @@
     gap: 5px;
   }
 }
+
+.auto-update-info {
+  margin-bottom: 15px;
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+
+.update-timer {
+  color: #4CAF50;
+  font-weight: 600;
+  font-size: 14px;
+}
+
+.last-updated {
+  color: #666;
+  font-size: 12px;
+}
