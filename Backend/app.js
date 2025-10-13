@@ -7,6 +7,8 @@ const seedDatabase = require("./utils/seed");
 const adminUserRoutes = require("./routes/admin.user.route");
 const adminFeedbackRoutes = require("./routes/admin.feedback.route");
 const kitchenRoutes = require("./routes/kitchen.routes");
+const customerRoutes = require("./routes/customer.routes");
+
 // load env
 dotenv.config();
 
@@ -19,7 +21,8 @@ app.use(morgan("dev"));
 
 // connect to MongoDB
 mongoose
-  .connect(process.env.MONGO_URI)
+  // .connect(process.env.MONGO_URI)
+  .connect("mongodb://localhost:27017/restaurantDB")
   .then(() => {
     seedDatabase();
     console.log("✅ MongoDB connected");
@@ -36,5 +39,8 @@ app.use("/api/admin", adminFeedbackRoutes);
 //chef
 app.use("/api/kitchen", kitchenRoutes);
 
+app.use("/api/customer", customerRoutes);
+
 // export app để server.js dùng
 module.exports = app;
+

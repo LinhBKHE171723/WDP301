@@ -18,6 +18,29 @@ exports.getTableByNumber = async (req, res) => {
       });
     }
 
+    // Kiểm tra status của bàn
+    if (table.status === 'occupied') {
+      return res.status(400).json({
+        success: false,
+        message: "Bàn này đang được sử dụng. Vui lòng chọn bàn khác."
+      });
+    }
+
+    if (table.status === 'reserved') {
+      return res.status(400).json({
+        success: false,
+        message: "Bàn này đã được đặt trước. Vui lòng chọn bàn khác."
+      });
+    }
+
+    // Chỉ cho phép vào menu khi bàn có status 'available'
+    if (table.status !== 'available') {
+      return res.status(400).json({
+        success: false,
+        message: "Bàn này hiện không khả dụng. Vui lòng chọn bàn khác."
+      });
+    }
+
     res.status(200).json({
       success: true,
       data: table
@@ -137,19 +160,34 @@ exports.createOrder = async (req, res) => {
     let totalAmount = 0;
 
     for (const orderItem of orderItems) {
-      const item = await Item.findById(orderItem.itemId);
-      if (!item) {
-        return res.status(404).json({ 
-          success: false, 
-          message: `Không tìm thấy món ăn với ID: ${orderItem.itemId}` 
-        });
+      let item;
+      
+      // Kiểm tra type để xác định tìm trong Menu hay Item
+      if (orderItem.type === 'menu') {
+        item = await Menu.findById(orderItem.itemId);
+        if (!item) {
+          return res.status(404).json({ 
+            success: false, 
+            message: `Không tìm thấy menu với ID: ${orderItem.itemId}` 
+          });
+        }
+      } else {
+        item = await Item.findById(orderItem.itemId);
+        if (!item) {
+          return res.status(404).json({ 
+            success: false, 
+            message: `Không tìm thấy món ăn với ID: ${orderItem.itemId}` 
+          });
+        }
       }
 
       const newOrderItem = new OrderItem({
         itemId: orderItem.itemId,
+        itemName: item.name,
+        itemType: orderItem.type,
         quantity: orderItem.quantity,
+        price: item.price,
         note: orderItem.note || "",
-        price: item.price
       });
 
       await newOrderItem.save();
@@ -205,6 +243,47 @@ exports.createOrder = async (req, res) => {
     res.status(500).json({ 
       success: false, 
       message: error.message 
+    });
+  }
+};
+
+// Lấy thông tin đơn hàng theo ID
+exports.getOrderById = async (req, res) => {
+  try {
+    const { orderId } = req.params;
+    const order = await Order.findById(orderId)
+      .populate('tableId', 'tableNumber')
+      .populate('orderItems')
+      .populate('paymentId');
+
+    if (!order) {
+      return res.status(404).json({
+        success: false,
+        message: "Không tìm thấy đơn hàng"
+      });
+    }
+
+    // Populate thông tin item trong orderItems
+    for (let i = 0; i < order.orderItems.length; i++) {
+      const orderItem = order.orderItems[i];
+      if (orderItem.itemId) {
+        // Tìm trong cả Item và Menu
+        let item = await Item.findById(orderItem.itemId);
+        if (!item) {
+          item = await Menu.findById(orderItem.itemId);
+        }
+        orderItem.itemId = item;
+      }
+    }
+
+    res.status(200).json({
+      success: true,
+      data: order
+    });
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      message: error.message
     });
   }
 };

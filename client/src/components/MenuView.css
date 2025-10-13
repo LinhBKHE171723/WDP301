@@ -402,11 +402,38 @@
 }
 
 .close-btn {
-  background: none;
-  border: none;
-  font-size: 20px;
-  cursor: pointer;
-  color: #666;
+  display: grid !important;
+  place-items: center !important;
+  width: 32px !important;
+  height: 32px !important;
+  aspect-ratio: 1 / 1 !important;
+  border: 1px solid #dc3545 !important;
+  background: #dc3545 !important;
+  font-size: 1rem !important;
+  cursor: pointer !important;
+  border-radius: 8px !important;
+  box-shadow: 0 1px 3px rgba(0,0,0,.08) !important;
+  color: white !important;
+  font-weight: bold !important;
+  transition: all 0.3s ease !important;
+  flex-shrink: 0 !important;
+  padding: 0 !important;
+  margin: 0 !important;
+  overflow: hidden !important;
+}
+
+.close-btn:active {
+  transform: scale(.98);
+}
+
+.close-btn:focus {
+  outline: 3px solid Highlight;
+  outline-offset: 2px;
+}
+
+.close-btn:hover {
+  background: #c82333;
+  border-color: #c82333;
 }
 
 .cart-items {

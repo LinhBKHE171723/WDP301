@@ -6,7 +6,8 @@ const {
   getAvailableItems,
   getItemById,
   createOrder,
-  getTableByNumber
+  getTableByNumber,
+  getOrderById
 } = require("../controllers/customer.controller");
 
 // Routes cho khách hàng (không cần authentication)
@@ -27,5 +28,8 @@ router.get("/items/:itemId", getItemById);
 
 // 6. Tạo đơn hàng mới
 router.post("/orders", createOrder);
+
+// 7. Lấy thông tin đơn hàng theo ID
+router.get("/orders/:orderId", getOrderById);
 
 module.exports = router;
