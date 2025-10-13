@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import ItemDetail from './ItemDetail';
+import OrderStatus from './OrderStatus';
 import './MenuView.css';
 
 const MenuView = ({ table, onBack }) => {
@@ -15,6 +16,7 @@ const MenuView = ({ table, onBack }) => {
   const [priceFilter, setPriceFilter] = useState('all');
   const [itemPriceFilter, setItemPriceFilter] = useState('all');
   const [categoryFilter, setCategoryFilter] = useState('all');
+  const [currentOrderId, setCurrentOrderId] = useState(null);
 
   useEffect(() => {
     fetchData();
@@ -161,7 +163,8 @@ const MenuView = ({ table, onBack }) => {
     try {
       const orderItems = cart.map(item => ({
         itemId: item.id,
-        quantity: item.quantity
+        quantity: item.quantity,
+        type: item.type // Thêm type để phân biệt Menu và Item
       }));
 
       const response = await fetch('http://localhost:5000/api/customer/orders', {
@@ -179,7 +182,7 @@ const MenuView = ({ table, onBack }) => {
 
       const data = await response.json();
       if (data.success) {
-        alert('Đặt món thành công!');
+        setCurrentOrderId(data.data._id);
         setCart([]);
         setShowCart(false);
       } else {
@@ -189,6 +192,16 @@ const MenuView = ({ table, onBack }) => {
       alert('Lỗi đặt món');
     }
   };
+
+  // Hiển thị OrderStatus nếu có orderId
+  if (currentOrderId) {
+    return (
+      <OrderStatus 
+        orderId={currentOrderId} 
+        onBack={() => setCurrentOrderId(null)} 
+      />
+    );
+  }
 
   if (loading) {
     return (
