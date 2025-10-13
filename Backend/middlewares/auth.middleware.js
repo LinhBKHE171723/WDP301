@@ -1,6 +1,6 @@
 // backend/middleware/auth.middleware.js
 const jwt = require('jsonwebtoken');
-
+const User = require('../models/User');
 function signAccessToken(payload) {
   return jwt.sign(payload, process.env.JWT_SECRET, {
     expiresIn: process.env.JWT_EXPIRES || '15m',
@@ -53,5 +53,41 @@ function roleRequired(...roles) {
     next();
   };
 }
+const authenticateUser = async (req, res, next) => {
+  // Lấy header 'Authorization' từ request
+  const authHeader = req.headers.authorization;
 
-module.exports = { signAccessToken, signRefreshToken, authRequired, roleRequired };
+  // Kiểm tra xem có Authorization header không và có bắt đầu bằng "Bearer " không
+  if (!authHeader || !authHeader.startsWith("Bearer ")) {
+    return res.status(401).json({ message: "Missing token" });
+  }
+
+  // Tách token ra khỏi chuỗi "Bearer <token>"
+  const token = authHeader.split(" ")[1];
+
+  try {
+    // Giải mã và xác thực token bằng secret key
+    // Nếu token sai hoặc hết hạn => sẽ ném lỗi
+    const payload = jwt.verify(token, process.env.JWT_SECRET);
+
+    // Tìm người dùng tương ứng với ID trong payload, loại bỏ field 'password'
+    const user = await User.findById(payload.id).select("-password");
+
+    // Nếu không tìm thấy user trong DB => không hợp lệ
+    if (!user) {
+      return res.status(401).json({ message: "User not found" });
+    }
+
+    // Gắn thông tin user vào request để các middleware/controller khác có thể dùng
+    req.user = user;
+
+    // Cho phép request đi tiếp (qua middleware hoặc route handler kế tiếp)
+    next();
+
+  } catch (err) {
+    // Nếu có lỗi trong quá trình verify (token sai / hết hạn / lỗi DB)
+    return res.status(401).json({ message: "Invalid or expired token" });
+  }
+}
+
+module.exports = { signAccessToken, signRefreshToken, authRequired, roleRequired, authenticateUser };
