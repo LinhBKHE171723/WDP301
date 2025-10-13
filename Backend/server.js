@@ -1,5 +1,6 @@
 const app = require("./app");
 const dotenv = require("dotenv");
+console.log("LOADED ENV:", process.env.SMTP_USER);
 
 dotenv.config();
 

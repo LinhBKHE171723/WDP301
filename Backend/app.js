@@ -5,7 +5,7 @@ const morgan = require("morgan");
 const dotenv = require("dotenv");
 const seedDatabase = require("./utils/seed");
 const adminUserRoutes = require("./routes/admin.user.route");
-const adminFeedbackRoutes = require("./routes/admin.feedback.route");
+const authRoutes = require("./routes/auth.route");
 // load env
 dotenv.config();
 
@@ -20,7 +20,7 @@ app.use(morgan("dev"));
 mongoose
   .connect(process.env.MONGO_URI)
   .then(() => {
-    seedDatabase();
+    // seedDatabase();
     console.log("✅ MongoDB connected");
   })
   .catch((err) => console.error(" MongoDB connection error:", err));
@@ -30,7 +30,6 @@ app.get("/", (req, res) => {
   res.send("API is running...");
 });
 app.use("/api/admin", adminUserRoutes);
-app.use("/api/admin", adminFeedbackRoutes);
-
+app.use("/api/auth", authRoutes);
 // export app để server.js dùng
 module.exports = app;
