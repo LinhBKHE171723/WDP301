@@ -257,3 +257,33 @@
   color: #666;
   font-size: 12px;
 }
+
+.item-status {
+  color: #666;
+  font-size: 14px;
+  margin-top: 4px;
+}
+
+.status-badge {
+  padding: 4px 8px;
+  border-radius: 12px;
+  font-size: 12px;
+  font-weight: 600;
+  color: white;
+}
+
+.status-pending {
+  background-color: #ffc107;
+}
+
+.status-preparing {
+  background-color: #17a2b8;
+}
+
+.status-ready {
+  background-color: #28a745;
+}
+
+.status-served {
+  background-color: #6f42c1;
+}
