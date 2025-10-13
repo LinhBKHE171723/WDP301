@@ -196,7 +196,7 @@ const OrderStatus = ({ orderId, onBack }) => {
             )}
           </div>
           <button onClick={fetchOrderStatus} className="refresh-btn">
-            🔄 Cập nhật ngay
+            Cập nhật trạng thái đơn hàng
           </button>
         </div>
       </div>
