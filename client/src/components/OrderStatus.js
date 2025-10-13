@@ -74,9 +74,7 @@ const OrderStatus = ({ orderId, onBack }) => {
   const getStatusColor = (status) => {
     switch (status) {
       case 'pending':
-      case 'waiting_confirm':
         return '#ffc107';
-      case 'confirmed':
       case 'preparing':
         return '#17a2b8';
       case 'ready':
@@ -89,6 +87,21 @@ const OrderStatus = ({ orderId, onBack }) => {
         return '#dc3545';
       default:
         return '#6c757d';
+    }
+  };
+
+  const getItemStatusText = (status) => {
+    switch (status) {
+      case 'pending':
+        return 'Chờ xử lý';
+      case 'preparing':
+        return 'Đang chuẩn bị';
+      case 'ready':
+        return 'Sẵn sàng';
+      case 'served':
+        return 'Đã phục vụ';
+      default:
+        return status;
     }
   };
 
@@ -180,6 +193,13 @@ const OrderStatus = ({ orderId, onBack }) => {
                 {orderItem.itemType && (
                   <div className="item-type">
                     Loại: {orderItem.itemType === 'menu' ? 'Combo' : 'Món ăn'}
+                  </div>
+                )}
+                {orderItem.status && (
+                  <div className="item-status">
+                    Trạng thái: <span className={`status-badge status-${orderItem.status}`}>
+                      {getItemStatusText(orderItem.status)}
+                    </span>
                   </div>
                 )}
               </div>
