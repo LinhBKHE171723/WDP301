@@ -3,10 +3,10 @@ const router = express.Router();
 const feedbackController = require("../controllers/admin/feedback.controller");
 const { authRequired, roleRequired } = require("../middlewares/auth.middleware");
 
-router.use(authRequired, roleRequired("admin"));
+// router.use(authRequired, roleRequired("admin"));
 
-router.get("/feedbacks", feedbackController.getAll);
-router.get("/feedbacks/:id", feedbackController.getOne);
-router.delete("/feedbacks/:id", feedbackController.remove);
+router.get("/", feedbackController.getAll);
+router.get("/:id", feedbackController.getOne);
+router.delete("/:id", feedbackController.remove);
 
 module.exports = router;

@@ -8,9 +8,7 @@ exports.getAll = async ({ page = 1, limit = 10, rating, search }) => {
 
   // Tìm kiếm theo comment hoặc user.email hoặc user.name
   if (search) {
-    query.$or = [
-      { comment: { $regex: search, $options: "i" } },
-    ];
+    query.$or = [{ comment: { $regex: search, $options: "i" } }];
   }
 
   const skip = (page - 1) * limit;
@@ -22,9 +20,12 @@ exports.getAll = async ({ page = 1, limit = 10, rating, search }) => {
     })
     .populate({
       path: "orderId",
-      select: "_id createdAt",
-    })
-    .sort({ createdAt: -1 })
+      select: "_id createdAt servedBy",
+      populate: {
+        path: "servedBy",
+        select: "name email role",
+      },
+    }).sort({ createdAt: -1 })
     .skip(skip)
     .limit(Number(limit));
 

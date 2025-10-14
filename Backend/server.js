@@ -1,8 +1,8 @@
-const app = require("./app");
 const dotenv = require("dotenv");
-console.log("LOADED ENV:", process.env.SMTP_USER);
+dotenv.config();  // load env TRƯỚC
 
-dotenv.config();
+const app = require("./app");
+console.log("LOADED ENV:", process.env.SMTP_USER);  // giờ đã có giá trị
 
 const PORT = process.env.PORT || 5000;
 

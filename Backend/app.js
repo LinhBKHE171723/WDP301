@@ -6,6 +6,8 @@ const dotenv = require("dotenv");
 const seedDatabase = require("./utils/seed");
 const adminUserRoutes = require("./routes/admin.user.route");
 const authRoutes = require("./routes/auth.route");
+const adminFeedbackRoutes = require("./routes/admin.feedback.route");
+
 // load env
 dotenv.config();
 
@@ -29,6 +31,8 @@ mongoose
 app.get("/", (req, res) => {
   res.send("API is running...");
 });
+
+app.use("/api/admin/feedbacks", adminFeedbackRoutes);
 app.use("/api/admin", adminUserRoutes);
 app.use("/api/auth", authRoutes);
 // export app để server.js dùng

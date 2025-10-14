@@ -20,6 +20,12 @@ const userSchema = new Schema(
         return this.role === "customer" ? 0 : undefined;
       },
     },
+    accountStatus: {
+  type: String,
+  enum: ["active", "banned"],
+  default: "active"
+}
+
   },
   { timestamps: true }
 );
