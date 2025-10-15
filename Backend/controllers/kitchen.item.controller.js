@@ -141,73 +141,65 @@ exports.deleteItem = async (req, res) => {
   }
 };
 
+// --- Đánh dấu món ăn HẾT HÀNG ---
 exports.markItemUnavailable = async (req, res) => {
-  // 1. Lấy ID món ăn từ tham số URL
   const { itemId } = req.params;
-
-  // 2. Lấy lý do hết hàng từ Body (Tùy chọn, để phục vụ việc báo cáo sau này)
   const { reason } = req.body;
 
   try {
+    console.log("🧠 markItemUnavailable:", itemId);
     const item = await Item.findById(itemId);
-
-    if (!item) {
+    if (!item)
       return res.status(404).json({ message: "Không tìm thấy món ăn." });
-    }
 
-    // 3. Kiểm tra nếu món đã hết hàng rồi
-    if (item.isAvailable === false) {
-      return res.status(200).json({
-        message: `Món '${item.name}' đã được đánh dấu là hết hàng trước đó.`,
-        data: item,
-      });
-    }
+    if (!item.isAvailable)
+      return res
+        .status(200)
+        .json({ message: `Món '${item.name}' đã hết hàng.`, data: item });
 
-    // 4. Cập nhật trạng thái isAvailable
     item.isAvailable = false;
-    // Tùy chọn: Lưu lý do hết hàng vào một trường mới nếu bạn thêm vào Item model
-    // item.unavailableReason = reason;
-
     await item.save();
 
     res.status(200).json({
-      message: `Món '${item.name}' đã được đánh dấu là HẾT HÀNG (86) thành công.`,
-      data: {
-        itemId: item._id,
-        name: item.name,
-        isAvailable: item.isAvailable,
-        reason: reason || "Không rõ lý do",
-      },
-    });
-  } catch (error) {
-    console.error(error);
-    if (error.name === "CastError") {
-      return res.status(400).json({ message: "ID Món ăn không hợp lệ." });
-    }
-    res.status(500).json({
-      message: "Lỗi Server khi đánh dấu món hết hàng",
-      error: error.message,
-    });
-  }
-};
-
-// Hàm ngược lại để phục hồi món ăn (Tùy chọn)
-exports.markItemAvailable = async (req, res) => {
-  const { itemId } = req.params;
-  try {
-    const item = await Item.findByIdAndUpdate(
-      itemId,
-      { isAvailable: true },
-      { new: true }
-    );
-    if (!item) {
-      return res.status(404).json({ message: "Không tìm thấy món ăn." });
-    }
-    res.status(200).json({
-      message: `Món '${item.name}' đã được CUNG CẤP LẠI thành công.`,
+      message: `✅ Món '${item.name}' đã được đánh dấu là HẾT HÀNG.`,
       data: item,
     });
   } catch (error) {
-    res.status(500).json({ message: "Lỗi Server khi phục hồi món ăn." });
+    console.error("❌ markItemUnavailable ERROR:", error.message);
+    res
+      .status(500)
+      .json({
+        message: "Lỗi Server khi đánh dấu món hết hàng",
+        error: error.message,
+      });
+  }
+};
+
+// --- Đánh dấu món ăn CÒN HÀNG ---
+exports.markItemAvailable = async (req, res) => {
+  const { itemId } = req.params;
+  try {
+    console.log("🧠 markItemAvailable:", itemId);
+    const item = await Item.findByIdAndUpdate(
+      itemId,
+      { $set: { isAvailable: true } },
+      { new: true, runValidators: true }
+    );
+
+    if (!item)
+      return res.status(404).json({ message: "Không tìm thấy món ăn." });
+
+    res.status(200).json({
+      message: `✅ Món '${item.name}' đã được cung cấp lại.`,
+      data: item,
+    });
+  } catch (error) {
+    console.error("❌ markItemAvailable ERROR:", error.message);
+    res
+      .status(500)
+      .json({
+        message: "Lỗi Server khi phục hồi món ăn.",
+        error: error.message,
+      });
   }
 };

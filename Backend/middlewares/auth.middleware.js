@@ -1,57 +1,84 @@
-// backend/middleware/auth.middleware.js
-const jwt = require('jsonwebtoken');
+const jwt = require("jsonwebtoken");
 
 function signAccessToken(payload) {
   return jwt.sign(payload, process.env.JWT_SECRET, {
-    expiresIn: process.env.JWT_EXPIRES || '15m',
-  });
-}
-function signRefreshToken(payload) {
-  return jwt.sign(payload, process.env.REFRESH_SECRET, {
-    expiresIn: process.env.REFRESH_EXPIRES || '30d',
+    expiresIn: process.env.JWT_EXPIRES || "1d",
   });
 }
 
-// Helper lấy token từ nhiều nguồn, chấp nhận "Bearer"/"bearer"
+function signRefreshToken(payload) {
+  return jwt.sign(payload, process.env.REFRESH_SECRET, {
+    expiresIn: process.env.REFRESH_EXPIRES || "30d",
+  });
+}
+
 function extractToken(req) {
-  const h = req.headers.authorization || req.headers.Authorization || '';
-  const m = /^Bearer\s+(.+)$/i.exec(h);
-  if (m && m[1]) return m[1].trim();
-  // fallback khác nếu bạn dùng
-  if (req.headers['x-access-token']) return String(req.headers['x-access-token']).trim();
+  const authHeader = req.headers.authorization || "";
+  const match = /^Bearer\s+(.+)$/i.exec(authHeader);
+  if (match && match[1]) return match[1].trim();
+
   if (req.cookies?.accessToken) return req.cookies.accessToken;
+
   return null;
 }
 
 function authRequired(req, res, next) {
-  // Bỏ qua preflight CORS
-  if (req.method === 'OPTIONS') return next();
+  if (req.method === "OPTIONS") return next();
 
   const token = extractToken(req);
-  if (!token) return next({ status: 401, message: 'Unauthorized' });
+  if (!token) {
+    return next({ status: 401, message: "Yêu cầu cần token để xác thực." });
+  }
 
   try {
-    const payload = jwt.verify(token, process.env.JWT_SECRET);
-    // Chuẩn hoá user object để dùng nhất quán
+    const decoded = jwt.verify(token, process.env.JWT_SECRET);
+
     req.user = {
-      id: String(payload.id || payload.sub || ''),
-      role: payload.role,
-      email: payload.email,
-      raw: payload, // nếu cần debug thêm
+      id: String(decoded.id || ""),
+      role: decoded.role,
+      email: decoded.email,
     };
-    if (!req.user.id) return next({ status: 401, message: 'Invalid token payload' });
+
+    if (!req.user.id) {
+      return next({
+        status: 401,
+        message: "Token không chứa thông tin hợp lệ.",
+      });
+    }
+
     next();
-  } catch (e) {
-    return next({ status: 401, message: 'Invalid or expired token' });
+  } catch (err) {
+    console.error(err);
+    return next({
+      status: 401,
+      message: "Token không hợp lệ hoặc đã hết hạn.",
+    });
   }
 }
 
 function roleRequired(...roles) {
-  return (req, _res, next) => {
-    if (!req.user) return next({ status: 401, message: 'Unauthorized' });
-    if (!roles.includes(req.user.role)) return next({ status: 403, message: 'Forbidden' });
-    next();
+  return (req, res, next) => {
+    if (!req.user) {
+      return next({
+        status: 401,
+        message: "Không tìm thấy thông tin người dùng.",
+      });
+    }
+
+    if (!roles.includes(req.user.role)) {
+      return next({
+        status: 403,
+        message: "Bạn không có quyền truy cập tài nguyên này.",
+      });
+    }
+
+    next(); // Role hợp lệ, cho phép đi tiếp
   };
 }
 
-module.exports = { signAccessToken, signRefreshToken, authRequired, roleRequired };
+module.exports = {
+  signAccessToken,
+  signRefreshToken,
+  authRequired,
+  roleRequired,
+};
