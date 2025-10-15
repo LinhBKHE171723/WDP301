@@ -1,0 +1,35 @@
+const express = require("express");
+const router = express.Router();
+const {
+  getAvailableMenus,
+  getMenuById,
+  getAvailableItems,
+  getItemById,
+  createOrder,
+  getTableByNumber,
+  getOrderById
+} = require("../controllers/customer.controller");
+
+// Routes cho khách hàng (không cần authentication)
+// 1. Lấy thông tin bàn theo số bàn
+router.get("/table/:tableNumber", getTableByNumber);
+
+// 2. Lấy danh sách menu có sẵn
+router.get("/menus", getAvailableMenus);
+
+// 3. Lấy chi tiết menu
+router.get("/menus/:menuId", getMenuById);
+
+// 4. Lấy danh sách món ăn có sẵn
+router.get("/items", getAvailableItems);
+
+// 5. Lấy chi tiết món ăn
+router.get("/items/:itemId", getItemById);
+
+// 6. Tạo đơn hàng mới
+router.post("/orders", createOrder);
+
+// 7. Lấy thông tin đơn hàng theo ID
+router.get("/orders/:orderId", getOrderById);
+
+module.exports = router;

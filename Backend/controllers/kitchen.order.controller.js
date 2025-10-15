@@ -9,7 +9,7 @@ exports.getConfirmedOrders = async (req, res) => {
     // 2. Populate các thông tin cần thiết cho KDS:
     //    - orderItems: để biết có những món nào và trạng thái từng món
     //    - tableId: để biết order này của bàn nào
-    const orders = await Order.find({ status: "confirmed" })
+    const orders = await Order.find({ status: "confirm" })
       .populate({
         path: "orderItems",
         // Populate chi tiết Item (tên món ăn)
