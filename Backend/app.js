@@ -11,6 +11,7 @@ const adminUserRoutes = require("./routes/admin.user.route");
 const adminFeedbackRoutes = require("./routes/admin.feedback.route");
 const kitchenRoutes = require("./routes/kitchen.routes");
 const authRoutes = require("./routes/auth.route");
+const tableRoutes = require("./routes/admin.tablemap.route");
 // import middleware
 const authMiddleware = require("./middlewares/auth.middleware");
 
@@ -27,7 +28,7 @@ app.use(morgan("dev"));
 mongoose
   .connect(process.env.MONGO_URI)
   .then(() => {
-    seedDatabase();
+    // seedDatabase();
     console.log("✅ MongoDB connected");
   })
   .catch((err) => console.error(" MongoDB connection error:", err));
@@ -43,6 +44,10 @@ app.use("/api/auth", authRoutes);
 
 //chef
 app.use("/api/kitchen", kitchenRoutes);
+
+// table routes
+app.use("/api/tables", tableRoutes);
+
 
 // Protected example: get current user
 app.get("/api/users/me", authMiddleware.authenticateUser, (req, res) => {

@@ -1,25 +1,22 @@
-import logo from './logo.svg';
-import './App.css';
-
+import React from 'react'
+import { BrowserRouter, Routes, Route, Link } from 'react-router-dom'
+import TableMap from './components/waiter/TableMap'
+import TableDetail from './components/waiter/TableDetail'
 function App() {
   return (
-    <div className="App">
-      <header className="App-header">
-        <img src={logo} className="App-logo" alt="logo" />
-        <p>
-          Edit <code>src/App.js</code> and save to reload.
-        </p>
-        <a
-          className="App-link"
-          href="https://reactjs.org"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          Learn React
-        </a>
-      </header>
-    </div>
-  );
+     <BrowserRouter>
+      <div className="container">
+        <Routes>
+          <Route path="/tables" element={<TableMap />} />
+          <Route path="/tables/:id" element={<TableDetail />} />
+          <Route path="*" element={<div className="mt-5 text-center">
+            404 - Không tìm thấy trang
+            <Link to="/tables" className="btn btn-warning btn-sm ms-3">Quay về sơ đồ bàn</Link>
+            </div>} />
+        </Routes>
+      </div>
+    </BrowserRouter>
+  )
 }
 
-export default App;
+export default App

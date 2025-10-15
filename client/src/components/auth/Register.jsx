@@ -47,7 +47,7 @@ export default function Register({ onLogin }) {
   return (
     <div className="d-flex align-items-center justify-content-center min-vh-100 bg-light px-3">
       <div className="card shadow-lg p-4 w-100" style={{ maxWidth: "420px" }}>
-        <h3 className="text-center mb-4 fw-bold text-primary">Đăng ký tài khoản</h3>
+        <h3 className="text-center mb-4 fw-bold text-warning">Đăng ký tài khoản</h3>
 
         {err && (
           <div className="alert alert-danger text-center py-2">{err}</div>
@@ -104,7 +104,7 @@ export default function Register({ onLogin }) {
 
           <button
             type="submit"
-            className="btn btn-primary w-100 py-2 fw-semibold"
+            className="btn btn-warning w-100 py-2 fw-semibold"
             disabled={loading}
           >
             {loading ? "Đang đăng ký..." : "Đăng ký"}
@@ -115,7 +115,7 @@ export default function Register({ onLogin }) {
           <span className="text-muted">Đã có tài khoản?</span>{" "}
           <Link
             to="/login"
-            className="text-primary fw-semibold text-decoration-none"
+            className="text-warning fw-semibold text-decoration-none"
           >
             Đăng nhập ngay
           </Link>

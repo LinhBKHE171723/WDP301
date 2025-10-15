@@ -24,7 +24,7 @@ export default function Login() {
   return (
     <div className="d-flex align-items-center justify-content-center min-vh-100 bg-light px-3">
       <div className="card shadow-lg p-4 w-100" style={{ maxWidth: "420px" }}>
-        <h3 className="text-center mb-4 fw-bold text-primary">Đăng nhập</h3>
+        <h3 className="text-center mb-4 fw-bold text-warning">Đăng nhập</h3>
 
         {error && (
           <div className="alert alert-danger text-center py-2">{error}</div>
@@ -57,7 +57,7 @@ export default function Login() {
 
           <button
             type="submit"
-            className="btn btn-primary w-100 py-2 fw-semibold"
+            className="btn btn-warning w-100 py-2 fw-semibold"
           >
             Đăng nhập
           </button>
@@ -65,7 +65,7 @@ export default function Login() {
 
         <div className="text-center mt-3">
           <span className="text-muted">Chưa có tài khoản?</span>{" "}
-          <Link to="/register" className="text-primary fw-semibold text-decoration-none">
+          <Link to="/register" className="text-warning fw-semibold text-decoration-none">
             Đăng ký ngay
           </Link>
         </div>
