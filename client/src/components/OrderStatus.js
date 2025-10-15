@@ -308,27 +308,6 @@ const OrderStatus = ({ orderId, onBack }) => {
     }
   };
 
-  const handleCancelItem = async (orderItemId) => {
-    if (!window.confirm('Bạn có chắc chắn muốn hủy món này?')) {
-      return;
-    }
-
-    try {
-      const response = await fetch(`http://localhost:5000/api/customer/orders/${orderId}/items/${orderItemId}`, {
-        method: 'DELETE'
-      });
-
-      const data = await response.json();
-      if (data.success) {
-        setOrder(data.data);
-      } else {
-        alert('Lỗi hủy món: ' + data.message);
-      }
-    } catch (err) {
-      alert('Lỗi hủy món');
-    }
-  };
-
   if (loading) {
     return (
       <div className="order-status-container">
@@ -452,24 +431,6 @@ const OrderStatus = ({ orderId, onBack }) => {
                     </div>
                   </div>
                 </div>
-                
-                {Object.keys(groupedItem.statusCounts).includes('pending') && 
-                 order.status !== 'paid' && 
-                 order.status !== 'cancelled' && (
-                  <div className="item-actions">
-                    <button 
-                      onClick={() => {
-                        const pendingItems = groupedItem.orderItems.filter(item => item.status === 'pending');
-                        if (pendingItems.length > 0) {
-                          pendingItems.forEach(item => handleCancelItem(item._id));
-                        }
-                      }}
-                      className="cancel-item-btn"
-                    >
-                      Hủy món
-                    </button>
-                  </div>
-                )}
               </div>
             ))}
           </div>

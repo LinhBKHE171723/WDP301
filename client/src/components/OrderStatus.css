@@ -383,51 +383,6 @@
 }
 
 
-/* Item Actions */
-.item-actions {
-  margin-top: 8px;
-  display: flex;
-  justify-content: flex-end;
-}
-
-.cancel-item-btn {
-  background: #dc3545;
-  color: white;
-  border: none;
-  padding: 6px 12px;
-  border-radius: 4px;
-  cursor: pointer;
-  font-size: 12px;
-  font-weight: 600;
-  transition: all 0.3s ease;
-}
-
-.item-actions {
-  margin-top: 15px;
-  padding-top: 15px;
-  border-top: 1px solid #f0f0f0;
-  text-align: right;
-}
-
-.cancel-item-btn {
-  background: linear-gradient(135deg, #dc3545, #c82333);
-  color: white;
-  border: none;
-  padding: 10px 20px;
-  border-radius: 8px;
-  cursor: pointer;
-  font-size: 14px;
-  font-weight: 600;
-  transition: all 0.3s ease;
-  box-shadow: 0 2px 4px rgba(220, 53, 69, 0.3);
-}
-
-.cancel-item-btn:hover {
-  background: linear-gradient(135deg, #c82333, #bd2130);
-  transform: translateY(-1px);
-  box-shadow: 0 4px 8px rgba(220, 53, 69, 0.4);
-}
-
 /* Add Items Modal */
 .add-items-modal {
   position: fixed;
@@ -816,10 +771,6 @@
   .status-badges-container {
     width: 100%;
     justify-content: flex-start;
-  }
-  
-  .item-actions {
-    text-align: left;
   }
   
   .order-item {
