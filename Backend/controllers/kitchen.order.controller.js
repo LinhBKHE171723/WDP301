@@ -94,6 +94,12 @@ exports.startPreparingOrder = async (req, res) => {
       })
       .populate("tableId", "number");
 
+    // Emit WebSocket event để cập nhật real-time
+    const io = req.app.get("io");
+    if (io) {
+      io.to(`order-${orderId}`).emit("order-updated", updatedOrder);
+    }
+
     res.status(200).json({
       message: `Order ID: ${orderId} đã được chuyển sang trạng thái 'preparing' và các món đã sẵn sàng để chế biến.`,
       data: updatedOrder,
@@ -151,6 +157,15 @@ exports.assignChefToItem = async (req, res) => {
     const populatedItem = await OrderItem.findById(orderItemId)
       .populate("assignedChef", "name username")
       .populate("itemId", "name");
+
+    // Emit WebSocket event để cập nhật real-time
+    const order = await Order.findById(orderItem.orderId)
+      .populate("orderItems")
+      .populate("tableId", "tableNumber");
+    const io = req.app.get("io");
+    if (io) {
+      io.to(`order-${orderItem.orderId}`).emit("order-updated", order);
+    }
 
     res.status(200).json({
       message: `Món '${populatedItem.itemId.name}' đã được phân công cho ${chefToAssign.name}.`,
@@ -338,6 +353,15 @@ exports.markItemReady = async (req, res) => {
       "itemId",
       "name"
     );
+
+    // Emit WebSocket event để cập nhật real-time
+    const fullOrder = await Order.findById(order._id)
+      .populate("orderItems")
+      .populate("tableId", "tableNumber");
+    const io = req.app.get("io");
+    if (io) {
+      io.to(`order-${order._id}`).emit("order-updated", fullOrder);
+    }
 
     res.status(200).json({
       message: `Món '${populatedItem.itemId.name}' đã hoàn thành và sẵn sàng phục vụ.`,

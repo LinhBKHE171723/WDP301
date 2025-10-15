@@ -5,14 +5,13 @@ const orderSchema = new Schema(
   {
     userId: { type: Schema.Types.ObjectId, ref: "User" }, // khách hàng
     servedBy: { type: Schema.Types.ObjectId, ref: "User" }, // nhân viên phục vụ
-    tableId: { type: Schema.Types.ObjectId, ref: "Table" },
+    tableId: { type: Schema.Types.ObjectId, ref: "Table", default: null }, // Will be assigned by staff later
     orderItems: [{ type: Schema.Types.ObjectId, ref: "OrderItem" }],
     paymentId: { type: Schema.Types.ObjectId, ref: "Payment" },
     status: {
       type: String,
       enum: [
         "pending",
-        "waiting_confirm",
         "confirmed",
         "preparing",
         "ready",

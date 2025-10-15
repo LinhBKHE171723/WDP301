@@ -3,7 +3,7 @@ import ItemDetail from './ItemDetail';
 import OrderStatus from './OrderStatus';
 import './MenuView.css';
 
-const MenuView = ({ table, onBack }) => {
+const MenuView = () => {
   const [menus, setMenus] = useState([]);
   const [items, setItems] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -173,7 +173,6 @@ const MenuView = ({ table, onBack }) => {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          tableId: table._id,
           orderItems: orderItems,
           customerName: "Khách vãng lai",
           customerPhone: ""
@@ -226,14 +225,10 @@ const MenuView = ({ table, onBack }) => {
       <header className="menu-header">
         <div className="header-info">
           <h1>Thực đơn nhà hàng</h1>
-          <p>Bàn số: {table.tableNumber}</p>
         </div>
         <div className="header-actions">
           <button onClick={() => setShowCart(true)} className="cart-btn">
             Giỏ hàng ({cart.length})
-          </button>
-          <button onClick={onBack} className="back-btn">
-            Đổi bàn
           </button>
         </div>
       </header>

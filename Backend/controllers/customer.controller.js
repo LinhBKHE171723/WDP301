@@ -146,26 +146,33 @@ exports.createOrder = async (req, res) => {
   try {
     const { tableId, orderItems, customerName, customerPhone } = req.body;
 
-    // Kiểm tra bàn có tồn tại không
-    const table = await Table.findById(tableId);
-    if (!table) {
-      return res.status(404).json({ 
-        success: false, 
-        message: "Không tìm thấy bàn" 
-      });
+    // Kiểm tra bàn có tồn tại không (chỉ khi có tableId)
+    if (tableId) {
+      const table = await Table.findById(tableId);
+      if (!table) {
+        return res.status(404).json({ 
+          success: false, 
+          message: "Không tìm thấy bàn" 
+        });
+      }
     }
 
-    // Tạo OrderItems
+    // Tạo OrderItems (không merge ở DB để có thể track từng suất riêng biệt)
     const createdOrderItems = [];
     let totalAmount = 0;
 
+    console.log('📦 Creating order items:', orderItems);
+
     for (const orderItem of orderItems) {
       let item;
+      
+      console.log('🔍 Processing order item:', orderItem);
       
       // Kiểm tra type để xác định tìm trong Menu hay Item
       if (orderItem.type === 'menu') {
         item = await Menu.findById(orderItem.itemId);
         if (!item) {
+          console.log('❌ Menu not found:', orderItem.itemId);
           return res.status(404).json({ 
             success: false, 
             message: `Không tìm thấy menu với ID: ${orderItem.itemId}` 
@@ -174,6 +181,7 @@ exports.createOrder = async (req, res) => {
       } else {
         item = await Item.findById(orderItem.itemId);
         if (!item) {
+          console.log('❌ Item not found:', orderItem.itemId);
           return res.status(404).json({ 
             success: false, 
             message: `Không tìm thấy món ăn với ID: ${orderItem.itemId}` 
@@ -181,19 +189,30 @@ exports.createOrder = async (req, res) => {
         }
       }
 
-      const newOrderItem = new OrderItem({
-        itemId: orderItem.itemId,
-        itemName: item.name,
-        itemType: orderItem.type,
-        quantity: orderItem.quantity,
-        price: item.price,
-        note: orderItem.note || "",
-      });
+      console.log('✅ Found item:', item.name, 'Price:', item.price);
 
-      await newOrderItem.save();
-      createdOrderItems.push(newOrderItem._id);
-      totalAmount += item.price * orderItem.quantity;
+      // Tạo OrderItem riêng biệt cho mỗi suất (quantity = 1)
+      for (let i = 0; i < orderItem.quantity; i++) {
+        const newOrderItem = new OrderItem({
+          itemId: orderItem.itemId,
+          itemName: item.name,
+          itemType: orderItem.type,
+          quantity: 1, // Mỗi OrderItem chỉ có quantity = 1
+          price: item.price,
+          note: orderItem.note || "",
+        });
+
+        console.log('💾 Saving order item:', newOrderItem);
+        await newOrderItem.save();
+        console.log('✅ Order item saved with ID:', newOrderItem._id);
+        
+        createdOrderItems.push(newOrderItem._id);
+        totalAmount += item.price;
+      }
     }
+
+    console.log('📋 Created order items:', createdOrderItems);
+    console.log('💰 Total amount:', totalAmount);
 
     // Tạo Payment
     const payment = new Payment({
@@ -217,12 +236,15 @@ exports.createOrder = async (req, res) => {
     });
 
     await order.save();
+    console.log('✅ Order saved with ID:', order._id);
 
     // Cập nhật OrderItems với orderId
-    await OrderItem.updateMany(
+    console.log('🔗 Updating order items with orderId:', order._id);
+    const updateResult = await OrderItem.updateMany(
       { _id: { $in: createdOrderItems } },
       { orderId: order._id }
     );
+    console.log('✅ Order items updated:', updateResult);
 
     // Cập nhật Payment với orderId
     payment.orderId = order._id;
@@ -233,6 +255,12 @@ exports.createOrder = async (req, res) => {
       .populate("orderItems")
       .populate("tableId")
       .populate("paymentId");
+
+    // Emit WebSocket event để cập nhật real-time
+    const io = req.app.get("io");
+    if (io) {
+      io.to(`order-${order._id}`).emit("order-updated", populatedOrder);
+    }
 
     res.status(201).json({
       success: true,
@@ -284,6 +312,188 @@ exports.getOrderById = async (req, res) => {
     res.status(500).json({
       success: false,
       message: error.message
+    });
+  }
+};
+
+// Thêm món mới vào order hiện có
+exports.addItemsToOrder = async (req, res) => {
+  try {
+    const { orderId } = req.params;
+    const { orderItems } = req.body;
+
+    // Kiểm tra order tồn tại
+    const order = await Order.findById(orderId);
+    if (!order) {
+      return res.status(404).json({
+        success: false,
+        message: "Không tìm thấy đơn hàng"
+      });
+    }
+
+    // Kiểm tra order chưa bị hủy
+    if (order.status === 'cancelled') {
+      return res.status(400).json({
+        success: false,
+        message: "Không thể thêm món vào đơn hàng đã bị hủy"
+      });
+    }
+
+    // Tạo OrderItems mới (mỗi suất là 1 OrderItem riêng biệt)
+    const createdOrderItems = [];
+    let additionalAmount = 0;
+
+    for (const orderItem of orderItems) {
+      let item;
+      
+      // Kiểm tra type để xác định tìm trong Menu hay Item
+      if (orderItem.type === 'menu') {
+        item = await Menu.findById(orderItem.itemId);
+        if (!item) {
+          return res.status(404).json({ 
+            success: false, 
+            message: `Không tìm thấy menu với ID: ${orderItem.itemId}` 
+          });
+        }
+      } else {
+        item = await Item.findById(orderItem.itemId);
+        if (!item) {
+          return res.status(404).json({ 
+            success: false, 
+            message: `Không tìm thấy món ăn với ID: ${orderItem.itemId}` 
+          });
+        }
+      }
+
+      // Tạo OrderItem riêng biệt cho mỗi suất (quantity = 1)
+      for (let i = 0; i < orderItem.quantity; i++) {
+        const newOrderItem = new OrderItem({
+          orderId: orderId,
+          itemId: orderItem.itemId,
+          itemName: item.name,
+          itemType: orderItem.type,
+          quantity: 1, // Mỗi OrderItem chỉ có quantity = 1
+          price: item.price,
+          status: "pending",
+          note: orderItem.note || "",
+        });
+
+        await newOrderItem.save();
+        createdOrderItems.push(newOrderItem._id);
+        additionalAmount += item.price;
+        console.log(`➕ Added new item: ${item.name} (suất ${i + 1})`);
+      }
+    }
+
+    // Cập nhật order với orderItems mới và totalAmount
+    order.orderItems.push(...createdOrderItems);
+    order.totalAmount += additionalAmount;
+    await order.save();
+
+    // Cập nhật Payment với totalAmount mới
+    const payment = await Payment.findById(order.paymentId);
+    if (payment) {
+      payment.totalAmount = order.totalAmount;
+      await payment.save();
+    }
+
+    // Populate để trả về thông tin đầy đủ
+    const populatedOrder = await Order.findById(order._id)
+      .populate("orderItems")
+      .populate("tableId")
+      .populate("paymentId");
+
+    // Emit WebSocket event để cập nhật real-time
+    const io = req.app.get("io");
+    if (io) {
+      io.to(`order-${order._id}`).emit("order-updated", populatedOrder);
+    }
+
+    res.status(200).json({
+      success: true,
+      message: "Thêm món thành công",
+      data: populatedOrder
+    });
+  } catch (error) {
+    res.status(500).json({ 
+      success: false, 
+      message: error.message 
+    });
+  }
+};
+
+// Hủy món có status pending
+exports.cancelOrderItem = async (req, res) => {
+  try {
+    const { orderId, orderItemId } = req.params;
+
+    // Kiểm tra order tồn tại
+    const order = await Order.findById(orderId);
+    if (!order) {
+      return res.status(404).json({
+        success: false,
+        message: "Không tìm thấy đơn hàng"
+      });
+    }
+
+    // Kiểm tra orderItem tồn tại và thuộc về order này
+    const orderItem = await OrderItem.findById(orderItemId);
+    if (!orderItem || orderItem.orderId.toString() !== orderId) {
+      return res.status(404).json({
+        success: false,
+        message: "Không tìm thấy món trong đơn hàng"
+      });
+    }
+
+    // Kiểm tra orderItem có status pending
+    if (orderItem.status !== 'pending') {
+      return res.status(400).json({
+        success: false,
+        message: "Chỉ có thể hủy món có trạng thái chờ xử lý"
+      });
+    }
+
+    // Tính toán amount cần trừ
+    const itemAmount = orderItem.price * orderItem.quantity;
+
+    // Xóa orderItem khỏi DB
+    await OrderItem.findByIdAndDelete(orderItemId);
+
+    // Remove khỏi order.orderItems array
+    order.orderItems = order.orderItems.filter(id => id.toString() !== orderItemId);
+    
+    // Cập nhật totalAmount
+    order.totalAmount -= itemAmount;
+    await order.save();
+
+    // Cập nhật Payment với totalAmount mới
+    const payment = await Payment.findById(order.paymentId);
+    if (payment) {
+      payment.totalAmount = order.totalAmount;
+      await payment.save();
+    }
+
+    // Populate để trả về thông tin đầy đủ
+    const populatedOrder = await Order.findById(order._id)
+      .populate("orderItems")
+      .populate("tableId")
+      .populate("paymentId");
+
+    // Emit WebSocket event để cập nhật real-time
+    const io = req.app.get("io");
+    if (io) {
+      io.to(`order-${order._id}`).emit("order-updated", populatedOrder);
+    }
+
+    res.status(200).json({
+      success: true,
+      message: "Hủy món thành công",
+      data: populatedOrder
+    });
+  } catch (error) {
+    res.status(500).json({ 
+      success: false, 
+      message: error.message 
     });
   }
 };
