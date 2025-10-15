@@ -94,12 +94,6 @@ exports.startPreparingOrder = async (req, res) => {
       })
       .populate("tableId", "number");
 
-    // Emit WebSocket event để cập nhật real-time
-    const io = req.app.get("io");
-    if (io) {
-      io.to(`order-${orderId}`).emit("order-updated", updatedOrder);
-    }
-
     res.status(200).json({
       message: `Order ID: ${orderId} đã được chuyển sang trạng thái 'preparing' và các món đã sẵn sàng để chế biến.`,
       data: updatedOrder,

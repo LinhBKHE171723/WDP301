@@ -403,12 +403,6 @@ exports.addItemsToOrder = async (req, res) => {
       .populate("tableId")
       .populate("paymentId");
 
-    // Emit WebSocket event để cập nhật real-time
-    const io = req.app.get("io");
-    if (io) {
-      io.to(`order-${order._id}`).emit("order-updated", populatedOrder);
-    }
-
     res.status(200).json({
       success: true,
       message: "Thêm món thành công",
@@ -478,12 +472,6 @@ exports.cancelOrderItem = async (req, res) => {
       .populate("orderItems")
       .populate("tableId")
       .populate("paymentId");
-
-    // Emit WebSocket event để cập nhật real-time
-    const io = req.app.get("io");
-    if (io) {
-      io.to(`order-${order._id}`).emit("order-updated", populatedOrder);
-    }
 
     res.status(200).json({
       success: true,
