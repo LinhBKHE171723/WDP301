@@ -1,5 +1,4 @@
-import React, { useState, useEffect } from 'react';
-import { io } from 'socket.io-client';
+import React, { useState, useEffect, useCallback } from 'react';
 import './OrderStatus.css';
 
 const OrderStatus = ({ orderId, onBack }) => {
@@ -7,60 +6,52 @@ const OrderStatus = ({ orderId, onBack }) => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [lastUpdated, setLastUpdated] = useState(null);
-  const [connectionStatus, setConnectionStatus] = useState('connecting');
   const [showAddItemsModal, setShowAddItemsModal] = useState(false);
   const [menus, setMenus] = useState([]);
   const [items, setItems] = useState([]);
   const [tempCart, setTempCart] = useState([]);
   const [activeTab, setActiveTab] = useState('menus');
 
+  const fetchOrderStatusSilent = useCallback(async () => {
+    try {
+      const response = await fetch(`http://localhost:5000/api/customer/orders/${orderId}`);
+      const data = await response.json();
+
+      if (data.success) {
+        if (JSON.stringify(data.data) !== JSON.stringify(order)) {
+          setOrder(data.data);
+          setLastUpdated(new Date());
+        }
+      }
+    } catch (err) {
+      console.error('Silent fetch error:', err);
+    }
+  }, [orderId, order]);
+
   useEffect(() => {
     if (!orderId) return;
-
-    // Fetch dữ liệu ban đầu
     fetchOrderStatus();
-
-    // Kết nối Socket.IO
-    const socket = io('http://localhost:5000');
-
-    // Xử lý kết nối thành công
-    socket.on('connect', () => {
-      console.log('✅ Connected to server');
-      setConnectionStatus('connected');
-      setError('');
-      
-      // Join vào room của order này
-      socket.emit('join-order', orderId);
-    });
-
-    // Lắng nghe event cập nhật order
-    socket.on('order-updated', (updatedOrder) => {
-      console.log('📦 Order updated:', updatedOrder);
-      setOrder(updatedOrder);
-      setLastUpdated(new Date());
-    });
-
-    // Xử lý lỗi kết nối
-    socket.on('connect_error', (error) => {
-      console.error('❌ Connection error:', error);
-      setConnectionStatus('disconnected');
-      setError('Mất kết nối với server. Đang thử kết nối lại...');
-    });
-
-    // Xử lý reconnect
-    socket.on('reconnect', () => {
-      console.log('🔄 Reconnected to server');
-      setConnectionStatus('connected');
-      setError('');
-      fetchOrderStatus(); // Fetch lại dữ liệu mới nhất
-      socket.emit('join-order', orderId);
-    });
-
-    // Cleanup khi unmount
-    return () => {
-      socket.disconnect();
-    };
   }, [orderId]);
+
+  useEffect(() => {
+    let intervalId;
+    
+    const startPolling = () => {
+      if (order && order.status !== 'paid' && order.status !== 'cancelled') {
+        intervalId = setInterval(() => {
+          fetchOrderStatusSilent();
+        }, 5000);
+      }
+    };
+
+    startPolling();
+
+    return () => {
+      if (intervalId) {
+        clearInterval(intervalId);
+      }
+    };
+  }, [orderId, order?.status, fetchOrderStatusSilent]);
 
   const fetchOrderStatus = async () => {
     try {
@@ -136,7 +127,6 @@ const OrderStatus = ({ orderId, onBack }) => {
     }
   };
 
-  // Group order items by itemId and itemType để hiển thị gộp
   const groupOrderItems = (orderItems) => {
     const grouped = {};
     
@@ -168,7 +158,6 @@ const OrderStatus = ({ orderId, onBack }) => {
     return Object.values(grouped);
   };
 
-  // Get status text for grouped items
   const getGroupedStatusText = (statusCounts) => {
     const statuses = Object.keys(statusCounts);
     if (statuses.length === 1) {
@@ -181,7 +170,6 @@ const OrderStatus = ({ orderId, onBack }) => {
     ).join(', ');
   };
 
-  // Fetch menus and items for add items modal
   const fetchMenuAndItems = async () => {
     try {
       const [menusRes, itemsRes] = await Promise.all([
@@ -203,20 +191,17 @@ const OrderStatus = ({ orderId, onBack }) => {
     }
   };
 
-  // Handle opening add items modal
   const handleAddMoreItems = () => {
     setShowAddItemsModal(true);
     setTempCart([]);
     fetchMenuAndItems();
   };
 
-  // Handle closing add items modal
   const handleCloseAddItemsModal = () => {
     setShowAddItemsModal(false);
     setTempCart([]);
   };
 
-  // Add item to temp cart
   const addToTempCart = (item, type = 'item', quantity = 1) => {
     const cartItem = {
       id: item._id,
@@ -244,7 +229,6 @@ const OrderStatus = ({ orderId, onBack }) => {
     setTempCart(prevCart => prevCart.filter(item => item.id !== itemId));
   };
 
-  // Update quantity in temp cart
   const updateTempCartQuantity = (itemId, newQuantity) => {
     if (newQuantity <= 0) {
       removeFromTempCart(itemId);
@@ -296,8 +280,6 @@ const OrderStatus = ({ orderId, onBack }) => {
   };
 
 
-  // Cancel order item
-  // Hủy toàn bộ đơn hàng
   const handleCancelOrder = async () => {
     if (!window.confirm('Bạn có chắc chắn muốn hủy đơn hàng này?')) {
       return;
@@ -477,7 +459,6 @@ const OrderStatus = ({ orderId, onBack }) => {
                   <div className="item-actions">
                     <button 
                       onClick={() => {
-                        // Hủy tất cả OrderItem pending của món này
                         const pendingItems = groupedItem.orderItems.filter(item => item.status === 'pending');
                         if (pendingItems.length > 0) {
                           pendingItems.forEach(item => handleCancelItem(item._id));
