@@ -9,7 +9,8 @@ const {
   getTableByNumber,
   getOrderById,
   addItemsToOrder,
-  cancelOrderItem
+  cancelOrderItem,
+  updateOrderStatus
 } = require("../controllers/customer.controller");
 
 // Routes cho khách hàng (không cần authentication)
@@ -39,5 +40,8 @@ router.post("/orders/:orderId/items", addItemsToOrder);
 
 // 9. Hủy món có status pending
 router.delete("/orders/:orderId/items/:orderItemId", cancelOrderItem);
+
+// 10. Cập nhật trạng thái đơn hàng
+router.put("/orders/:orderId", updateOrderStatus);
 
 module.exports = router;

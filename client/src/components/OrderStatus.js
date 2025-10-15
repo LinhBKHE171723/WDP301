@@ -297,6 +297,35 @@ const OrderStatus = ({ orderId, onBack }) => {
 
 
   // Cancel order item
+  // Hủy toàn bộ đơn hàng
+  const handleCancelOrder = async () => {
+    if (!window.confirm('Bạn có chắc chắn muốn hủy đơn hàng này?')) {
+      return;
+    }
+
+    try {
+      const response = await fetch(`http://localhost:5000/api/customer/orders/${orderId}`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          status: 'cancelled'
+        })
+      });
+
+      const data = await response.json();
+      if (data.success) {
+        setOrder(data.data);
+        alert('Đã hủy đơn hàng thành công');
+      } else {
+        alert('Lỗi hủy đơn hàng: ' + data.message);
+      }
+    } catch (err) {
+      alert('Lỗi hủy đơn hàng');
+    }
+  };
+
   const handleCancelItem = async (orderItemId) => {
     if (!window.confirm('Bạn có chắc chắn muốn hủy món này?')) {
       return;
@@ -357,9 +386,15 @@ const OrderStatus = ({ orderId, onBack }) => {
       <div className="order-status-card">
         <div className="header">
           <h2>Trạng thái đơn hàng</h2>
-          <button onClick={onBack} className="back-btn">
-            ← Quay lại
-          </button>
+          {order.status === 'pending' ? (
+            <button onClick={handleCancelOrder} className="cancel-order-btn">
+              Hủy đơn
+            </button>
+          ) : order.status === 'paid' || order.status === 'cancelled' ? (
+            <button onClick={onBack} className="back-btn">
+              ← Quay lại menu
+            </button>
+          ) : null}
         </div>
 
         <div className="order-info">
@@ -378,7 +413,7 @@ const OrderStatus = ({ orderId, onBack }) => {
         </div>
 
         <div className="status-section">
-          <h3>Trạng thái hiện tại</h3>
+          <h3>Trạng thái đơn hàng</h3>
           <div 
             className="current-status"
             style={{ backgroundColor: getStatusColor(order.status) }}
@@ -390,7 +425,7 @@ const OrderStatus = ({ orderId, onBack }) => {
         <div className="order-items">
           <div className="order-items-header">
             <h3>Món đã đặt</h3>
-            {order.status === 'pending' && (
+            {order.status !== 'paid' && order.status !== 'cancelled' && (
               <button onClick={handleAddMoreItems} className="add-more-btn">
                 + Gọi thêm món
               </button>
@@ -399,28 +434,46 @@ const OrderStatus = ({ orderId, onBack }) => {
           <div className="items-list">
             {groupOrderItems(order.orderItems || []).map((groupedItem, index) => (
               <div key={index} className="order-item">
-                <div className="item-info">
-                  <span className="item-name">
+                <div className="item-header">
+                  <div className="item-name">
                     {groupedItem.itemName || 'Món ăn'}
-                  </span>
-                  <span className="item-price">
-                    {groupedItem.price?.toLocaleString('vi-VN')} VNĐ
-                  </span>
-                </div>
-                <div className="item-quantity">
-                  Số lượng: {groupedItem.totalQuantity}
-                </div>
-                {groupedItem.itemType && (
-                  <div className="item-type">
-                    Loại: {groupedItem.itemType === 'menu' ? 'Combo' : 'Món ăn'}
                   </div>
-                )}
-                <div className="item-status">
-                  Trạng thái: <span className={`status-badge status-${Object.keys(groupedItem.statusCounts)[0]}`}>
-                    {getGroupedStatusText(groupedItem.statusCounts)}
-                  </span>
+                  <div className="item-type-badge">
+                    {groupedItem.itemType === 'menu' ? 'Combo' : 'Món ăn'}
+                  </div>
                 </div>
-                {Object.keys(groupedItem.statusCounts).includes('pending') && (
+                
+                <div className="item-details">
+                  <div className="price-info">
+                    <div className="unit-price">
+                      <span className="label">Đơn giá:</span>
+                      <span className="value">{groupedItem.price?.toLocaleString('vi-VN')} VNĐ</span>
+                    </div>
+                    <div className="quantity-info">
+                      <span className="label">Số lượng:</span>
+                      <span className="value">{groupedItem.totalQuantity}</span>
+                    </div>
+                    <div className="total-price">
+                      <span className="label">Thành tiền:</span>
+                      <span className="value">{(groupedItem.price * groupedItem.totalQuantity)?.toLocaleString('vi-VN')} VNĐ</span>
+                    </div>
+                  </div>
+                  
+                  <div className="item-status-section">
+                    <span className="status-label">Trạng thái:</span>
+                    <div className="status-badges-container">
+                      {Object.entries(groupedItem.statusCounts).map(([status, count]) => (
+                        <span key={status} className={`status-badge status-${status}`}>
+                          {getItemStatusText(status)}: {count}
+                        </span>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+                
+                {Object.keys(groupedItem.statusCounts).includes('pending') && 
+                 order.status !== 'paid' && 
+                 order.status !== 'cancelled' && (
                   <div className="item-actions">
                     <button 
                       onClick={() => {
@@ -450,7 +503,7 @@ const OrderStatus = ({ orderId, onBack }) => {
             )}
           </div>
           <button onClick={fetchOrderStatus} className="refresh-btn">
-            Cập nhật thủ công
+            Cập nhật trạng thái
           </button>
         </div>
       </div>

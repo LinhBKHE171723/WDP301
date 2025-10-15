@@ -497,3 +497,53 @@ exports.cancelOrderItem = async (req, res) => {
     });
   }
 };
+
+// Update order status
+exports.updateOrderStatus = async (req, res) => {
+  try {
+    const { orderId } = req.params;
+    const { status } = req.body;
+
+    // Validate status
+    const validStatuses = ['pending', 'confirmed', 'preparing', 'ready', 'served', 'cancelled'];
+    if (!validStatuses.includes(status)) {
+      return res.status(400).json({
+        success: false,
+        message: "Trạng thái không hợp lệ"
+      });
+    }
+
+    // Find and update order
+    const order = await Order.findByIdAndUpdate(
+      orderId,
+      { status },
+      { new: true }
+    ).populate("orderItems")
+     .populate("tableId")
+     .populate("paymentId");
+
+    if (!order) {
+      return res.status(404).json({
+        success: false,
+        message: "Không tìm thấy đơn hàng"
+      });
+    }
+
+    // Emit WebSocket event để cập nhật real-time
+    const io = req.app.get("io");
+    if (io) {
+      io.to(`order-${order._id}`).emit("order-updated", order);
+    }
+
+    res.status(200).json({
+      success: true,
+      message: "Cập nhật trạng thái đơn hàng thành công",
+      data: order
+    });
+  } catch (error) {
+    res.status(500).json({ 
+      success: false, 
+      message: error.message 
+    });
+  }
+};
