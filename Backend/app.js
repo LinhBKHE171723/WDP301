@@ -8,7 +8,7 @@ const adminUserRoutes = require("./routes/admin.user.route");
 const adminFeedbackRoutes = require("./routes/admin.feedback.route");
 const kitchenRoutes = require("./routes/kitchen.routes");
 const customerRoutes = require("./routes/customer.routes");
-
+const authRoutes = require("./routes/auth.route");
 // load env
 dotenv.config();
 
@@ -18,11 +18,12 @@ const app = express();
 app.use(cors());
 app.use(express.json());
 app.use(morgan("dev"));
+app.disable("etag");
 
 // connect to MongoDB
 mongoose
   // .connect(process.env.MONGO_URI)
-  .connect("mongodb://localhost:27017/restaurantDB")
+  .connect(process.env.MONGO_URI)
   .then(() => {
     seedDatabase();
     console.log("✅ MongoDB connected");
@@ -33,6 +34,9 @@ mongoose
 app.get("/", (req, res) => {
   res.send("API is running...");
 });
+//auth
+app.use("/api/auth", authRoutes);
+//admin
 app.use("/api/admin", adminUserRoutes);
 app.use("/api/admin", adminFeedbackRoutes);
 
@@ -43,4 +47,3 @@ app.use("/api/customer", customerRoutes);
 
 // export app để server.js dùng
 module.exports = app;
-
