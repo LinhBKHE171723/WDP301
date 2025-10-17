@@ -20,6 +20,7 @@ const userSchema = new mongoose.Schema(
       unique: true,
       trim: true,
       match: [
+        // Regex kiểm tra định dạng email hợp lệ
         /^\w+([\.-]?\w+)*@\w+([\.-]?\w+)*(\.\w{2,3})+$/,
         "Vui lòng nhập một địa chỉ email hợp lệ.",
       ],
@@ -46,11 +47,13 @@ const userSchema = new mongoose.Schema(
       ],
       default: "customer",
     },
+    //  Trạng thái đi làm việc (chỉ có cho nhân viên)
     status: {
       type: String,
       enum: ["active", "inactive"],
       default: "active",
     },
+    // ⭐ Điểm tích lũy (chỉ có cho khách hàng)
     point: {
       type: Number,
       default: function () {
@@ -68,11 +71,13 @@ userSchema.pre("save", async function (next) {
   }
 
   const salt = await bcrypt.genSalt(10);
-  this.password = await bcrypt.hash(this.password, salt);
+  this.password = await bcrypt.hash(this.password, salt); // Băm mật khẩu bằng thuật toán bcrypt + salt
   next();
 });
 
+//  Hàm so sánh mật khẩu khi đăng nhập (.method làm định nghĩa hàm cho instance)
 userSchema.methods.comparePassword = function (enteredPassword) {
+  // So sánh mật khẩu người dùng nhập với mật khẩu đã băm trong DB
   return bcrypt.compare(enteredPassword, this.password);
 };
 

@@ -5,7 +5,7 @@ import KitchenDashboard from "../pages/KitchenDashboard";
 
 export default function AppRouter() {
   const { user } = useAuth();
-
+  // AppRouter để điều hướng các trang
   return (
     <Routes>
       {/* Luôn có route login */}
@@ -16,7 +16,7 @@ export default function AppRouter() {
         <Route path="/kitchen/dashboard" element={<KitchenDashboard />} />
       )}
 
-      {/* Nếu chưa login thì đẩy về /auth/login */}
+      {/* Nếu user chưa login, điều hướng về trang login */}
       <Route
         path="*"
         element={

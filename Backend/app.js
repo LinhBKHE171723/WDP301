@@ -23,7 +23,7 @@ app.disable("etag");
 // connect to MongoDB
 mongoose
   // .connect(process.env.MONGO_URI)
-  .connect("mongodb://localhost:27017/restaurantDB")
+  .connect(process.env.MONGO_URI)
   .then(() => {
     seedDatabase();
     console.log("✅ MongoDB connected");
