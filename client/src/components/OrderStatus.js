@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import './OrderStatus.css';
+import FeedbackForm from './FeedbackForm';
 
 const OrderStatus = ({ orderId, onBack }) => {
   const [order, setOrder] = useState(null);
@@ -11,6 +12,7 @@ const OrderStatus = ({ orderId, onBack }) => {
   const [items, setItems] = useState([]);
   const [tempCart, setTempCart] = useState([]);
   const [activeTab, setActiveTab] = useState('menus');
+  const [showFeedback, setShowFeedback] = useState(false);
 
   const fetchOrderStatusSilent = useCallback(async () => {
     try {
@@ -202,13 +204,14 @@ const OrderStatus = ({ orderId, onBack }) => {
     setTempCart([]);
   };
 
-  const addToTempCart = (item, type = 'item', quantity = 1) => {
+  const addToTempCart = (item, type = 'item', quantity = 1, note = '') => {
     const cartItem = {
       id: item._id,
       name: item.name,
       price: item.price,
       type: type,
-      quantity: quantity
+      quantity: quantity,
+      note: note
     };
 
     setTempCart(prevCart => {
@@ -241,6 +244,14 @@ const OrderStatus = ({ orderId, onBack }) => {
     );
   };
 
+  const updateTempCartNote = (itemId, newNote) => {
+    setTempCart(prevCart =>
+      prevCart.map(item =>
+        item.id === itemId ? { ...item, note: newNote } : item
+      )
+    );
+  };
+
   // Get total price of temp cart
   const getTempCartTotal = () => {
     return tempCart.reduce((total, item) => total + (item.price * item.quantity), 0);
@@ -254,7 +265,8 @@ const OrderStatus = ({ orderId, onBack }) => {
       const orderItems = tempCart.map(item => ({
         itemId: item.id,
         quantity: item.quantity,
-        type: item.type
+        type: item.type,
+        note: item.note || '' // Thêm ghi chú cho từng món ăn
       }));
 
       const response = await fetch(`http://localhost:5000/api/customer/orders/${orderId}/items`, {
@@ -308,6 +320,11 @@ const OrderStatus = ({ orderId, onBack }) => {
     }
   };
 
+  const handleFeedbackSubmitted = (feedback) => {
+    setShowFeedback(false);
+    alert('Cảm ơn bạn đã đánh giá!');
+  };
+
   if (loading) {
     return (
       <div className="order-status-container">
@@ -347,15 +364,26 @@ const OrderStatus = ({ orderId, onBack }) => {
       <div className="order-status-card">
         <div className="header">
           <h2>Trạng thái đơn hàng</h2>
-          {order.status === 'pending' ? (
-            <button onClick={handleCancelOrder} className="cancel-order-btn">
-              Hủy đơn
-            </button>
-          ) : order.status === 'paid' || order.status === 'cancelled' ? (
-            <button onClick={onBack} className="back-btn">
-              ← Quay lại menu
-            </button>
-          ) : null}
+          <div className="header-actions">
+            {order.status === 'pending' ? (
+              <button onClick={handleCancelOrder} className="cancel-order-btn">
+                Hủy đơn
+              </button>
+            ) : order.status === 'paid' ? (
+              <>
+                <button onClick={() => setShowFeedback(true)} className="feedback-btn">
+                  Đánh giá dịch vụ
+                </button>
+                <button onClick={onBack} className="back-btn">
+                  ← Quay lại menu
+                </button>
+              </>
+            ) : order.status === 'cancelled' ? (
+              <button onClick={onBack} className="back-btn">
+                ← Quay lại menu
+              </button>
+            ) : null}
+          </div>
         </div>
 
         <div className="order-info">
@@ -448,6 +476,7 @@ const OrderStatus = ({ orderId, onBack }) => {
             Cập nhật trạng thái
           </button>
         </div>
+
       </div>
 
       {/* Add Items Modal */}
@@ -542,6 +571,17 @@ const OrderStatus = ({ orderId, onBack }) => {
                         <span className="item-price">
                           {item.price.toLocaleString('vi-VN')} VNĐ
                         </span>
+                        <div className="item-note">
+                          <label htmlFor={`temp-note-${item.id}`}>Ghi chú:</label>
+                          <input
+                            id={`temp-note-${item.id}`}
+                            type="text"
+                            value={item.note || ''}
+                            onChange={(e) => updateTempCartNote(item.id, e.target.value)}
+                            placeholder="Nhập ghi chú cho món ăn..."
+                            className="note-input"
+                          />
+                        </div>
                       </div>
                       <div className="item-controls">
                         <button onClick={() => updateTempCartQuantity(item.id, item.quantity - 1)}>
@@ -568,6 +608,27 @@ const OrderStatus = ({ orderId, onBack }) => {
                 </div>
               </div>
             )}
+          </div>
+        </div>
+      )}
+
+      {/* Feedback Modal */}
+      {showFeedback && (
+        <div className="add-items-modal">
+          <div className="modal-content">
+            <div className="modal-header">
+              <h3>Đánh giá dịch vụ</h3>
+              <button onClick={() => setShowFeedback(false)} className="close-btn">
+                ✕
+              </button>
+            </div>
+            
+            <div className="modal-body">
+              <FeedbackForm 
+                orderId={orderId} 
+                onFeedbackSubmitted={handleFeedbackSubmitted}
+              />
+            </div>
           </div>
         </div>
       )}

@@ -46,13 +46,14 @@ const MenuView = () => {
     }
   };
 
-  const addToCart = (item, type = 'item', quantity = 1) => {
+  const addToCart = (item, type = 'item', quantity = 1, note = '') => {
     const cartItem = {
       id: item._id,
       name: item.name,
       price: item.price,
       type: type,
-      quantity: quantity
+      quantity: quantity,
+      note: note
     };
 
     setCart(prevCart => {
@@ -90,6 +91,14 @@ const MenuView = () => {
     setCart(prevCart =>
       prevCart.map(item =>
         item.id === itemId ? { ...item, quantity: newQuantity } : item
+      )
+    );
+  };
+
+  const updateNote = (itemId, newNote) => {
+    setCart(prevCart =>
+      prevCart.map(item =>
+        item.id === itemId ? { ...item, note: newNote } : item
       )
     );
   };
@@ -164,7 +173,8 @@ const MenuView = () => {
       const orderItems = cart.map(item => ({
         itemId: item.id,
         quantity: item.quantity,
-        type: item.type // Thêm type để phân biệt Menu và Item
+        type: item.type, // Thêm type để phân biệt Menu và Item
+        note: item.note || '' // Thêm ghi chú cho từng món ăn
       }));
 
       const response = await fetch('http://localhost:5000/api/customer/orders', {
@@ -453,6 +463,17 @@ const MenuView = () => {
                   <div className="item-info">
                     <h4>{item.name}</h4>
                     <p>{item.price.toLocaleString('vi-VN')} VNĐ</p>
+                    <div className="item-note">
+                      <label htmlFor={`note-${item.id}`}>Ghi chú:</label>
+                      <input
+                        id={`note-${item.id}`}
+                        type="text"
+                        value={item.note || ''}
+                        onChange={(e) => updateNote(item.id, e.target.value)}
+                        placeholder="Nhập ghi chú cho món ăn..."
+                        className="note-input"
+                      />
+                    </div>
                   </div>
                   <div className="item-controls">
                     <button onClick={() => updateQuantity(item.id, item.quantity - 1)}>

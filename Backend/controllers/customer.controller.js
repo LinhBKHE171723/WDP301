@@ -4,6 +4,7 @@ const Table = require("../models/Table");
 const Order = require("../models/Order");
 const OrderItem = require("../models/OrderItem");
 const Payment = require("../models/Payment");
+const Feedback = require("../models/Feedback");
 
 // Lấy thông tin bàn theo số bàn
 exports.getTableByNumber = async (req, res) => {
@@ -527,6 +528,143 @@ exports.updateOrderStatus = async (req, res) => {
       success: true,
       message: "Cập nhật trạng thái đơn hàng thành công",
       data: order
+    });
+  } catch (error) {
+    res.status(500).json({ 
+      success: false, 
+      message: error.message 
+    });
+  }
+};
+
+// Tạo feedback cho order đã thanh toán
+exports.createFeedback = async (req, res) => {
+  try {
+    const { orderId } = req.params;
+    const { rating, comment } = req.body;
+
+    // Kiểm tra order tồn tại
+    const order = await Order.findById(orderId);
+    if (!order) {
+      return res.status(404).json({
+        success: false,
+        message: "Không tìm thấy đơn hàng"
+      });
+    }
+
+    // Kiểm tra order đã thanh toán chưa
+    if (order.status !== 'paid') {
+      return res.status(400).json({
+        success: false,
+        message: "Chỉ có thể đánh giá đơn hàng đã thanh toán"
+      });
+    }
+
+    // Kiểm tra đã có feedback cho order này chưa
+    const existingFeedback = await Feedback.findOne({ orderId: orderId });
+    if (existingFeedback) {
+      return res.status(400).json({
+        success: false,
+        message: "Đơn hàng này đã được đánh giá"
+      });
+    }
+
+    // Validate rating
+    if (!rating || rating < 1 || rating > 5) {
+      return res.status(400).json({
+        success: false,
+        message: "Đánh giá phải từ 1 đến 5 sao"
+      });
+    }
+
+    // Tạo feedback mới
+    const feedback = new Feedback({
+      orderId: orderId,
+      userId: order.userId || null, // có thể null nếu khách không đăng nhập
+      rating: rating,
+      comment: comment || ""
+    });
+
+    await feedback.save();
+
+    // Populate để trả về thông tin đầy đủ
+    const populatedFeedback = await Feedback.findById(feedback._id)
+      .populate("orderId", "_id status totalAmount")
+      .populate("userId", "name email");
+
+    res.status(201).json({
+      success: true,
+      message: "Cảm ơn bạn đã đánh giá!",
+      data: populatedFeedback
+    });
+  } catch (error) {
+    res.status(500).json({ 
+      success: false, 
+      message: error.message 
+    });
+  }
+};
+
+// Lấy feedback của một order
+exports.getOrderFeedback = async (req, res) => {
+  try {
+    const { orderId } = req.params;
+
+    const feedback = await Feedback.findOne({ orderId: orderId })
+      .populate("orderId", "_id status totalAmount")
+      .populate("userId", "name email");
+
+    if (!feedback) {
+      return res.status(404).json({
+        success: false,
+        message: "Chưa có đánh giá cho đơn hàng này"
+      });
+    }
+
+    res.status(200).json({
+      success: true,
+      data: feedback
+    });
+  } catch (error) {
+    res.status(500).json({ 
+      success: false, 
+      message: error.message 
+    });
+  }
+};
+
+// Kiểm tra order có thể feedback không
+exports.canFeedback = async (req, res) => {
+  try {
+    const { orderId } = req.params;
+
+    const order = await Order.findById(orderId);
+    if (!order) {
+      return res.status(404).json({
+        success: false,
+        message: "Không tìm thấy đơn hàng"
+      });
+    }
+
+    // Kiểm tra đã có feedback chưa
+    const existingFeedback = await Feedback.findOne({ orderId: orderId });
+    if (existingFeedback) {
+      return res.status(200).json({
+        success: true,
+        canFeedback: false,
+        message: "Đơn hàng này đã được đánh giá",
+        feedback: existingFeedback
+      });
+    }
+
+    // Kiểm tra order đã thanh toán chưa
+    const canFeedback = order.status === 'paid';
+
+    res.status(200).json({
+      success: true,
+      canFeedback: canFeedback,
+      message: canFeedback ? "Có thể đánh giá đơn hàng" : "Chỉ có thể đánh giá đơn hàng đã thanh toán",
+      orderStatus: order.status
     });
   } catch (error) {
     res.status(500).json({ 
