@@ -7,7 +7,13 @@ const {
   getItemById,
   createOrder,
   getTableByNumber,
-  getOrderById
+  getOrderById,
+  addItemsToOrder,
+  cancelOrderItem,
+  updateOrderStatus,
+  createFeedback,
+  getOrderFeedback,
+  canFeedback
 } = require("../controllers/customer.controller");
 
 // Routes cho khách hàng (không cần authentication)
@@ -31,5 +37,23 @@ router.post("/orders", createOrder);
 
 // 7. Lấy thông tin đơn hàng theo ID
 router.get("/orders/:orderId", getOrderById);
+
+// 8. Thêm món mới vào order hiện có
+router.post("/orders/:orderId/items", addItemsToOrder);
+
+// 9. Hủy món có status pending
+router.delete("/orders/:orderId/items/:orderItemId", cancelOrderItem);
+
+// 10. Cập nhật trạng thái đơn hàng
+router.put("/orders/:orderId", updateOrderStatus);
+
+// 11. Kiểm tra order có thể feedback không
+router.get("/orders/:orderId/can-feedback", canFeedback);
+
+// 12. Lấy feedback của một order
+router.get("/orders/:orderId/feedback", getOrderFeedback);
+
+// 13. Tạo feedback cho order đã thanh toán
+router.post("/orders/:orderId/feedback", createFeedback);
 
 module.exports = router;
