@@ -32,6 +32,7 @@ export const AuthProvider = ({ children }) => {
 
         // Nếu hợp lệ thì cập nhật user và login state
         setUser(res.user);
+        localStorage.setItem("user", JSON.stringify(res.user)); // đảm bảo user luôn mới nhất , tránh sửa role rồi hack vào trang không đúng quyền
         setIsLoggedIn(true);
       } catch (err) {
         // Token sai hoặc hết hạn

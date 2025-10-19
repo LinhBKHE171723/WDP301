@@ -44,7 +44,7 @@ function authRequired(req, res, next) {
   }
 
   try {
-    // ✅ Giải mã & verify token bằng secret của server
+    // ✅ Giải mã & verify token bằng secret của server và trả về payload là 1 object
     const decoded = jwt.verify(token, process.env.JWT_SECRET);
 
     // Lưu thông tin người dùng đã xác thực vào req.user để route khác dùng

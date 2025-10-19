@@ -2,16 +2,20 @@ import { Routes, Route, Navigate } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
 import LoginPage from "../pages/LoginPage";
 import KitchenDashboard from "../pages/KitchenDashboard";
+import WaiterDashboard from "../pages/WaiterDashboard";
 
 export default function AppRouter() {
   const { user, token, isLoggedIn, loading } = useAuth();
   
+  /*
   function PrivateRoute({ element, roles }) {
     const { isLoggedIn, user } = useAuth();
     if (!isLoggedIn) return <Navigate to="/auth/login" replace />;
     if (roles && !roles.includes(user.role)) return <Navigate to="/auth/login" replace />;
     return element;
   }
+  */
+
   // AppRouter để điều hướng các trang
   // Khi đang xác minh token (chưa biết login hay chưa)
   if (loading) {
@@ -25,21 +29,28 @@ export default function AppRouter() {
   return (
     <Routes>
       {/* Nếu chưa đăng nhập → chỉ cho vào trang login */}
-      {!isLoggedIn && (
-        <Route path="/auth/login" element={<LoginPage />} />
-      )}
+      {!isLoggedIn && <Route path="/auth/login" element={<LoginPage />} />}
 
       {/* Nếu đã đăng nhập và có quyền kitchen_manager */}
       {isLoggedIn && user?.role === "kitchen_manager" && token && (
         <Route path="/kitchen/dashboard" element={<KitchenDashboard />} />
       )}
 
-      {/* Nếu user chưa login, điều hướng về trang login */}
+      {/* Nếu đã đăng nhập và có quyền waiter */}
+      {isLoggedIn && user?.role === "waiter" && token && (
+        <Route path="/waiter/dashboard" element={<WaiterDashboard />} />
+      )}
+
+      {/* Nếu user điền URL linh tinh hoặc cố tình điền url ko thuộc role của mình */}
       <Route
         path="*"
         element={
-          user && token && isLoggedIn ? (
+          !isLoggedIn || !token ? (
+            <Navigate to="/auth/login" replace />
+          ) : user?.role === "kitchen_manager" ? (
             <Navigate to="/kitchen/dashboard" replace />
+          ) : user?.role === "waiter" ? (
+            <Navigate to="/waiter/dashboard" replace />
           ) : (
             <Navigate to="/auth/login" replace />
           )

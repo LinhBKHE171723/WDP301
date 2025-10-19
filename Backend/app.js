@@ -9,6 +9,7 @@ const adminFeedbackRoutes = require("./routes/admin.feedback.route");
 const kitchenRoutes = require("./routes/kitchen.routes");
 const customerRoutes = require("./routes/customer.routes");
 const authRoutes = require("./routes/auth.route");
+const waiterRoutes = require("./routes/waiter.routes");
 // load env
 dotenv.config();
 
@@ -44,6 +45,9 @@ app.use("/api/admin", adminFeedbackRoutes);
 app.use("/api/kitchen", kitchenRoutes);
 
 app.use("/api/customer", customerRoutes);
+
+// waiter
+// app.use("/api/waiter", waiterRoutes);
 
 // export app để server.js dùng
 module.exports = app;

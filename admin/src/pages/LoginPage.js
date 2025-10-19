@@ -20,7 +20,10 @@ export default function LoginPage() {
       login(res.user, res.token);
       if (res.user.role === "kitchen_manager") {
         navigate("/kitchen/dashboard");
-      } else {
+      } else if (res.user.role === "waiter") {
+        navigate("/waiter/dashboard");
+      }
+      else {
         setError("Tài khoản này không có quyền truy cập Kitchen.");
       }
     } catch (err) {
