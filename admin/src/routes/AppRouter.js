@@ -4,23 +4,41 @@ import LoginPage from "../pages/LoginPage";
 import KitchenDashboard from "../pages/KitchenDashboard";
 
 export default function AppRouter() {
-  const { user } = useAuth();
+  const { user, token, isLoggedIn, loading } = useAuth();
+  
+  function PrivateRoute({ element, roles }) {
+    const { isLoggedIn, user } = useAuth();
+    if (!isLoggedIn) return <Navigate to="/auth/login" replace />;
+    if (roles && !roles.includes(user.role)) return <Navigate to="/auth/login" replace />;
+    return element;
+  }
+  // AppRouter để điều hướng các trang
+  // Khi đang xác minh token (chưa biết login hay chưa)
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center min-h-screen">
+        <p className="text-gray-600 text-lg">Đang kiểm tra phiên đăng nhập...</p>
+      </div>
+    );
+  }
 
   return (
     <Routes>
-      {/* Luôn có route login */}
-      <Route path="/auth/login" element={<LoginPage />} />
+      {/* Nếu chưa đăng nhập → chỉ cho vào trang login */}
+      {!isLoggedIn && (
+        <Route path="/auth/login" element={<LoginPage />} />
+      )}
 
-      {/* Nếu user hợp lệ */}
-      {user?.role === "kitchen_manager" && (
+      {/* Nếu đã đăng nhập và có quyền kitchen_manager */}
+      {isLoggedIn && user?.role === "kitchen_manager" && token && (
         <Route path="/kitchen/dashboard" element={<KitchenDashboard />} />
       )}
 
-      {/* Nếu chưa login thì đẩy về /auth/login */}
+      {/* Nếu user chưa login, điều hướng về trang login */}
       <Route
         path="*"
         element={
-          user ? (
+          user && token && isLoggedIn ? (
             <Navigate to="/kitchen/dashboard" replace />
           ) : (
             <Navigate to="/auth/login" replace />
