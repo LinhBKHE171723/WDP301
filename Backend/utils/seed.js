@@ -1,4 +1,7 @@
+// backend/seed/seedDatabase.js
+
 const mongoose = require("mongoose");
+const bcrypt = require("bcryptjs");
 const User = require("../models/User");
 const Ingredient = require("../models/Ingredient");
 const Item = require("../models/Item");
@@ -29,8 +32,8 @@ const seedDatabase = async () => {
     ]);
     console.log("🧹 Đã xoá toàn bộ dữ liệu cũ.");
 
-    // 2️⃣ Tạo user mẫu
-    const users = await User.insertMany([
+    // 2️⃣ Tạo user mẫu (dùng create để chạy pre('save') → hash mật khẩu)
+    const userData = [
       {
         name: "Nguyễn Văn Khách",
         username: "customer01",
@@ -75,7 +78,7 @@ const seedDatabase = async () => {
       {
         name: "Quản Lý Bếp",
         username: "kitchen01",
-        password: "password123",
+        password: "123456",
         email: "kitchen@example.com",
         phone: "0908888988",
         role: "kitchen_manager",
@@ -88,7 +91,14 @@ const seedDatabase = async () => {
         phone: "0909999000",
         role: "admin",
       },
-    ]);
+    ];
+
+    const users = [];
+    for (const data of userData) {
+      const user = await User.create(data);
+      users.push(user);
+    }
+    console.log("👤 Đã tạo user mẫu và hash mật khẩu thành công.");
 
     const customer = users.find((u) => u.role === "customer");
     const waiters = users.filter((u) => u.role === "waiter");
@@ -112,6 +122,7 @@ const seedDatabase = async () => {
       { name: "Nước mắm", unit: "chai", stockQuantity: 50, minStock: 10 },
       { name: "Tỏi", unit: "kg", stockQuantity: 30, minStock: 6 },
     ]);
+    console.log("🥬 Đã thêm nguyên liệu mẫu.");
 
     // 4️⃣ Món ăn
     const items = await Item.insertMany([
@@ -159,52 +170,8 @@ const seedDatabase = async () => {
         price: 70000,
         ingredients: [ingredients.find((i) => i.name === "Rau xà lách")._id],
       },
-      {
-        name: "Gà Rán Giòn",
-        description: "Gà chiên giòn với nước mắm tỏi",
-        category: "Món chính",
-        price: 160000,
-        ingredients: [
-          ingredients.find((i) => i.name === "Thịt gà")._id,
-          ingredients.find((i) => i.name === "Tỏi")._id,
-          ingredients.find((i) => i.name === "Nước mắm")._id,
-        ],
-      },
-      {
-        name: "Pizza Hải Sản",
-        description: "Pizza với tôm, mực, phô mai kéo sợi",
-        category: "Món chính",
-        price: 230000,
-        ingredients: [
-          ingredients.find((i) => i.name === "Phô mai")._id,
-          ingredients.find((i) => i.name === "Tôm tươi")._id,
-        ],
-      },
-      {
-        name: "Súp Bí Đỏ",
-        description: "Súp bí đỏ kem béo thơm ngon",
-        category: "Khai vị",
-        price: 90000,
-        ingredients: [ingredients.find((i) => i.name === "Bơ")._id],
-      },
-      {
-        name: "Cơm Chiên Dương Châu",
-        description: "Cơm chiên với trứng, lạp xưởng, rau củ",
-        category: "Món chính",
-        price: 120000,
-        ingredients: [ingredients.find((i) => i.name === "Trứng gà")._id],
-      },
-      {
-        name: "Mực Nướng Muối Ớt",
-        description: "Mực tươi nướng muối ớt đậm đà",
-        category: "Món chính",
-        price: 200000,
-        ingredients: [
-          ingredients.find((i) => i.name === "Ớt chuông")._id,
-          ingredients.find((i) => i.name === "Tỏi")._id,
-        ],
-      },
     ]);
+    console.log("🍽️ Đã thêm món ăn mẫu.");
 
     // 5️⃣ Bàn ăn (20 bàn)
     const tables = await Promise.all(
@@ -216,6 +183,7 @@ const seedDatabase = async () => {
         })
       )
     );
+    console.log("🍽️ Đã tạo bàn ăn.");
 
     // 6️⃣ Tạo order cho 10 bàn đầu
     for (let i = 0; i < 10; i++) {
