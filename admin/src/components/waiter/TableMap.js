@@ -1,22 +1,29 @@
 import React, { useEffect, useState } from "react";
-import { Container, Row, Col, Card, Spinner } from "react-bootstrap";
+import { Container, Row, Col, Card, Spinner, Form } from "react-bootstrap";
 import { useNavigate } from "react-router-dom";
 import { toast } from "react-toastify";
-import Header from "./Header"
+import Header from "./Header";
 import NotificationBell from "./NotificationBell";
 import waiterApi from "../../api/waiterApi";
 import { useAuth } from "../../context/AuthContext";
 
 export default function TableMap() {
   const [tables, setTables] = useState([]);
+  const [filteredTables, setFilteredTables] = useState([]);
   const [loading, setLoading] = useState(true);
+
+  const [filterStatus, setFilterStatus] = useState("all");
+  const [filterOrderStatus, setFilterOrderStatus] = useState("all");
+  const [filterWaiter, setFilterWaiter] = useState("all");
+
   const navigate = useNavigate();
   const { logout, user } = useAuth();
 
   const fetchTables = async () => {
     try {
-      const res = await waiterApi.getAllTables();
+      const res = await waiterApi.getAllTables(); // trả về danh sách bàn, có populate orderNow & servedBy
       setTables(res.tables || []);
+      setFilteredTables(res.tables || []);
     } catch (err) {
       console.error(err);
       toast.error("Không thể tải danh sách bàn!");
@@ -29,12 +36,44 @@ export default function TableMap() {
     fetchTables();
   }, []);
 
+  useEffect(() => {
+    let filtered = [...tables];
+
+    // Lọc theo trạng thái bàn
+    if (filterStatus !== "all") {
+      filtered = filtered.filter((t) => t.status === filterStatus);
+    }
+
+    // Lọc theo trạng thái order
+    if (filterOrderStatus !== "all") {
+      filtered = filtered.filter(
+        (t) => t.orderNow?.status === filterOrderStatus
+      );
+    }
+
+    // Lọc theo tên nhân viên phục vụ
+    if (filterWaiter !== "all") {
+      filtered = filtered.filter(
+        (t) => t.orderNow?.servedBy?.name === filterWaiter
+      );
+    }
+
+    setFilteredTables(filtered);
+  }, [filterStatus, filterOrderStatus, filterWaiter, tables]);
+
+  // Lấy danh sách tên nhân viên phục vụ có trong dữ liệu
+  const waiterNames = [
+    ...new Set(
+      tables
+        .filter((t) => t.orderNow?.servedBy?.name)
+        .map((t) => t.orderNow.servedBy.name)
+    ),
+  ];
+
   return (
     <div className="min-vh-100 bg-light d-flex flex-column">
-      {/* Header cố định */}
       <Header onLogout={logout} user={user} />
 
-      {/* Nội dung chính */}
       <Container className="flex-grow-1 mt-4 pb-5">
         <div className="d-flex flex-wrap justify-content-between align-items-center mb-3">
           <h4 className="fw-bold text-dark mb-3 mb-md-0">
@@ -43,60 +82,119 @@ export default function TableMap() {
           <NotificationBell />
         </div>
 
+        {/* Bộ lọc */}
+        <Card className="p-3 mb-4 shadow-sm border-0">
+          <Row className="g-3">
+            <Col xs={12} md={4}>
+              <Form.Select
+                value={filterStatus}
+                onChange={(e) => setFilterStatus(e.target.value)}
+              >
+                <option value="all">Tất cả trạng thái bàn</option>
+                <option value="available">Trống</option>
+                <option value="occupied">Đang có khách</option>
+              </Form.Select>
+            </Col>
+            <Col xs={12} md={4}>
+              <Form.Select
+                value={filterOrderStatus}
+                onChange={(e) => setFilterOrderStatus(e.target.value)}
+              >
+                <option value="all">Tất cả trạng thái order</option>
+                <option value="pending">Chờ xác nhận</option>
+                <option value="confirmed">Đã xác nhận</option>
+                <option value="preparing">Đang chế biến</option>
+                <option value="ready">Sẵn sàng</option>
+                <option value="served">Đã phục vụ</option>
+                <option value="paid">Đã thanh toán</option>
+                <option value="cancelled">Đã huỷ</option>
+              </Form.Select>
+            </Col>
+            <Col xs={12} md={4}>
+              <Form.Select
+                value={filterWaiter}
+                onChange={(e) => setFilterWaiter(e.target.value)}
+              >
+                <option value="all">Tất cả nhân viên phục vụ</option>
+                {waiterNames.map((name) => (
+                  <option key={name} value={name}>
+                    {name}
+                  </option>
+                ))}
+              </Form.Select>
+            </Col>
+          </Row>
+        </Card>
+
+        {/* Nội dung chính */}
         {loading ? (
           <div className="text-center mt-5">
             <Spinner animation="border" variant="warning" />
           </div>
         ) : (
           <Row>
-            {tables.map((table) => (
-              <Col
-                key={table._id}
-                xs={6}
-                sm={6}
-                md={4}
-                lg={3}
-                xl={2}
-                className="mb-4"
-              >
-                <Card
-                  className={`shadow-sm border-3 text-center p-3 h-100 ${
-                    table.status === "occupied"
-                      ? "border-danger bg-light"
-                      : "border-success bg-white"
-                  }`}
-                  onClick={() => navigate(`/waiter/tables/${table._id}`)}
-                  style={{
-                    cursor: "pointer",
-                    transition: "transform 0.2s",
-                  }}
-                  onMouseEnter={(e) =>
-                    (e.currentTarget.style.transform = "scale(1.03)")
-                  }
-                  onMouseLeave={(e) =>
-                    (e.currentTarget.style.transform = "scale(1)")
-                  }
-                >
-                  <Card.Body className="d-flex flex-column justify-content-center">
-                    <h5 className="fw-bold">Bàn #{table.tableNumber}</h5>
-                    <p
-                      className={`mb-1 ${
-                        table.status === "occupied"
-                          ? "text-danger"
-                          : "text-success"
-                      } fw-semibold`}
+            {filteredTables.length === 0 ? (
+              <p className="text-center text-muted">Không có bàn phù hợp.</p>
+            ) : (
+              filteredTables.map((table) => {
+                const isOccupied = table.status === "occupied";
+                return (
+                  <Col
+                    key={table._id}
+                    xs={6}
+                    sm={6}
+                    md={4}
+                    lg={3}
+                    xl={2}
+                    className="mb-4"
+                  >
+                    <Card
+                      className={`shadow-sm border-3 text-center p-3 h-100 ${
+                        isOccupied
+                          ? "border-danger bg-light"
+                          : "border-success bg-white"
+                      }`}
+                      onClick={() => navigate(`/waiter/tables/${table._id}`)}
+                      style={{
+                        cursor: "pointer",
+                        transition: "transform 0.2s",
+                      }}
+                      onMouseEnter={(e) =>
+                        (e.currentTarget.style.transform = "scale(1.03)")
+                      }
+                      onMouseLeave={(e) =>
+                        (e.currentTarget.style.transform = "scale(1)")
+                      }
                     >
-                      {table.status === "occupied" ? "Đang có khách" : "Trống"}
-                    </p>
-                    {table.orders?.length > 0 && (
-                      <p className="small text-muted mb-0">
-                        🧾 {table.orders.length} đơn gần nhất
-                      </p>
-                    )}
-                  </Card.Body>
-                </Card>
-              </Col>
-            ))}
+                      <Card.Body>
+                        <h5 className="fw-bold">Bàn #{table.tableNumber}</h5>
+                        <p
+                          className={`fw-semibold mb-1 ${
+                            isOccupied ? "text-danger" : "text-success"
+                          }`}
+                        >
+                          {isOccupied ? "Đang có khách" : "Trống"}
+                        </p>
+
+                        {table.orderNow && (
+                          <>
+                            <p className="small text-muted mb-1">
+                              🧾 Order: #{table.orderNow._id.slice(-5)}
+                            </p>
+                            <p className="small text-muted mb-1">
+                              👤 {table.orderNow.servedBy?.name}
+                            </p>
+                            <p className="small text-secondary">
+                              Trạng thái: {table.orderNow.status}
+                            </p>
+                          </>
+                        )}
+                      </Card.Body>
+                    </Card>
+                  </Col>
+                );
+              })
+            )}
           </Row>
         )}
       </Container>

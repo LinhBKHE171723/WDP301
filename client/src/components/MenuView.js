@@ -1,9 +1,14 @@
 import React, { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
+import { useAuth } from '../context/AuthContext';
+import LoginModal from './LoginModal';
 import ItemDetail from './ItemDetail';
 import OrderStatus from './OrderStatus';
 import './MenuView.css';
 
 const MenuView = ({ table, onBack }) => {
+  const navigate = useNavigate();
+  const { user, isLoggedIn, login, logout } = useAuth();
   const [menus, setMenus] = useState([]);
   const [items, setItems] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -12,6 +17,7 @@ const MenuView = ({ table, onBack }) => {
   const [cart, setCart] = useState([]);
   const [showCart, setShowCart] = useState(false);
   const [selectedItem, setSelectedItem] = useState(null);
+  const [showLoginModal, setShowLoginModal] = useState(false);
   const [showItemDetail, setShowItemDetail] = useState(false);
   const [priceFilter, setPriceFilter] = useState('all');
   const [itemPriceFilter, setItemPriceFilter] = useState('all');
@@ -46,20 +52,21 @@ const MenuView = ({ table, onBack }) => {
     }
   };
 
-  const addToCart = (item, type = 'item', quantity = 1) => {
+  const addToCart = (item, type = 'item', quantity = 1, note = '') => {
     const cartItem = {
       id: item._id,
       name: item.name,
       price: item.price,
       type: type,
-      quantity: quantity
+      quantity: quantity,
+      note: note
     };
 
     setCart(prevCart => {
-      const existingItem = prevCart.find(cartItem => cartItem.id === item._id);
+      const existingItem = prevCart.find(cartItem => cartItem.id === item._id && cartItem.note === note);
       if (existingItem) {
         return prevCart.map(cartItem =>
-          cartItem.id === item._id
+          cartItem.id === item._id && cartItem.note === note
             ? { ...cartItem, quantity: cartItem.quantity + quantity }
             : cartItem
         );
@@ -78,18 +85,30 @@ const MenuView = ({ table, onBack }) => {
     setSelectedItem(null);
   };
 
-  const removeFromCart = (itemId) => {
-    setCart(prevCart => prevCart.filter(item => item.id !== itemId));
+  const handleNoteChange = (item, newNote) => {
+    setCart(prevCart =>
+      prevCart.map(cartItem =>
+        cartItem.id === item.id && cartItem.note === item.note
+          ? { ...cartItem, note: newNote }
+          : cartItem
+      )
+    );
   };
 
-  const updateQuantity = (itemId, newQuantity) => {
+  const removeFromCart = (itemId, note = '') => {
+    setCart(prevCart => prevCart.filter(item => 
+      !(item.id === itemId && item.note === note)
+    ));
+  };
+
+  const updateQuantity = (itemId, newQuantity, note = '') => {
     if (newQuantity <= 0) {
-      removeFromCart(itemId);
+      removeFromCart(itemId, note);
       return;
     }
     setCart(prevCart =>
       prevCart.map(item =>
-        item.id === itemId ? { ...item, quantity: newQuantity } : item
+        item.id === itemId && item.note === note ? { ...item, quantity: newQuantity } : item
       )
     );
   };
@@ -164,7 +183,8 @@ const MenuView = ({ table, onBack }) => {
       const orderItems = cart.map(item => ({
         itemId: item.id,
         quantity: item.quantity,
-        type: item.type // Thêm type để phân biệt Menu và Item
+        type: item.type, // Thêm type để phân biệt Menu và Item
+        note: item.note || "" // Thêm note
       }));
 
       const response = await fetch('http://localhost:5000/api/customer/orders', {
@@ -172,12 +192,11 @@ const MenuView = ({ table, onBack }) => {
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({
-          tableId: table._id,
-          orderItems: orderItems,
-          customerName: "Khách vãng lai",
-          customerPhone: ""
-        })
+         body: JSON.stringify({
+           tableId: table?._id || null,
+           orderItems: orderItems,
+           userId: user?.id || null
+         })
       });
 
       const data = await response.json();
@@ -191,6 +210,16 @@ const MenuView = ({ table, onBack }) => {
     } catch (err) {
       alert('Lỗi đặt món');
     }
+  };
+
+  const handleLogin = (userData, token) => {
+    login(userData, token);
+    alert(`Chào mừng ${userData.username}!`);
+  };
+
+  const handleLogout = () => {
+    logout();
+    alert('Đã đăng xuất thành công!');
   };
 
   // Hiển thị OrderStatus nếu có orderId
@@ -226,14 +255,25 @@ const MenuView = ({ table, onBack }) => {
       <header className="menu-header">
         <div className="header-info">
           <h1>Thực đơn nhà hàng</h1>
-          <p>Bàn số: {table.tableNumber}</p>
         </div>
         <div className="header-actions">
+          {isLoggedIn ? (
+            <div className="user-info">
+              <span className="welcome-text">Xin chào, {user?.name || user?.username || 'Khách hàng'}!</span>
+              <button onClick={() => navigate('/order-history')} className="order-history-btn">
+                📋 Lịch sử đơn hàng
+              </button>
+              <button onClick={handleLogout} className="logout-btn">
+                Đăng xuất
+              </button>
+            </div>
+          ) : (
+            <button onClick={() => setShowLoginModal(true)} className="login-btn">
+              Đăng nhập
+            </button>
+          )}
           <button onClick={() => setShowCart(true)} className="cart-btn">
             Giỏ hàng ({cart.length})
-          </button>
-          <button onClick={onBack} className="back-btn">
-            Đổi bàn
           </button>
         </div>
       </header>
@@ -452,28 +492,38 @@ const MenuView = ({ table, onBack }) => {
                 ✕
               </button>
             </div>
-            <div className="cart-items">
-              {cart.map(item => (
-                <div key={item.id} className="cart-item">
-                  <div className="item-info">
-                    <h4>{item.name}</h4>
-                    <p>{item.price.toLocaleString('vi-VN')} VNĐ</p>
-                  </div>
-                  <div className="item-controls">
-                    <button onClick={() => updateQuantity(item.id, item.quantity - 1)}>
-                      -
-                    </button>
-                    <span>{item.quantity}</span>
-                    <button onClick={() => updateQuantity(item.id, item.quantity + 1)}>
-                      +
-                    </button>
-                    <button onClick={() => removeFromCart(item.id)} className="remove-btn">
-                      Xóa
-                    </button>
-                  </div>
-                </div>
-              ))}
-            </div>
+             <div className="cart-items">
+               {cart.map((item, index) => (
+                 <div key={`${item.id}-${index}`} className="cart-item">
+                   <div className="item-info">
+                     <h4>{item.name}</h4>
+                     <p>{item.price.toLocaleString('vi-VN')} VNĐ</p>
+                     <div className="note-input-container">
+                       <input
+                         type="text"
+                         value={item.note || ''}
+                         onChange={(e) => handleNoteChange(item, e.target.value)}
+                         placeholder="Ghi chú cho món này..."
+                         className="note-input"
+                         maxLength="100"
+                       />
+                     </div>
+                   </div>
+                   <div className="item-controls">
+                     <button onClick={() => updateQuantity(item.id, item.quantity - 1, item.note)}>
+                       -
+                     </button>
+                     <span>{item.quantity}</span>
+                     <button onClick={() => updateQuantity(item.id, item.quantity + 1, item.note)}>
+                       +
+                     </button>
+                     <button onClick={() => removeFromCart(item.id, item.note)} className="remove-btn">
+                       Xóa
+                     </button>
+                   </div>
+                 </div>
+               ))}
+             </div>
             <div className="cart-footer">
               <div className="total-price">
                 Tổng: {getTotalPrice().toLocaleString('vi-VN')} VNĐ
@@ -486,16 +536,23 @@ const MenuView = ({ table, onBack }) => {
         </div>
       )}
 
-      {showItemDetail && selectedItem && (
-        <ItemDetail
-          itemId={selectedItem.item._id}
-          type={selectedItem.type}
-          onClose={handleCloseDetail}
-          onAddToCart={addToCart}
-        />
-      )}
-    </div>
-  );
-};
+       {showItemDetail && selectedItem && (
+         <ItemDetail
+           itemId={selectedItem.item._id}
+           type={selectedItem.type}
+           onClose={handleCloseDetail}
+           onAddToCart={addToCart}
+         />
+       )}
+
+       {/* Login Modal */}
+       <LoginModal 
+         isOpen={showLoginModal}
+         onClose={() => setShowLoginModal(false)}
+         onLogin={handleLogin}
+       />
+     </div>
+   );
+ };
 
 export default MenuView;
