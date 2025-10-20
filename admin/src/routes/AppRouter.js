@@ -3,6 +3,8 @@ import { useAuth } from "../context/AuthContext";
 import LoginPage from "../pages/LoginPage";
 import KitchenDashboard from "../pages/KitchenDashboard";
 import WaiterDashboard from "../pages/WaiterDashboard";
+import TableMap from "../components/waiter/TableMap";
+import TableDetail from "../components/waiter/TableDetail";
 
 export default function AppRouter() {
   const { user, token, isLoggedIn, loading } = useAuth();
@@ -38,7 +40,11 @@ export default function AppRouter() {
 
       {/* Nếu đã đăng nhập và có quyền waiter */}
       {isLoggedIn && user?.role === "waiter" && token && (
-        <Route path="/waiter/dashboard" element={<WaiterDashboard />} />
+        <>
+          <Route path="/waiter/dashboard" element={<WaiterDashboard />} />
+          <Route path="/waiter/tables" element={<TableMap />} /> 
+          <Route path="/waiter/tables/:tableId" element={<TableDetail />} />  
+        </>
       )}
 
       {/* Nếu user điền URL linh tinh hoặc cố tình điền url ko thuộc role của mình */}

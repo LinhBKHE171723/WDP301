@@ -3,30 +3,25 @@ const jwt = require("jsonwebtoken");
 
 exports.login = async (req, res) => {
   try {
-    //  Lấy usernameOrEmail và mật khẩu người dùng nhập từ body request
-    const { usernameOrEmail, password } = req.body;
+    //  Lấy email và mật khẩu người dùng nhập từ body request
+    const { email, password } = req.body;
 
     // 1. Tìm user trong DB
 
     console.log("--- Login Attempt ---");
-    console.log("UsernameOrEmail:", usernameOrEmail);
+    console.log("Email:", email);
     console.log("Password:", password);
 
-    //  Tìm user trong MongoDB theo username hoặc email
+    //  Tìm user trong MongoDB theo email
     //  -> `.select("+password")`: vì trong model có `select: false`, nên phải bật lại để lấy password ra
-    const user = await User.findOne({
-      $or: [
-        { email: usernameOrEmail },
-        { username: usernameOrEmail }
-      ]
-    }).select("+password");
+    const user = await User.findOne({ email }).select("+password");
 
-    console.log("User found in DB:", user ? (user.email || user.username) : "Not Found");
+    console.log("User found in DB:", user ? user.email : "Not Found");
     // Nếu không tìm thấy user → trả lỗi 401 (Unauthorized)
     if (!user) {
       return res
         .status(401)
-        .json({ message: "Tên đăng nhập/email hoặc mật khẩu không chính xác." });
+        .json({ message: "Email hoặc mật khẩu không chính xác." });
     }
 
     //  So sánh mật khẩu người dùng nhập với mật khẩu đã băm trong DB
@@ -36,7 +31,7 @@ exports.login = async (req, res) => {
     if (!isMatch) {
       return res
         .status(401)
-        .json({ message: "Tên đăng nhập/email hoặc mật khẩu không chính xác." });
+        .json({ message: "Email hoặc mật khẩu không chính xác." });
     }
 
     // 3. Tạo JWT Payload
@@ -60,7 +55,6 @@ exports.login = async (req, res) => {
       token,
       user: {
         id: user._id,
-        name: user.name,
         username: user.username,
         name: user.name,
         email: user.email,
