@@ -32,7 +32,9 @@ const waiterApi = {
   // ==========================
 
   // Lấy danh sách bàn
-  getAllTables: () => Client.get("/waiter/tables"),
+getAllTables: () => Client.get("/waiter/tables"),
+    // Lấy chi tiết bàn cụ thể (bao gồm các order liên quan)
+getTableDetails: (tableId) => Client.get(`/waiter/tables/${tableId}`),
 
   // Cập nhật trạng thái bàn (ví dụ: occupied / available)
   updateTableStatus: (tableId, status) =>

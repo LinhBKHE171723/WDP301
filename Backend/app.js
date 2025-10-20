@@ -47,7 +47,7 @@ app.use("/api/kitchen", kitchenRoutes);
 app.use("/api/customer", customerRoutes);
 
 // waiter
-// app.use("/api/waiter", waiterRoutes);
+app.use("/api/waiter", waiterRoutes);
 
 // export app để server.js dùng
 module.exports = app;
