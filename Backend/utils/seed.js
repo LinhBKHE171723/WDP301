@@ -1,7 +1,4 @@
-// backend/seed/seedDatabase.js
-
 const mongoose = require("mongoose");
-const bcrypt = require("bcryptjs");
 const User = require("../models/User");
 const Ingredient = require("../models/Ingredient");
 const Item = require("../models/Item");
@@ -17,7 +14,7 @@ const seedDatabase = async () => {
   try {
     console.log("🚀 Bắt đầu seed database...");
 
-    // 1️⃣ Xoá toàn bộ dữ liệu cũ
+    // 1️⃣ Xóa toàn bộ dữ liệu cũ
     await Promise.all([
       User.deleteMany(),
       Ingredient.deleteMany(),
@@ -32,12 +29,12 @@ const seedDatabase = async () => {
     ]);
     console.log("🧹 Đã xoá toàn bộ dữ liệu cũ.");
 
-    // 2️⃣ Tạo user mẫu (dùng create để chạy pre('save') → hash mật khẩu)
+    // 2️⃣ Tạo user mẫu (dùng for để trigger pre-save hash)
     const userData = [
       {
         name: "Nguyễn Văn Khách",
         username: "customer01",
-        password: "password123",
+        password: "customer123",
         email: "customer@example.com",
         phone: "0123456789",
         role: "customer",
@@ -46,7 +43,7 @@ const seedDatabase = async () => {
       {
         name: "Trần Thị Phục Vụ 1",
         username: "waiter01",
-        password: "password123",
+        password: "waiter1@123",
         email: "waiter1@example.com",
         phone: "0987654321",
         role: "waiter",
@@ -54,7 +51,7 @@ const seedDatabase = async () => {
       {
         name: "Phạm Văn Phục Vụ 2",
         username: "waiter02",
-        password: "password123",
+        password: "waiter2@123",
         email: "waiter2@example.com",
         phone: "0987654322",
         role: "waiter",
@@ -62,7 +59,7 @@ const seedDatabase = async () => {
       {
         name: "Lê Thị Phục Vụ 3",
         username: "waiter03",
-        password: "password123",
+        password: "waiter3@123",
         email: "waiter3@example.com",
         phone: "0987654323",
         role: "waiter",
@@ -70,7 +67,7 @@ const seedDatabase = async () => {
       {
         name: "Đầu Bếp Trưởng",
         username: "chef01",
-        password: "password123",
+        password: "chef@123",
         email: "chef@example.com",
         phone: "0908888999",
         role: "chef",
@@ -78,7 +75,7 @@ const seedDatabase = async () => {
       {
         name: "Quản Lý Bếp",
         username: "kitchen01",
-        password: "123456",
+        password: "kitchen@123",
         email: "kitchen@example.com",
         phone: "0908888988",
         role: "kitchen_manager",
@@ -86,7 +83,7 @@ const seedDatabase = async () => {
       {
         name: "Admin Nhà Hàng",
         username: "admin01",
-        password: "password123",
+        password: "admin@123",
         email: "admin@example.com",
         phone: "0909999000",
         role: "admin",
@@ -95,10 +92,10 @@ const seedDatabase = async () => {
 
     const users = [];
     for (const data of userData) {
-      const user = await User.create(data);
+      const user = await User.create(data); // middleware hash password
       users.push(user);
+      console.log(`✅ Tạo user: ${user.username}`);
     }
-    console.log("👤 Đã tạo user mẫu và hash mật khẩu thành công.");
 
     const customer = users.find((u) => u.role === "customer");
     const waiters = users.filter((u) => u.role === "waiter");
@@ -122,7 +119,6 @@ const seedDatabase = async () => {
       { name: "Nước mắm", unit: "chai", stockQuantity: 50, minStock: 10 },
       { name: "Tỏi", unit: "kg", stockQuantity: 30, minStock: 6 },
     ]);
-    console.log("🥬 Đã thêm nguyên liệu mẫu.");
 
     // 4️⃣ Món ăn
     const items = await Item.insertMany([
@@ -154,16 +150,6 @@ const seedDatabase = async () => {
         ],
       },
       {
-        name: "Mì Ý Carbonara",
-        description: "Mì Ý kem trứng và thịt xông khói",
-        category: "Món chính",
-        price: 220000,
-        ingredients: [
-          ingredients.find((i) => i.name === "Trứng gà")._id,
-          ingredients.find((i) => i.name === "Bột mì")._id,
-        ],
-      },
-      {
         name: "Salad Rau Củ",
         description: "Rau củ tươi trộn dầu giấm",
         category: "Khai vị",
@@ -171,7 +157,6 @@ const seedDatabase = async () => {
         ingredients: [ingredients.find((i) => i.name === "Rau xà lách")._id],
       },
     ]);
-    console.log("🍽️ Đã thêm món ăn mẫu.");
 
     // 5️⃣ Bàn ăn (20 bàn)
     const tables = await Promise.all(
@@ -183,12 +168,12 @@ const seedDatabase = async () => {
         })
       )
     );
-    console.log("🍽️ Đã tạo bàn ăn.");
 
     // 6️⃣ Tạo order cho 10 bàn đầu
     for (let i = 0; i < 10; i++) {
       const table = tables[i];
       const selectedItems = [];
+
       for (let j = 0; j < 3; j++) {
         const randomItem = items[Math.floor(Math.random() * items.length)];
         const orderItem = await OrderItem.create({

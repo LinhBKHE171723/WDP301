@@ -13,16 +13,22 @@ const waiterTableController = {
     try {
       const tables = await Table.find()
         .populate({
-          path: "orders",
-          select: "status totalAmount createdAt",
-          options: { sort: { createdAt: -1 }, limit: 1 }, // lấy order mới nhất
+          path: "orderNow",
+          populate: [
+            { path: "servedBy", select: "name email" },
+            { path: "userId", select: "name email" },
+            {
+              path: "orderItems",
+              populate: { path: "itemId", select: "name price" },
+            },
+          ],
         })
         .lean();
 
       res.status(200).json({ success: true, tables });
     } catch (error) {
       console.error("❌ Lỗi khi lấy danh sách bàn:", error);
-      res.status(500).json({ success: false, message: "Server error" });
+      res.status(500).json({ success: false, message: "Không thể lấy danh sách bàn" });
     }
   },
 
@@ -37,38 +43,28 @@ const waiterTableController = {
 
       const table = await Table.findById(tableId)
         .populate({
-          path: "orders",
+          path: "orderNow",
           populate: [
+            { path: "servedBy", select: "name email" },
+            { path: "userId", select: "name email" },
             {
               path: "orderItems",
-              populate: {
-                path: "itemId",
-                select: "name price image category",
-              },
+              populate: { path: "itemId", select: "name price" },
             },
-            {
-              path: "paymentId",
-              select: "status amountPaid paymentMethod",
-            },
-            {
-              path: "userId",
-              select: "name email phone",
-            },
-            {
-              path: "servedBy",
-              select: "name",
-            },
+            { path: "paymentId", select: "status amountPaid paymentMethod" },
           ],
         })
         .lean();
 
       if (!table)
-        return res.status(404).json({ success: false, message: "Không tìm thấy bàn" });
+        return res
+          .status(404)
+          .json({ success: false, message: "Không tìm thấy bàn" });
 
       res.status(200).json({ success: true, table });
     } catch (error) {
       console.error("❌ Lỗi khi lấy chi tiết bàn:", error);
-      res.status(500).json({ success: false, message: "Server error" });
+      res.status(500).json({ success: false, message: "Lỗi server" });
     }
   },
 };
