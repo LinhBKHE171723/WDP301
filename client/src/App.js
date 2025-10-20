@@ -1,7 +1,6 @@
 import React, { useMemo, useState } from "react"
 import { BrowserRouter as Router, Routes, Route, Navigate, useNavigate } from "react-router-dom"
 
-import TableInput from "./components/TableInput"
 import MenuView from "./components/MenuView"
 
 import CashierShiftManager from "./components/cashier/CashierShiftManager"
@@ -93,11 +92,8 @@ function OrderPaymentRoute() {
 /* -------------------------- App chính -------------------------- */
 
 function App() {
-  // Đặt table hiện tại (luồng đặt chỗ)
-  const [currentTable, setCurrentTable] = useState(null)
-
-  const handleTableSubmit = (table) => setCurrentTable(table)
-  const handleBackToTable = () => setCurrentTable(null)
+  // Table sẽ được waiter nhập sau trên hệ thống
+  const defaultTable = null
 
   // Trạng thái ca làm (demo)
   const [shiftData, setShiftData] = useState({
@@ -121,16 +117,10 @@ function App() {
           {/* Redirect root */}
           <Route path="/" element={<Navigate to="/reservation" replace />} />
 
-          {/* Luồng đặt chỗ */}
+          {/* Luồng đặt chỗ - đi thẳng vào menu */}
           <Route
             path="/reservation"
-            element={
-              currentTable ? (
-                <MenuView table={currentTable} onBack={handleBackToTable} />
-              ) : (
-                <TableInput onTableSubmit={handleTableSubmit} />
-              )
-            }
+            element={<MenuView table={defaultTable} onBack={() => {}} />}
           />
 
           {/* Trang menu demo */}
