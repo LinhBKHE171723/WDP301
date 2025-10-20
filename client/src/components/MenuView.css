@@ -462,6 +462,33 @@
   font-size: 14px;
 }
 
+.note-input-container {
+  margin-top: 8px;
+}
+
+.note-input {
+  width: 100%;
+  padding: 8px 12px;
+  border: 1px solid #ddd;
+  border-radius: 6px;
+  font-size: 13px;
+  font-family: inherit;
+  background: #f9f9f9;
+  transition: all 0.3s ease;
+}
+
+.note-input:focus {
+  outline: none;
+  border-color: #4CAF50;
+  background: white;
+  box-shadow: 0 0 0 2px rgba(76, 175, 80, 0.1);
+}
+
+.note-input::placeholder {
+  color: #999;
+  font-style: italic;
+}
+
 .item-controls {
   display: flex;
   align-items: center;
