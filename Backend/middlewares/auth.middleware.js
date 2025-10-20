@@ -34,7 +34,7 @@ function extractToken(req) {
 // ➤ Kiểm tra token hợp lệ, giải mã để lấy user info.
 function authRequired(req, res, next) {
   // Khi trình duyệt gửi một request có xác thực hoặc header đặc biệt (như Authorization: Bearer ...),
-  // nó sẽ gửi trước một request “thăm dò” gọi là preflight request để xem có chấp nhận CORS ko. return next để bỏ qua preflight request
+  // nó sẽ gửi trước một request "thăm dò" gọi là preflight request để xem có chấp nhận CORS ko. return next để bỏ qua preflight request
   if (req.method === "OPTIONS") return next(); 
 
   const token = extractToken(req);
