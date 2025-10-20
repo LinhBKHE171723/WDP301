@@ -1,5 +1,4 @@
 const jwt = require("jsonwebtoken");
-const User = require("../models/User");
 
 // 🧾 Tạo Access Token (thời hạn ngắn, dùng khi gọi API)
 function signAccessToken(payload) {
@@ -33,7 +32,7 @@ function extractToken(req) {
 // 🛡️ Middleware xác thực (authentication)
 // ➤ Dùng ở mọi route yêu cầu login (ví dụ /api/orders)
 // ➤ Kiểm tra token hợp lệ, giải mã để lấy user info.
-async function authRequired(req, res, next) {
+function authRequired(req, res, next) {
   // Khi trình duyệt gửi một request có xác thực hoặc header đặc biệt (như Authorization: Bearer ...),
   // nó sẽ gửi trước một request "thăm dò" gọi là preflight request để xem có chấp nhận CORS ko. return next để bỏ qua preflight request
   if (req.method === "OPTIONS") return next(); 
@@ -48,24 +47,21 @@ async function authRequired(req, res, next) {
     // ✅ Giải mã & verify token bằng secret của server và trả về payload là 1 object
     const decoded = jwt.verify(token, process.env.JWT_SECRET);
 
-    // Lấy thông tin đầy đủ user từ database
-    const user = await User.findById(decoded.id).select('-password');
-    if (!user) {
-      return next({
-        status: 401,
-        message: "User không tồn tại.",
-      });
-    }
-
     // Lưu thông tin người dùng đã xác thực vào req.user để route khác dùng
     req.user = {
-      id: user._id,
-      name: user.name,
-      username: user.username,
-      email: user.email,
-      role: user.role,
+      id: String(decoded.id || ""),
+      role: decoded.role,
+      username: decoded.username,
+      name: decoded.name,
+      email: decoded.email,
     };
-    
+    // Nếu token không có id thì xem như không hợp lệ
+    if (!req.user.id) {
+      return next({
+        status: 401,
+        message: "Token không chứa thông tin hợp lệ.",
+      });
+    }
     // Cho phép đi tiếp đến route controller
     next();
   } catch (err) {
