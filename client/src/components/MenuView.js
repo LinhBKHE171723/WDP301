@@ -255,7 +255,6 @@ const MenuView = ({ table, onBack }) => {
       <header className="menu-header">
         <div className="header-info">
           <h1>Thực đơn nhà hàng</h1>
-           <p>Bàn số: {table?.tableNumber || table?.number || 'Chưa chọn bàn'}</p>
         </div>
         <div className="header-actions">
           {isLoggedIn ? (
@@ -275,9 +274,6 @@ const MenuView = ({ table, onBack }) => {
           )}
           <button onClick={() => setShowCart(true)} className="cart-btn">
             Giỏ hàng ({cart.length})
-          </button>
-          <button onClick={onBack} className="back-btn">
-            Đổi bàn
           </button>
         </div>
       </header>
