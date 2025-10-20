@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import './LoginModal.css';
 
 const LoginModal = ({ isOpen, onClose, onLogin }) => {
-  const [form, setForm] = useState({ usernameOrEmail: "", password: "" });
+  const [form, setForm] = useState({ email: "", password: "" });
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
 
@@ -23,7 +23,7 @@ const LoginModal = ({ isOpen, onClose, onLogin }) => {
           "Content-Type": "application/json",
         },
         body: JSON.stringify({
-          usernameOrEmail: form.usernameOrEmail,
+          email: form.email,
           password: form.password
         }),
       });
@@ -50,7 +50,7 @@ const LoginModal = ({ isOpen, onClose, onLogin }) => {
   };
 
   const handleClose = () => {
-    setForm({ usernameOrEmail: "", password: "" });
+    setForm({ email: "", password: "" });
     setError("");
     onClose();
   };
@@ -70,15 +70,15 @@ const LoginModal = ({ isOpen, onClose, onLogin }) => {
         <div className="login-modal-body">
           <form onSubmit={handleSubmit}>
             <div className="form-group">
-              <label htmlFor="usernameOrEmail">Tên đăng nhập hoặc Email</label>
+              <label htmlFor="email">Email</label>
               <input
-                type="text"
-                id="usernameOrEmail"
-                name="usernameOrEmail"
-                value={form.usernameOrEmail}
+                type="email"
+                id="email"
+                name="email"
+                value={form.email}
                 onChange={handleChange}
                 required
-                placeholder="Nhập tên đăng nhập hoặc email"
+                placeholder="Nhập email"
               />
             </div>
 
