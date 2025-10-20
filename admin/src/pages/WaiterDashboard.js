@@ -9,8 +9,7 @@ import { toast, ToastContainer } from "react-toastify";
 import "react-toastify/dist/ReactToastify.css";
 
 export default function WaiterDashboard() {
-    const { token, logout } = useAuth();
-
+    const { token, logout, user } = useAuth();
     // State lưu danh sách order mà waiter đang xử lý
     const [orders, setOrders] = useState([]);
 
@@ -57,7 +56,7 @@ export default function WaiterDashboard() {
     return (
         <div className="min-vh-100 bg-light d-flex flex-column">
             {/* Header cố định trên cùng */}
-            <Header onLogout={logout} />
+            <Header onLogout={logout} user={user} />
 
             {/* Nội dung chính */}
             <Container className="flex-grow-1 mt-4 pb-4">

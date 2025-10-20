@@ -51,6 +51,8 @@ function authRequired(req, res, next) {
     req.user = {
       id: String(decoded.id || ""),
       role: decoded.role,
+      username: decoded.username,
+      name: decoded.name,
       email: decoded.email,
     };
     // Nếu token không có id thì xem như không hợp lệ
