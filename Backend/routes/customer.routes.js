@@ -1,5 +1,6 @@
 const express = require("express");
 const router = express.Router();
+const { authRequired } = require("../middlewares/auth.middleware");
 const {
   getAvailableMenus,
   getMenuById,
@@ -8,6 +9,7 @@ const {
   createOrder,
   getTableByNumber,
   getOrderById,
+  getUserOrders,
   addItemsToOrder,
   cancelOrderItem,
   updateOrderStatus,
@@ -37,6 +39,9 @@ router.post("/orders", createOrder);
 
 // 7. Lấy thông tin đơn hàng theo ID
 router.get("/orders/:orderId", getOrderById);
+
+// 7.1. Lấy danh sách đơn hàng của user đã đăng nhập (cần authentication)
+router.get("/user/orders", authRequired, getUserOrders);
 
 // 8. Thêm món mới vào order hiện có
 router.post("/orders/:orderId/items", addItemsToOrder);

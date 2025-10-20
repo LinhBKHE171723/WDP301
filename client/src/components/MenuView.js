@@ -1,9 +1,14 @@
 import React, { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
+import { useAuth } from '../context/AuthContext';
+import LoginModal from './LoginModal';
 import ItemDetail from './ItemDetail';
 import OrderStatus from './OrderStatus';
 import './MenuView.css';
 
 const MenuView = ({ table, onBack }) => {
+  const navigate = useNavigate();
+  const { user, isLoggedIn, login, logout } = useAuth();
   const [menus, setMenus] = useState([]);
   const [items, setItems] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -12,6 +17,7 @@ const MenuView = ({ table, onBack }) => {
   const [cart, setCart] = useState([]);
   const [showCart, setShowCart] = useState(false);
   const [selectedItem, setSelectedItem] = useState(null);
+  const [showLoginModal, setShowLoginModal] = useState(false);
   const [showItemDetail, setShowItemDetail] = useState(false);
   const [priceFilter, setPriceFilter] = useState('all');
   const [itemPriceFilter, setItemPriceFilter] = useState('all');
@@ -189,8 +195,7 @@ const MenuView = ({ table, onBack }) => {
          body: JSON.stringify({
            tableId: table?._id || null,
            orderItems: orderItems,
-           customerName: "Khách vãng lai",
-           customerPhone: ""
+           userId: user?.id || null
          })
       });
 
@@ -205,6 +210,16 @@ const MenuView = ({ table, onBack }) => {
     } catch (err) {
       alert('Lỗi đặt món');
     }
+  };
+
+  const handleLogin = (userData, token) => {
+    login(userData, token);
+    alert(`Chào mừng ${userData.username}!`);
+  };
+
+  const handleLogout = () => {
+    logout();
+    alert('Đã đăng xuất thành công!');
   };
 
   // Hiển thị OrderStatus nếu có orderId
@@ -243,6 +258,21 @@ const MenuView = ({ table, onBack }) => {
            <p>Bàn số: {table?.tableNumber || table?.number || 'Chưa chọn bàn'}</p>
         </div>
         <div className="header-actions">
+          {isLoggedIn ? (
+            <div className="user-info">
+              <span className="welcome-text">Xin chào, {user?.name || user?.username || 'Khách hàng'}!</span>
+              <button onClick={() => navigate('/order-history')} className="order-history-btn">
+                📋 Lịch sử đơn hàng
+              </button>
+              <button onClick={handleLogout} className="logout-btn">
+                Đăng xuất
+              </button>
+            </div>
+          ) : (
+            <button onClick={() => setShowLoginModal(true)} className="login-btn">
+              Đăng nhập
+            </button>
+          )}
           <button onClick={() => setShowCart(true)} className="cart-btn">
             Giỏ hàng ({cart.length})
           </button>
@@ -518,6 +548,13 @@ const MenuView = ({ table, onBack }) => {
            onAddToCart={addToCart}
          />
        )}
+
+       {/* Login Modal */}
+       <LoginModal 
+         isOpen={showLoginModal}
+         onClose={() => setShowLoginModal(false)}
+         onLogin={handleLogin}
+       />
      </div>
    );
  };

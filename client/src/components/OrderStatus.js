@@ -347,7 +347,7 @@ const OrderStatus = ({ orderId, onBack }) => {
               Hủy đơn hàng
             </button>
           )}
-          {order && order.status === 'paid' && (
+          {order && (order.status === 'paid' || order.status === 'cancelled') && (
             <button onClick={onBack} className="back-to-menu-btn">
               Quay lại menu
             </button>

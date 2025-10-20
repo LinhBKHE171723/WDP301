@@ -145,7 +145,7 @@ exports.getItemById = async (req, res) => {
 // Tạo đơn hàng mới
 exports.createOrder = async (req, res) => {
   try {
-    const { tableId, orderItems, customerName, customerPhone } = req.body;
+    const { tableId, orderItems, userId } = req.body;
 
     // Kiểm tra bàn có tồn tại không (chỉ khi có tableId)
     if (tableId) {
@@ -232,8 +232,7 @@ exports.createOrder = async (req, res) => {
       status: "pending",
       totalAmount: totalAmount,
       discount: 0,
-      customerName: customerName || "Khách vãng lai",
-      customerPhone: customerPhone || ""
+      userId: userId || null
     });
 
     await order.save();
@@ -272,6 +271,45 @@ exports.createOrder = async (req, res) => {
     res.status(500).json({ 
       success: false, 
       message: error.message 
+    });
+  }
+};
+
+// Lấy danh sách đơn hàng của user đã đăng nhập
+exports.getUserOrders = async (req, res) => {
+  try {
+    const userId = req.user.id; // Lấy từ auth middleware
+    
+    const orders = await Order.find({ userId: userId })
+      .populate('tableId', 'tableNumber')
+      .populate('orderItems')
+      .populate('paymentId')
+      .sort({ createdAt: -1 }); // Sắp xếp theo thời gian tạo mới nhất
+
+    // Populate thông tin item trong orderItems
+    for (let i = 0; i < orders.length; i++) {
+      const order = orders[i];
+      for (let j = 0; j < order.orderItems.length; j++) {
+        const orderItem = order.orderItems[j];
+        if (orderItem.itemId) {
+          // Tìm trong cả Item và Menu
+          let item = await Item.findById(orderItem.itemId);
+          if (!item) {
+            item = await Menu.findById(orderItem.itemId);
+          }
+          orderItem.itemId = item;
+        }
+      }
+    }
+
+    res.status(200).json({
+      success: true,
+      data: orders
+    });
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      message: error.message
     });
   }
 };
