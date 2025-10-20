@@ -1,7 +1,7 @@
 import React from "react";
 import { Button, Navbar, Container, Nav } from "react-bootstrap";
 
-export default function Header({ onLogout }) {
+export default function Header({ onLogout, user }) {
   return (
     <Navbar
       bg="white"
@@ -41,7 +41,7 @@ export default function Header({ onLogout }) {
               className="rounded-circle border"
             />
             <span className="fw-bold text-dark d-none d-sm-inline">
-              Waiter 01
+              {user?.name}
             </span>
             <Button
               variant="outline-danger"

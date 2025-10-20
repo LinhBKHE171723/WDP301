@@ -44,6 +44,8 @@ exports.login = async (req, res) => {
       id: user._id,
       role: user.role,
       username: user.username,
+      name: user.name,
+      email: user.email,
     };
 
     // 4. Ký và tạo Token
@@ -60,6 +62,7 @@ exports.login = async (req, res) => {
         id: user._id,
         name: user.name,
         username: user.username,
+        name: user.name,
         email: user.email,
         role: user.role,
       },
