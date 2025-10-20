@@ -6,10 +6,10 @@ const tableSchema = new Schema({
   qrCode: String,
   status: {
     type: String,
-    enum: ["available", "occupied", "reserved"],
+    enum: ["available", "occupied"],
     default: "available",
   },
-  orders: [{ type: Schema.Types.ObjectId, ref: "Order" }],
+  orderNow: { type: Schema.Types.ObjectId, ref: "Order" },
 });
 
 module.exports = mongoose.model("Table", tableSchema);
