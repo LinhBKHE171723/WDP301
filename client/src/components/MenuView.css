@@ -64,6 +64,7 @@
   display: flex;
   gap: 10px;
   align-items: center;
+  height: 60px;
 }
 
 .user-info {
@@ -106,6 +107,12 @@
   font-weight: 600;
   font-size: 14px;
   transition: all 0.3s ease;
+  height: 40px;
+  display: flex;
+  align-items: center !important;
+  justify-content: center;
+  white-space: nowrap;
+  margin: 0 !important;
 }
 
 .login-btn:hover {
@@ -139,11 +146,19 @@
   cursor: pointer;
   font-weight: 600;
   transition: all 0.3s ease;
+  height: 40px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
 }
 
 .cart-btn {
   background: #4CAF50;
   color: white;
+  padding: 10px 30px;
+  border-radius: 6px;
+  white-space: nowrap;
+  align-items: center !important;
 }
 
 .cart-btn:hover {

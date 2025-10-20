@@ -834,7 +834,7 @@
 }
 
 .back-to-menu-btn {
-  background: #28a745;
+  background: #007bff;
   color: white;
   border: none;
   padding: 10px 20px;
@@ -849,7 +849,7 @@
 }
 
 .back-to-menu-btn:hover {
-  background: #218838;
+  background: #0056b3;
   transform: translateY(-2px);
-  box-shadow: 0 4px 12px rgba(40, 167, 69, 0.3);
+  box-shadow: 0 4px 12px rgba(0, 123, 255, 0.3);
 }

@@ -220,7 +220,7 @@ const OrderStatus = ({ orderId, onBack }) => {
   const getStatusText = (status) => {
     switch (status) {
       case 'pending':
-        return 'Đã đặt món';
+        return 'Chờ xác nhận';
       case 'waiting_confirm':
         return 'Chờ xác nhận';
       case 'confirmed':
