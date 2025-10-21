@@ -8,10 +8,6 @@ const ItemDetail = ({ itemId, type, onClose, onAddToCart }) => {
   const [error, setError] = useState('');
   const [quantity, setQuantity] = useState(1);
 
-  useEffect(() => {
-    fetchItemDetail();
-  }, [fetchItemDetail]);
-
   const fetchItemDetail = useCallback(async () => {
     try {
       setLoading(true);
@@ -30,6 +26,10 @@ const ItemDetail = ({ itemId, type, onClose, onAddToCart }) => {
       setLoading(false);
     }
   }, [itemId, type]);
+
+  useEffect(() => {
+    fetchItemDetail();
+  }, [fetchItemDetail]);
 
   const handleAddToCart = () => {
     onAddToCart(item, type, quantity);
