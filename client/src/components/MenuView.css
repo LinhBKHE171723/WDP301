@@ -595,6 +595,28 @@
   font-weight: 600;
 }
 
+.quantity-input {
+  width: 50px;
+  height: 30px;
+  border: 1px solid #ddd;
+  border-radius: 4px;
+  text-align: center;
+  font-weight: 600;
+  font-size: 14px;
+  background: white;
+  transition: border-color 0.2s ease;
+}
+
+.quantity-input:focus {
+  outline: none;
+  border-color: #007bff;
+  box-shadow: 0 0 0 2px rgba(0, 123, 255, 0.25);
+}
+
+.quantity-input:hover {
+  border-color: #007bff;
+}
+
 .remove-btn {
   background: #dc3545 !important;
   color: white !important;

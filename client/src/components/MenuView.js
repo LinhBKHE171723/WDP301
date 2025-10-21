@@ -1,9 +1,12 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
+import { getCookie, setCookie, eraseCookie } from '../utils/cookie';
 import LoginModal from './LoginModal';
 import ItemDetail from './ItemDetail';
 import OrderStatus from './OrderStatus';
+import { filterMenusByPrice, filterItemsByPriceAndCategory, getUniqueCategories } from '../utils/priceFilters';
+import { API_ENDPOINTS } from '../utils/apiConfig';
 import './MenuView.css';
 
 const MenuView = ({ table, onBack }) => {
@@ -25,6 +28,11 @@ const MenuView = ({ table, onBack }) => {
   const [currentOrderId, setCurrentOrderId] = useState(null);
 
   useEffect(() => {
+    // Khôi phục order id từ cookie nếu có
+    const savedOrderId = getCookie('current_order_id');
+    if (savedOrderId) {
+      setCurrentOrderId(savedOrderId);
+    }
     fetchData();
   }, []);
 
@@ -32,8 +40,8 @@ const MenuView = ({ table, onBack }) => {
     try {
       setLoading(true);
       const [menusRes, itemsRes] = await Promise.all([
-        fetch('http://localhost:5000/api/customer/menus'),
-        fetch('http://localhost:5000/api/customer/items')
+        fetch(API_ENDPOINTS.CUSTOMER.MENUS),
+        fetch(API_ENDPOINTS.CUSTOMER.ITEMS)
       ]);
 
       const menusData = await menusRes.json();
@@ -117,65 +125,6 @@ const MenuView = ({ table, onBack }) => {
     return cart.reduce((total, item) => total + (item.price * item.quantity), 0);
   };
 
-  const filterMenusByPrice = (menus) => {
-    switch (priceFilter) {
-      case 'under-100k':
-        return menus.filter(menu => menu.price < 100000);
-      case '100k-200k':
-        return menus.filter(menu => menu.price >= 100000 && menu.price < 200000);
-      case '200k-500k':
-        return menus.filter(menu => menu.price >= 200000 && menu.price < 500000);
-      case '500k-1000k':
-        return menus.filter(menu => menu.price >= 500000 && menu.price < 1000000);
-      case '1000k-2000k':
-        return menus.filter(menu => menu.price >= 1000000 && menu.price < 2000000);
-      case '2000k-5000k':
-        return menus.filter(menu => menu.price >= 2000000 && menu.price < 5000000);
-      case 'over-5000k':
-        return menus.filter(menu => menu.price >= 5000000);
-      default:
-        return menus;
-    }
-  };
-
-  const filterItemsByPriceAndCategory = (items) => {
-    let filteredItems = items;
-
-    // Filter by price
-    switch (itemPriceFilter) {
-      case 'under-50k':
-        filteredItems = filteredItems.filter(item => item.price < 50000);
-        break;
-      case '50k-100k':
-        filteredItems = filteredItems.filter(item => item.price >= 50000 && item.price < 100000);
-        break;
-      case '100k-200k':
-        filteredItems = filteredItems.filter(item => item.price >= 100000 && item.price < 200000);
-        break;
-      case '200k-500k':
-        filteredItems = filteredItems.filter(item => item.price >= 200000 && item.price < 500000);
-        break;
-      case 'over-500k':
-        filteredItems = filteredItems.filter(item => item.price >= 500000);
-        break;
-      default:
-        // No price filter
-        break;
-    }
-
-    // Filter by category
-    if (categoryFilter !== 'all') {
-      filteredItems = filteredItems.filter(item => item.category === categoryFilter);
-    }
-
-    return filteredItems;
-  };
-
-  const getUniqueCategories = (items) => {
-    const categories = [...new Set(items.map(item => item.category))];
-    return categories.filter(category => category); // Remove empty/null categories
-  };
-
   const handleOrder = async () => {
     if (cart.length === 0) return;
 
@@ -187,7 +136,7 @@ const MenuView = ({ table, onBack }) => {
         note: item.note || "" // Thêm note
       }));
 
-      const response = await fetch('http://localhost:5000/api/customer/orders', {
+      const response = await fetch(API_ENDPOINTS.CUSTOMER.ORDERS, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -202,6 +151,8 @@ const MenuView = ({ table, onBack }) => {
       const data = await response.json();
       if (data.success) {
         setCurrentOrderId(data.data._id);
+        // Lưu order id vào cookie trong 2 ngày
+        setCookie('current_order_id', data.data._id, 2);
         setCart([]);
         setShowCart(false);
       } else {
@@ -222,12 +173,17 @@ const MenuView = ({ table, onBack }) => {
     alert('Đã đăng xuất thành công!');
   };
 
+  const handleBackFromOrder = () => {
+    setCurrentOrderId(null);
+    eraseCookie('current_order_id');
+  };
+
   // Hiển thị OrderStatus nếu có orderId
   if (currentOrderId) {
     return (
       <OrderStatus 
         orderId={currentOrderId} 
-        onBack={() => setCurrentOrderId(null)} 
+        onBack={handleBackFromOrder} 
       />
     );
   }
@@ -350,7 +306,7 @@ const MenuView = ({ table, onBack }) => {
               </div>
             </div>
             <div className="menu-grid">
-              {filterMenusByPrice(menus).map(menu => (
+              {filterMenusByPrice(menus, priceFilter).map(menu => (
               <div key={menu._id} className="menu-card">
                 <div 
                   className="menu-image clickable"
@@ -434,7 +390,7 @@ const MenuView = ({ table, onBack }) => {
             </div>
             
             <div className="menu-grid">
-              {filterItemsByPriceAndCategory(items).map(item => (
+              {filterItemsByPriceAndCategory(items, itemPriceFilter, categoryFilter).map(item => (
               <div key={item._id} className="menu-card">
                 <div 
                   className="menu-image clickable"
@@ -513,7 +469,19 @@ const MenuView = ({ table, onBack }) => {
                      <button onClick={() => updateQuantity(item.id, item.quantity - 1, item.note)}>
                        -
                      </button>
-                     <span>{item.quantity}</span>
+                     <input
+                       type="number"
+                       min="1"
+                       max="99"
+                       value={item.quantity}
+                       onChange={(e) => {
+                         const newQuantity = parseInt(e.target.value) || 1;
+                         if (newQuantity >= 1 && newQuantity <= 99) {
+                           updateQuantity(item.id, newQuantity, item.note);
+                         }
+                       }}
+                       className="quantity-input"
+                     />
                      <button onClick={() => updateQuantity(item.id, item.quantity + 1, item.note)}>
                        +
                      </button>
@@ -552,7 +520,7 @@ const MenuView = ({ table, onBack }) => {
          onLogin={handleLogin}
        />
      </div>
-   );
- };
+  );
+};
 
 export default MenuView;

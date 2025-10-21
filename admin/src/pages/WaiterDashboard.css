@@ -1,0 +1,101 @@
+/* Waiter Dashboard Styles */
+.connection-status {
+  padding: 6px 12px;
+  border-radius: 15px;
+  font-size: 12px;
+  font-weight: 500;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  transition: all 0.3s ease;
+}
+
+.connection-status.connected {
+  background: #e8f5e8;
+  color: #2e7d32;
+  border: 1px solid #4caf50;
+}
+
+.connection-status.connecting {
+  background: #fff3e0;
+  color: #f57c00;
+  border: 1px solid #ff9800;
+}
+
+.connection-status.reconnecting {
+  background: #fff3e0;
+  color: #f57c00;
+  border: 1px solid #ff9800;
+}
+
+.connection-status.disconnected {
+  background: #ffebee;
+  color: #c62828;
+  border: 1px solid #f44336;
+}
+
+/* Tab styles */
+.nav-tabs .nav-link {
+  border: none;
+  color: #666;
+  font-weight: 500;
+  padding: 12px 20px;
+  border-radius: 8px 8px 0 0;
+  margin-right: 5px;
+  transition: all 0.3s ease;
+}
+
+.nav-tabs .nav-link:hover {
+  background: #f8f9fa;
+  color: #333;
+}
+
+.nav-tabs .nav-link.active {
+  background: #4CAF50;
+  color: white;
+  border: none;
+}
+
+.nav-tabs .nav-link.active:hover {
+  background: #45a049;
+  color: white;
+}
+
+/* Order count badges */
+.nav-link {
+  position: relative;
+}
+
+.nav-link::after {
+  content: attr(data-count);
+  position: absolute;
+  top: -5px;
+  right: -5px;
+  background: #ff4444;
+  color: white;
+  border-radius: 50%;
+  width: 20px;
+  height: 20px;
+  font-size: 10px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: bold;
+}
+
+.nav-link[data-count="0"]::after {
+  display: none;
+}
+
+/* Responsive adjustments */
+@media (max-width: 768px) {
+  .connection-status {
+    font-size: 10px;
+    padding: 4px 8px;
+  }
+  
+  .nav-tabs .nav-link {
+    padding: 8px 12px;
+    font-size: 14px;
+  }
+}

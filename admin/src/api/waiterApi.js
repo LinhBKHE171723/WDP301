@@ -5,15 +5,22 @@ const waiterApi = {
   // 🔸 ORDER MANAGEMENT
   // ==========================
 
-  // Lấy tất cả order waiter đang phụ trách (pending / confirmed / served)
-  getActiveOrders: () => Client.get("/waiter/orders"),
+  // Lấy tất cả order waiter đang phụ trách (confirmed / preparing / ready)
+  getActiveOrders: () => Client.get("/waiter/orders/active"),
+
+  // Lấy danh sách order cần xác nhận từ waiter
+  getPendingOrders: () => Client.get("/waiter/orders/pending"),
 
   // Lấy chi tiết 1 order cụ thể
   getOrderDetails: (orderId) => Client.get(`/waiter/orders/${orderId}`),
 
-  // Cập nhật trạng thái đơn hàng (pending → confirmed → served)
+  // Waiter phản hồi đơn hàng (xác nhận hoặc từ chối)
+  respondToOrder: (orderId, approved, reason) =>
+    Client.post(`/waiter/orders/${orderId}/respond`, { approved, reason }),
+
+  // Cập nhật trạng thái đơn hàng (confirmed → served)
   updateOrderStatus: (orderId, status) =>
-    Client.put(`/waiter/orders/${orderId}`, { status }),
+    Client.put(`/waiter/orders/${orderId}/status`, { status }),
 
   // Xác nhận đã phục vụ xong toàn bộ order
   markOrderServed: (orderId) =>

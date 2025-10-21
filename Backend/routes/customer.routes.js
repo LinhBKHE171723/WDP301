@@ -15,7 +15,8 @@ const {
   updateOrderStatus,
   createFeedback,
   getOrderFeedback,
-  canFeedback
+  canFeedback,
+  confirmOrder
 } = require("../controllers/customer.controller");
 
 // Routes cho khách hàng (không cần authentication)
@@ -51,6 +52,9 @@ router.delete("/orders/:orderId/items/:orderItemId", cancelOrderItem);
 
 // 10. Cập nhật trạng thái đơn hàng
 router.put("/orders/:orderId", updateOrderStatus);
+
+// 10.1. Customer xác nhận đơn hàng sau khi waiter approve
+router.post("/orders/:orderId/confirm", confirmOrder);
 
 // 11. Kiểm tra order có thể feedback không
 router.get("/orders/:orderId/can-feedback", canFeedback);

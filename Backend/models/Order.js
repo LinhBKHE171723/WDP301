@@ -24,6 +24,24 @@ const orderSchema = new Schema(
     totalAmount: Number,
     discount: Number,
     servedAt: Date,
+    waiterResponse: {
+      status: {
+        type: String,
+        enum: ["pending", "approved", "rejected"],
+        default: "pending"
+      },
+      reason: String,
+      respondedAt: Date
+    },
+    customerConfirmed: {
+      type: Boolean,
+      default: false
+    },
+    confirmationHistory: [{
+      action: String, // 'waiter_approved', 'waiter_rejected', 'customer_confirmed', 'order_modified'
+      timestamp: Date,
+      details: String
+    }]
   },
   { timestamps: true }
 );
