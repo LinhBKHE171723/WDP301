@@ -88,22 +88,20 @@ const createOrderItemsFromCart = async (orderItems) => {
       }
     }
 
-    // Tạo OrderItem riêng biệt cho mỗi suất (quantity = 1)
-    for (let i = 0; i < orderItem.quantity; i++) {
-      const OrderItem = require("../models/OrderItem");
-      const newOrderItem = new OrderItem({
-        itemId: orderItem.itemId,
-        itemName: item.name,
-        itemType: orderItem.type,
-        quantity: 1, // Mỗi OrderItem chỉ có quantity = 1
-        price: item.price,
-        note: orderItem.note || "",
-      });
+    // Tạo OrderItem với số lượng được yêu cầu
+    const OrderItem = require("../models/OrderItem");
+    const newOrderItem = new OrderItem({
+      itemId: orderItem.itemId,
+      itemName: item.name,
+      itemType: orderItem.type,
+      quantity: orderItem.quantity, // Sử dụng số lượng từ frontend
+      price: item.price,
+      note: orderItem.note || "",
+    });
 
-      await newOrderItem.save();
-      createdOrderItems.push(newOrderItem._id);
-      totalAmount += item.price;
-    }
+    await newOrderItem.save();
+    createdOrderItems.push(newOrderItem._id);
+    totalAmount += item.price * orderItem.quantity; // Tính tổng tiền theo số lượng
   }
 
   return {

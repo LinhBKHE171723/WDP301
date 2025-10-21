@@ -469,7 +469,19 @@ const MenuView = ({ table, onBack }) => {
                      <button onClick={() => updateQuantity(item.id, item.quantity - 1, item.note)}>
                        -
                      </button>
-                     <span>{item.quantity}</span>
+                     <input
+                       type="number"
+                       min="1"
+                       max="99"
+                       value={item.quantity}
+                       onChange={(e) => {
+                         const newQuantity = parseInt(e.target.value) || 1;
+                         if (newQuantity >= 1 && newQuantity <= 99) {
+                           updateQuantity(item.id, newQuantity, item.note);
+                         }
+                       }}
+                       className="quantity-input"
+                     />
                      <button onClick={() => updateQuantity(item.id, item.quantity + 1, item.note)}>
                        +
                      </button>

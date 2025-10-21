@@ -157,7 +157,16 @@ exports.createOrder = async (req, res) => {
       status: "pending",
       totalAmount: totalAmount,
       discount: 0,
-      userId: userId || null
+      userId: userId || null,
+      waiterResponse: {
+        status: "pending"
+      },
+      customerConfirmed: false,
+      confirmationHistory: [{
+        action: 'order_created',
+        timestamp: new Date(),
+        details: 'Customer tạo đơn hàng mới'
+      }]
     });
 
     await order.save();
@@ -178,10 +187,12 @@ exports.createOrder = async (req, res) => {
       .populate("tableId")
       .populate("paymentId");
 
-    // Emit WebSocket event để cập nhật real-time
+    // Emit WebSocket event để thông báo waiter có đơn hàng mới cần xác nhận
     const webSocketService = req.app.get("webSocketService");
     if (webSocketService) {
       webSocketService.broadcastToOrder(order._id, "order:created", populatedOrder);
+      // Broadcast to all waiter connections (not order-specific)
+      webSocketService.broadcastToAllWaiters("order:needs_waiter_confirm", populatedOrder);
     }
 
     res.status(201).json({
@@ -305,29 +316,38 @@ exports.addItemsToOrder = async (req, res) => {
         }
       }
 
-      // Tạo OrderItem riêng biệt cho mỗi suất (quantity = 1)
-      for (let i = 0; i < orderItem.quantity; i++) {
-        const newOrderItem = new OrderItem({
-          orderId: orderId,
-          itemId: orderItem.itemId,
-          itemName: item.name,
-          itemType: orderItem.type,
-          quantity: 1, // Mỗi OrderItem chỉ có quantity = 1
-          price: item.price,
-          status: "pending",
-          note: orderItem.note || "",
-        });
+      // Tạo OrderItem với số lượng được yêu cầu
+      const newOrderItem = new OrderItem({
+        orderId: orderId,
+        itemId: orderItem.itemId,
+        itemName: item.name,
+        itemType: orderItem.type,
+        quantity: orderItem.quantity, // Sử dụng số lượng từ frontend
+        price: item.price,
+        status: "pending",
+        note: orderItem.note || "",
+      });
 
-        await newOrderItem.save();
-        createdOrderItems.push(newOrderItem._id);
-        additionalAmount += item.price;
-        // Item added successfully
-      }
+      await newOrderItem.save();
+      createdOrderItems.push(newOrderItem._id);
+      additionalAmount += item.price * orderItem.quantity; // Tính tổng tiền theo số lượng
     }
 
     // Cập nhật order với orderItems mới và totalAmount
     order.orderItems.push(...createdOrderItems);
     order.totalAmount += additionalAmount;
+    
+    // Reset confirmation flow khi order được modify
+    order.waiterResponse.status = 'pending';
+    order.waiterResponse.reason = null;
+    order.waiterResponse.respondedAt = null;
+    order.customerConfirmed = false;
+    order.confirmationHistory.push({
+      action: 'order_modified',
+      timestamp: new Date(),
+      details: 'Customer thêm món vào đơn hàng'
+    });
+    
     await order.save();
 
     // Cập nhật Payment với totalAmount mới
@@ -347,6 +367,8 @@ exports.addItemsToOrder = async (req, res) => {
     const webSocketService = req.app.get("webSocketService");
     if (webSocketService) {
       webSocketService.broadcastToOrder(order._id, "order:updated", populatedOrder);
+      // Thông báo waiter có đơn hàng cần xác nhận lại
+      webSocketService.broadcastToAllWaiters("order:needs_waiter_confirm", populatedOrder);
     }
 
     res.status(200).json({
@@ -404,6 +426,18 @@ exports.cancelOrderItem = async (req, res) => {
     
     // Cập nhật totalAmount
     order.totalAmount -= itemAmount;
+    
+    // Reset confirmation flow khi order được modify
+    order.waiterResponse.status = 'pending';
+    order.waiterResponse.reason = null;
+    order.waiterResponse.respondedAt = null;
+    order.customerConfirmed = false;
+    order.confirmationHistory.push({
+      action: 'order_modified',
+      timestamp: new Date(),
+      details: 'Customer hủy món trong đơn hàng'
+    });
+    
     await order.save();
 
     // Cập nhật Payment với totalAmount mới
@@ -423,6 +457,8 @@ exports.cancelOrderItem = async (req, res) => {
     const webSocketService = req.app.get("webSocketService");
     if (webSocketService) {
       webSocketService.broadcastToOrder(order._id, "order:updated", populatedOrder);
+      // Thông báo waiter có đơn hàng cần xác nhận lại
+      webSocketService.broadcastToAllWaiters("order:needs_waiter_confirm", populatedOrder);
     }
 
     res.status(200).json({
@@ -474,6 +510,11 @@ exports.updateOrderStatus = async (req, res) => {
     const webSocketService = req.app.get("webSocketService");
     if (webSocketService) {
       webSocketService.broadcastToOrder(order._id, "order:updated", order);
+      
+      // Nếu đơn hàng bị hủy, thông báo waiter
+      if (status === 'cancelled') {
+        webSocketService.broadcastToAllWaiters("order:cancelled", order);
+      }
     }
 
     res.status(200).json({
@@ -581,6 +622,66 @@ exports.getOrderFeedback = async (req, res) => {
     res.status(500).json({ 
       success: false, 
       message: error.message 
+    });
+  }
+};
+
+// Customer xác nhận đơn hàng sau khi waiter đã approve
+exports.confirmOrder = async (req, res) => {
+  try {
+    const { orderId } = req.params;
+
+    // Tìm order
+    const order = await Order.findById(orderId);
+    if (!order) {
+      return res.status(404).json({
+        success: false,
+        message: "Không tìm thấy đơn hàng"
+      });
+    }
+
+    // Kiểm tra order có thể xác nhận không
+    if (order.status !== 'pending' || order.waiterResponse.status !== 'approved' || order.customerConfirmed) {
+      return res.status(400).json({
+        success: false,
+        message: "Đơn hàng không thể xác nhận"
+      });
+    }
+
+    // Cập nhật order
+    order.customerConfirmed = true;
+    order.status = 'confirmed';
+    order.confirmationHistory.push({
+      action: 'customer_confirmed',
+      timestamp: new Date(),
+      details: 'Customer xác nhận đơn hàng'
+    });
+
+    await order.save();
+
+    // Populate để trả về thông tin đầy đủ
+    const populatedOrder = await Order.findById(order._id)
+      .populate("orderItems")
+      .populate("tableId")
+      .populate("paymentId");
+
+    // Emit WebSocket event để thông báo kitchen có đơn hàng mới
+    const webSocketService = req.app.get("webSocketService");
+    if (webSocketService) {
+      webSocketService.broadcastToOrder(order._id, "order:confirmed", populatedOrder);
+      // Broadcast to all kitchen connections
+      webSocketService.broadcastToAllKitchen("order:confirmed", populatedOrder);
+    }
+
+    res.status(200).json({
+      success: true,
+      message: "Đã xác nhận đơn hàng thành công",
+      data: populatedOrder
+    });
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      message: error.message
     });
   }
 };

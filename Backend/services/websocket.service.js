@@ -73,6 +73,16 @@ class WebSocketService {
       case 'unsubscribe':
         this.handleUnsubscribe(ws, message.orderId);
         break;
+      case 'auth':
+        // Set user role for this connection
+        ws.userRole = message.role;
+        console.log(`🔐 WebSocket authenticated as: ${message.role}`);
+        ws.send(JSON.stringify({ 
+          type: 'auth_success', 
+          role: message.role,
+          message: `Authenticated as ${message.role}` 
+        }));
+        break;
       case 'ping':
         ws.send(JSON.stringify({ type: 'pong' }));
         break;
@@ -192,6 +202,44 @@ class WebSocketService {
     if (subscribers.size === 0) {
       this.connections.delete(orderIdStr);
     }
+  }
+
+  // Broadcast to all waiter connections
+  broadcastToAllWaiters(eventType, data) {
+    const message = {
+      type: eventType,
+      data: data,
+      timestamp: new Date().toISOString()
+    };
+
+    this.wss.clients.forEach(ws => {
+      try {
+        if (ws.readyState === WebSocket.OPEN && ws.userRole === 'waiter') {
+          ws.send(JSON.stringify(message));
+        }
+      } catch (error) {
+        console.error('❌ Error sending WebSocket message to waiter:', error);
+      }
+    });
+  }
+
+  // Broadcast to all kitchen connections
+  broadcastToAllKitchen(eventType, data) {
+    const message = {
+      type: eventType,
+      data: data,
+      timestamp: new Date().toISOString()
+    };
+
+    this.wss.clients.forEach(ws => {
+      try {
+        if (ws.readyState === WebSocket.OPEN && ws.userRole === 'kitchen_manager') {
+          ws.send(JSON.stringify(message));
+        }
+      } catch (error) {
+        console.error('❌ Error sending WebSocket message to kitchen:', error);
+      }
+    });
   }
 
   // Heartbeat mechanism to keep connections alive
