@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { getRatingText } from '../utils/ratingUtils';
 import { API_ENDPOINTS } from '../utils/apiConfig';
 import './FeedbackForm.css';
@@ -14,9 +14,9 @@ const FeedbackForm = ({ orderId, onFeedbackSubmitted }) => {
 
   useEffect(() => {
     checkCanFeedback();
-  }, [orderId]);
+  }, [orderId, checkCanFeedback]);
 
-  const checkCanFeedback = async () => {
+  const checkCanFeedback = useCallback(async () => {
     try {
       setCheckingFeedback(true);
       const response = await fetch(API_ENDPOINTS.CUSTOMER.ORDER_CAN_FEEDBACK(orderId));
@@ -35,7 +35,7 @@ const FeedbackForm = ({ orderId, onFeedbackSubmitted }) => {
     } finally {
       setCheckingFeedback(false);
     }
-  };
+  }, [orderId]);
 
   const handleSubmit = async (e) => {
     e.preventDefault();

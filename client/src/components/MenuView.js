@@ -306,7 +306,7 @@ const MenuView = ({ table, onBack }) => {
               </div>
             </div>
             <div className="menu-grid">
-              {filterMenusByPrice(menus).map(menu => (
+              {filterMenusByPrice(menus, priceFilter).map(menu => (
               <div key={menu._id} className="menu-card">
                 <div 
                   className="menu-image clickable"
@@ -390,7 +390,7 @@ const MenuView = ({ table, onBack }) => {
             </div>
             
             <div className="menu-grid">
-              {filterItemsByPriceAndCategory(items).map(item => (
+              {filterItemsByPriceAndCategory(items, itemPriceFilter, categoryFilter).map(item => (
               <div key={item._id} className="menu-card">
                 <div 
                   className="menu-image clickable"

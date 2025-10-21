@@ -101,7 +101,7 @@ const OrderHistory = ({ onBack }) => {
               <div className="order-header">
                 <div className="order-info">
                   <h3>Đơn hàng #{order._id.slice(-8).toUpperCase()}</h3>
-                  <p className="order-date">{formatDate(order.createdAt)}</p>
+                  <p className="order-date">{formatOrderDate(order.createdAt)}</p>
                   {order.tableId && (
                     <p className="table-info">Bàn số: {order.tableId.tableNumber}</p>
                   )}

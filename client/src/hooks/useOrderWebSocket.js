@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 
 // WebSocket configuration constants
 const RETRY_INTERVALS = [1000, 2000, 4000, 8000, 16000, 30000];
@@ -76,7 +76,7 @@ export const useOrderWebSocket = (orderId) => {
   };
 
   // Connect to WebSocket
-  const connect = () => {
+  const connect = useCallback(() => {
     if (isManualCloseRef.current) return;
 
     try {
@@ -155,10 +155,10 @@ export const useOrderWebSocket = (orderId) => {
       setError(error.message);
       setConnectionState('disconnected');
     }
-  };
+  }, [orderId]);
 
   // Disconnect
-  const disconnect = () => {
+  const disconnect = useCallback(() => {
     console.log('Manually disconnecting WebSocket');
     isManualCloseRef.current = true;
     
@@ -175,7 +175,7 @@ export const useOrderWebSocket = (orderId) => {
     
     setConnectionState('disconnected');
     isConnectedRef.current = false;
-  };
+  }, []);
 
   // Manual refresh
   const manualRefresh = async (orderId) => {
@@ -206,7 +206,7 @@ export const useOrderWebSocket = (orderId) => {
     return () => {
       disconnect();
     };
-  }, []); // Run only once
+  }, [connect, disconnect]); // Run only once
 
   // Subscribe to order when orderId changes
   useEffect(() => {

@@ -158,6 +158,42 @@ const seedDatabase = async () => {
       },
     ]);
 
+    // 4.5️⃣ Tạo menu mẫu
+    const menus = await Menu.insertMany([
+      {
+        name: "Combo Bò Bít Tết",
+        description: "Bò bít tết + Salad + Nước uống",
+        items: [
+          items.find((i) => i.name === "Bò Bít Tết")._id,
+          items.find((i) => i.name === "Salad Rau Củ")._id,
+        ],
+        price: 300000,
+        type: "combo",
+        isAvailable: true,
+      },
+      {
+        name: "Combo Hải Sản",
+        description: "Cá hồi + Tôm tempura + Salad",
+        items: [
+          items.find((i) => i.name === "Cá Hồi Áp Chảo")._id,
+          items.find((i) => i.name === "Tôm Tempura")._id,
+          items.find((i) => i.name === "Salad Rau Củ")._id,
+        ],
+        price: 450000,
+        type: "combo",
+        isAvailable: true,
+      },
+      {
+        name: "Combo Gia Đình",
+        description: "Tất cả món chính + Salad",
+        items: items.map((item) => item._id),
+        price: 600000,
+        type: "combo",
+        isAvailable: true,
+      },
+    ]);
+    console.log("🍽️ Đã tạo các Menu mẫu.");
+
     // 5️⃣ Bàn ăn (20 bàn)
     const tables = await Promise.all(
       Array.from({ length: 20 }, (_, i) =>
