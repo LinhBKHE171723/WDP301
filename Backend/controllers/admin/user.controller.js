@@ -1,5 +1,5 @@
 // controllers/admin/user.controller.js
-const AdminUserService = require("../../services/admin.user.service");
+const AdminUserService = require("../../services/admin/admin.user.service");
 const { success, error } = require("../../utils/response");
 
 module.exports = {
@@ -14,7 +14,6 @@ module.exports = {
   },
 create: async (req, res) => {
   try {
-    // Gọi service để tạo tài khoản + random password + gửi email
     const user = await AdminUserService.create(req.body);
 
     return success(res, user, "Tạo tài khoản thành công. Mật khẩu đã gửi email.");

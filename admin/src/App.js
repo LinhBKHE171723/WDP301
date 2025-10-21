@@ -1,12 +1,14 @@
 import { Routes, Route } from "react-router-dom";
-import Sidebar from "./components/Sidebar";
-import { Header } from "./components/Header";
-import DashboardPage from "./pages/DashboardPage";
-import AnalyticsPage from "./pages/AnalyticsPage";
-import AccountsPage from "./pages/AccountsPage";
-import FeedbackPage from "./pages/FeedbackPage";
-import SettingsPage from "./pages/SettingsPage";
-import { Toaster } from "sonner"; // ✅ THÊM DÒNG NÀY
+import Sidebar from "./components/admin/Sidebar";
+import { Header } from "./components/admin/Header";
+import DashboardPage from "./pages/admin/DashboardPage";
+import AnalyticsPage from "./pages/admin/AnalyticsPage";
+import AnalyticsPage2 from "./pages/admin/AnalyticsPage2";
+import AccountsPage from "./pages/admin/AccountsPage";
+import FeedbackPage from "./pages/admin/FeedbackPage";
+import SettingsPage from "./pages/admin/SettingsPage";
+import { Toaster } from "sonner";
+import ItemReportPage from "./pages/admin/ItemReportPage";
 
 export default function App() {
   return (
@@ -19,6 +21,9 @@ export default function App() {
             <Routes>
               <Route path="/" element={<DashboardPage />} />
               <Route path="/analytics" element={<AnalyticsPage />} />
+              <Route path="/item-report" element={<ItemReportPage />} />
+              <Route path="/item-analytics" element={<AnalyticsPage2 />} />
+
               <Route path="/accounts" element={<AccountsPage />} />
               <Route path="/feedback" element={<FeedbackPage />} />
               <Route path="/settings" element={<SettingsPage />} />
@@ -27,7 +32,6 @@ export default function App() {
         </main>
       </div>
 
-      {/* ✅ THÊM TOASTER Ở NGOÀI CÙNG */}
       <Toaster richColors position="top-right" />
     </div>
   );

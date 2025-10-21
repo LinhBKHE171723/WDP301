@@ -3,7 +3,7 @@ const router = require("express").Router();
 const userCtrl = require("../controllers/admin/user.controller");
 const { authRequired, roleRequired } = require("../middlewares/auth.middleware");
 
-// Base mount trong app.js: app.use("/api/admin", adminUserRoutes);
+// "/api/admin"
 router.get("/users",  userCtrl.list);
 router.post("/users",  userCtrl.create);
 router.put("/users/:id",  userCtrl.update);

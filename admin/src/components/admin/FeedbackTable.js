@@ -1,8 +1,8 @@
 // components/FeedbackTable.js
 import { useEffect, useMemo, useState } from "react";
-import { Card } from "./ui/card";
-import { Input } from "./ui/input";
-import { Badge } from "./ui/badge";
+import { Card } from "../ui/admin/card";
+import { Input } from "../ui/admin/input";
+import { Badge } from "../ui/admin/badge";
 import {
   Dialog,
   DialogContent,
@@ -11,18 +11,17 @@ import {
   DialogHeader,
   DialogTitle,
   DialogTrigger,
-} from "./ui/dialog";
-import { Button } from "./ui/button";
+  z,
+} from "../ui/admin/dialog";
+import { Button } from "../ui/admin/button";
 import axios from "axios";
 
-// format dd/mm/yyyy
 const formatDate = (iso) => {
   if (!iso) return "-";
   const d = new Date(iso);
   return d.toLocaleDateString("vi-VN");
 };
 
-// render ⭐ sao
 const renderStars = (n) => {
   const full = "⭐".repeat(Number(n || 0));
   const empty = "☆".repeat(5 - Number(n || 0));
@@ -37,9 +36,9 @@ const renderStars = (n) => {
 
 export function FeedbackTable() {
   const [search, setSearch] = useState("");
-  const [ratingFilter, setRatingFilter] = useState("all"); // all | 1..5
+  const [ratingFilter, setRatingFilter] = useState("all");
   const [feedbacks, setFeedbacks] = useState([]);
-  const [openRow, setOpenRow] = useState(null); // id đang mở dialog
+  const [openRow, setOpenRow] = useState(null);
 
   useEffect(() => {
     axios
@@ -133,7 +132,7 @@ export function FeedbackTable() {
                   ? ` (${fb.orderId.servedBy.role})`
                   : "";
                 const orderShort = fb?.orderId?._id
-                  ? `${String(fb.orderId._id).slice(-4) }...`
+                  ? `${String(fb.orderId._id).slice(-4)}...`
                   : "-";
                 const rating = fb?.rating || 0;
 

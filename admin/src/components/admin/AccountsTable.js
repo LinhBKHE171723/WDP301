@@ -1,14 +1,14 @@
 import { useState, useEffect } from "react";
-import { Card } from "./ui/card";
-import { Input } from "./ui/input";
-import { Button } from "./ui/button";
-import { Badge } from "./ui/badge";
+import { Card } from "../ui/admin/card";
+import { Input } from "../ui/admin/input";
+import { Button } from "../ui/admin/button";
+import { Badge } from "../ui/admin/badge";
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuTrigger,
-} from "./ui/dropdown-menu";
+} from "../ui/admin/dropdown-menu";
 import {
   Dialog,
   DialogContent,
@@ -17,8 +17,8 @@ import {
   DialogHeader,
   DialogTitle,
   DialogTrigger,
-} from "./ui/dialog";
-import { Label } from "./ui/label";
+} from "../ui/admin/dialog";
+import { Label } from "../ui/admin/label";
 import axios from "axios";
 
 // Hàm format ngày từ ISO sang dd/mm/yyyy
@@ -39,8 +39,8 @@ export function AccountsTable() {
 
   const toggleDropdown = (id) => setOpenRow(openRow === id ? null : id);
   const handleEdit = (user) => {
-    setEditData(user); // Lưu dữ liệu người dùng
-    setOpenEdit(true); // Mở dialog
+    setEditData(user);
+    setOpenEdit(true);
   };
   const handleSaveEdit = async () => {
     try {
@@ -79,16 +79,14 @@ export function AccountsTable() {
 
   // Lọc tìm kiếm
   const filtered = accounts.filter((a) => {
-  const matchSearch =
-    a.name.toLowerCase().includes(search.toLowerCase()) ||
-    a.email.toLowerCase().includes(search.toLowerCase());
+    const matchSearch =
+      a.name.toLowerCase().includes(search.toLowerCase()) ||
+      a.email.toLowerCase().includes(search.toLowerCase());
 
-  const matchStatus =
-    filterStatus === "all" || a.status === filterStatus;
+    const matchStatus = filterStatus === "all" || a.status === filterStatus;
 
-  return matchSearch && matchStatus;
-});
-
+    return matchSearch && matchStatus;
+  });
 
   // Validate FE
   const validate = () => {
@@ -134,7 +132,7 @@ export function AccountsTable() {
 
       setTimeout(() => {
         resetForm();
-        closeDialog(); // Đóng dialog
+        closeDialog();
       }, 1000);
     } catch (err) {
       if (err?.response?.status === 409) {
@@ -242,7 +240,7 @@ export function AccountsTable() {
                 variant="outline"
                 onClick={() => {
                   resetForm();
-                  document.body.click(); // đóng dialog thủ công
+                  document.body.click();
                 }}
               >
                 Huỷ
@@ -261,22 +259,22 @@ export function AccountsTable() {
       {/* TABLE */}
       <Card>
         <div className="flex items-center gap-3">
-  <Input
-    placeholder="Tìm theo tên hoặc email..."
-    value={search}
-    onChange={(e) => setSearch(e.target.value)}
-  />
+          <Input
+            placeholder="Tìm theo tên hoặc email..."
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+          />
 
-  <select
-    value={filterStatus}
-    onChange={(e) => setFilterStatus(e.target.value)}
-    className="border rounded px-3 py-2"
-  >
-    <option value="all">Tất cả</option>
-    <option value="active">Hoạt động</option>
-    <option value="inactive">Không hoạt động</option>
-  </select>
-</div>
+          <select
+            value={filterStatus}
+            onChange={(e) => setFilterStatus(e.target.value)}
+            className="border rounded px-3 py-2"
+          >
+            <option value="all">Tất cả</option>
+            <option value="active">Hoạt động</option>
+            <option value="inactive">Không hoạt động</option>
+          </select>
+        </div>
 
         <div className="mt-4 overflow-x-auto">
           <table className="w-full">

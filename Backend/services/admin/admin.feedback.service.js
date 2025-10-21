@@ -1,12 +1,10 @@
-const Feedback = require("../models/Feedback");
+const Feedback = require("../../models/Feedback");
 
 exports.getAll = async ({ page = 1, limit = 10, rating, search }) => {
   const query = {};
 
-  // Lọc theo rating (1-5)
   if (rating) query.rating = rating;
 
-  // Tìm kiếm theo comment hoặc user.email hoặc user.name
   if (search) {
     query.$or = [{ comment: { $regex: search, $options: "i" } }];
   }

@@ -1,4 +1,4 @@
-import { Card } from "./ui/card";
+import { Card } from "../ui/admin/card";
 
 export function Overview() {
   const items = [
@@ -13,7 +13,9 @@ export function Overview() {
         <Card key={it.label}>
           <div className="text-sm text-gray-600">{it.label}</div>
           <div className="mt-1 text-2xl font-semibold">{it.value}</div>
-          <div className="mt-1 text-sm text-green-600">{it.delta} so với tháng trước</div>
+          <div className="mt-1 text-sm text-green-600">
+            {it.delta} so với tháng trước
+          </div>
         </Card>
       ))}
     </div>

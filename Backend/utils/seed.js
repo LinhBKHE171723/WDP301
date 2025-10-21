@@ -17,7 +17,7 @@ const seedDatabase = async () => {
       const customer = await User.create({
         name: "Khach Hang A",
         username: "customer01",
-        password: "password123", // Nhớ mã hóa mật khẩu trong dự án thật
+        password: "password123", 
         email: "customer@example.com",
         phone: "0123456789",
         role: "customer",

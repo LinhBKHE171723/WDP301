@@ -1,4 +1,4 @@
-const feedbackService = require("../../services/admin.feedback.service");
+const feedbackService = require("../../services/admin/admin.feedback.service.js");
 const { success, error } = require("../../utils/response");
 
 exports.getAll = async (req, res) => {

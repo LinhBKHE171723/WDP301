@@ -1,7 +1,7 @@
 // services/auth.service.js
 const crypto = require("crypto");
-const User = require("../models/User");
-const VerificationToken = require("../models/VerificationToken");
+const User = require("../../models/User");
+const VerificationToken = require("../../models/VerificationToken");
 
 function generateToken() {
   return crypto.randomBytes(24).toString("hex"); // 48 hex chars

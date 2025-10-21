@@ -1,13 +1,22 @@
 // services/admin.user.service.js
-const User = require("../models/User");
+const User = require("../../models/User");
 const bcrypt = require("bcrypt");
 const crypto = require("crypto");
 const nodemailer = require("nodemailer");
+const dns = require("dns").promises;
 
 const SALT_ROUNDS = 10;
 const ALLOWED_ROLES = ["admin", "cashier", "waiter", "chef"];
+async function isRealEmail(email) {
+  const domain = email.split("@")[1];
+  try {
+    const records = await dns.resolveMx(domain);
+    return records && records.length > 0;
+  } catch {
+    return false;
+  }
+}
 
-// ===== Tạo mật khẩu ngẫu nhiên =====
 function genTempPassword(length = 10) {
   const chars = "ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz23456789!@#$%^&*";
   let pwd = "";
@@ -15,7 +24,6 @@ function genTempPassword(length = 10) {
   return pwd;
 }
 
-// ===== Cấu hình gửi email qua Gmail (đã có trong .env) =====
 const transporter = nodemailer.createTransport({
   host: process.env.SMTP_HOST,
   port: Number(process.env.SMTP_PORT || 587),
@@ -25,7 +33,6 @@ const transporter = nodemailer.createTransport({
 
 class AdminUserService {
 
-  // 📌 LIST USERS (không đổi)
   static async list({ page = 1, limit = 10, role, status, q }) {
     const filter = {};
     if (role) filter.role = role;
@@ -46,7 +53,6 @@ class AdminUserService {
   }
 
 
-  // 📌 CREATE NHÂN VIÊN – Gửi mật khẩu vào email
   static async create({ name, username, email, phone, role }) {
     if (!name || !email) {
       const err = new Error("Thiếu name hoặc email");
@@ -54,28 +60,32 @@ class AdminUserService {
       throw err;
     }
 
-    // Check email trùng
     const existedEmail = await User.findOne({ email });
     if (existedEmail) {
       const err = new Error("Email đã tồn tại");
       err.status = 409;
       throw err;
     }
+    // Kiểm tra Domain email có tồn tại không (MX Lookup)
+const isValidEmail = await isRealEmail(email);
+if (!isValidEmail) {
+  const err = new Error("Email không tồn tại hoặc không thể nhận thư");
+  err.status = 400;
+  throw err;
+}
 
-    // Check role hợp lệ
+
     if (role && !ALLOWED_ROLES.includes(role)) {
       const err = new Error("Role không hợp lệ");
       err.status = 400;
       throw err;
     }
 
-    // Check/ơr sinh username nếu chưa có
     let finalUsername = (username || "").trim();
     if (!finalUsername) {
       const base = email.split("@")[0];
       let candidate = base.toLowerCase().replace(/[^a-z0-9_]/g, "_");
       let i = 1;
-      // eslint-disable-next-line no-constant-condition
       while (true) {
         const exists = await User.findOne({ username: candidate });
         if (!exists) break;
@@ -84,22 +94,19 @@ class AdminUserService {
       finalUsername = candidate;
     }
 
-    // Tạo mật khẩu random + hash
     const tempPassword = genTempPassword(10);
     const passwordHash = await bcrypt.hash(tempPassword, SALT_ROUNDS);
 
-    // Lưu DB
     const user = await User.create({
       name,
       email,
       username: finalUsername,
       phone: phone || "",
       role: role || "waiter",
-      status: "active",
-      password: passwordHash, // LƯU HASH
+      status: "inactive",
+      password: passwordHash, 
     });
 
-    // Gửi email ngắn gọn
     const html = `
       <p><b>Tài khoản của bạn đã được tạo</b></p>
       <p>Email đăng nhập: ${email}<br/>
@@ -120,12 +127,17 @@ class AdminUserService {
   }
 
 
-  // 📌 UPDATE USER (không đổi email)
-// 📌 UPDATE USER (Không cho đổi email & password, giữ nguyên nếu FE không gửi)
+
 static async update(id, data) {
   const { email, password, _id, createdAt, updatedAt, ...updateData } = data;
   const existingUser = await User.findById(id);
   if (!existingUser) throw { status: 404, message: "User not found" };
+   if (updateData.accountStatus === "banned") {
+  updateData.status = "inactive";
+} else if (updateData.accountStatus === "active") {
+  updateData.status = "active";  // (optional)
+}
+
   Object.keys(updateData).forEach((key) => {
     if (updateData[key] === undefined || updateData[key] === null) {
       delete updateData[key]; 

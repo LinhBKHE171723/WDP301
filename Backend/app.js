@@ -4,9 +4,7 @@ const cors = require("cors");
 const morgan = require("morgan");
 const dotenv = require("dotenv");
 const seedDatabase = require("./utils/seed");
-const adminUserRoutes = require("./routes/admin.user.route");
 const authRoutes = require("./routes/auth.route");
-const adminFeedbackRoutes = require("./routes/admin.feedback.route");
 
 // load env
 dotenv.config();
@@ -31,9 +29,10 @@ mongoose
 app.get("/", (req, res) => {
   res.send("API is running...");
 });
-
-app.use("/api/admin/feedbacks", adminFeedbackRoutes);
-app.use("/api/admin", adminUserRoutes);
+//auth
 app.use("/api/auth", authRoutes);
+//admin
+app.use("/api/admin", require("./routes/admin.route.js"));
+
 // export app để server.js dùng
 module.exports = app;
