@@ -18,7 +18,8 @@ const {
   canFeedback,
   confirmOrder,
   updateOrderItemStatus,
-  getLatestOrder
+  getLatestOrder,
+  testUpdateOrderItemStatus
 } = require("../controllers/customer.controller");
 
 // Routes cho khách hàng (không cần authentication)
@@ -72,5 +73,8 @@ router.post("/orders/:orderId/feedback", createFeedback);
 
 // 14. Cập nhật trạng thái món ăn trong đơn hàng
 router.put("/order-items/:orderItemId/status", updateOrderItemStatus);
+
+// 15. Test endpoint để update order item status (cho testing)
+router.put("/orders/:orderId/test-update-item-status", testUpdateOrderItemStatus);
 
 module.exports = router;
