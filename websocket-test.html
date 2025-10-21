@@ -250,6 +250,17 @@
             <div id="orderItems">
                 <p>No order items loaded. Please connect to an order first.</p>
             </div>
+            
+            <div class="test-section">
+                <h4>🧪 Test OrderItem Status (First Item):</h4>
+                <p>This will update the first order item in the current order</p>
+                <div class="status-buttons">
+                    <button class="btn-pending" onclick="testUpdateOrderItemStatus('pending')">Pending</button>
+                    <button class="btn-preparing" onclick="testUpdateOrderItemStatus('preparing')">Preparing</button>
+                    <button class="btn-ready" onclick="testUpdateOrderItemStatus('ready')">Ready</button>
+                    <button class="btn-served" onclick="testUpdateOrderItemStatus('served')">Served</button>
+                </div>
+            </div>
         </div>
         
         <!-- Logs Tab -->
@@ -401,9 +412,15 @@
                     logMessage(`Order status: ${latestOrder.status}`, 'info');
                     logMessage(`Table: ${latestOrder.tableId?.tableNumber || 'N/A'}`, 'info');
                     
-                    // Tự động load order data
+                    // Tự động load order data với OrderItem IDs mới
                     orderItems = latestOrder.orderItems || [];
                     logMessage(`Loaded ${orderItems.length} order items`, 'success');
+                    
+                    // Log OrderItem IDs để debug
+                    orderItems.forEach((item, index) => {
+                        logMessage(`Item ${index + 1}: ${item.itemName} (ID: ${item._id})`, 'info');
+                    });
+                    
                     renderOrderItems();
                 } else {
                     logMessage(`Failed to get latest order: ${data.message}`, 'error');
@@ -440,6 +457,12 @@
                 container.innerHTML = '<p>No order items found.</p>';
                 return;
             }
+
+            // Debug: Log order items
+            logMessage(`Rendering ${orderItems.length} order items:`, 'info');
+            orderItems.forEach((item, index) => {
+                logMessage(`Item ${index + 1}: ${item.itemName} (ID: ${item._id})`, 'info');
+            });
 
             container.innerHTML = orderItems.map(item => `
                 <div class="order-item">
@@ -515,6 +538,39 @@
                 if (data.success) {
                     logMessage(`OrderItem updated successfully: ${data.message}`, 'success');
             } else {
+                    logMessage(`Failed to update OrderItem: ${data.message}`, 'error');
+                }
+            } catch (error) {
+                logMessage(`Error updating OrderItem: ${error.message}`, 'error');
+            }
+        }
+
+        // Test function để update order item status (không cần OrderItem ID cụ thể)
+        async function testUpdateOrderItemStatus(status) {
+            const orderId = document.getElementById('orderIdInput').value.trim();
+            
+            if (!orderId) {
+                logMessage('Please enter Order ID', 'error');
+                return;
+            }
+            
+            try {
+                logMessage(`Testing OrderItem status update to ${status} for Order ${orderId}...`, 'info');
+                
+                const response = await fetch(`http://[::1]:5000/api/customer/orders/${orderId}/test-update-item-status`, {
+                    method: 'PUT',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({ status })
+                });
+
+                const data = await response.json();
+                
+                if (data.success) {
+                    logMessage(`OrderItem updated successfully: ${data.message}`, 'success');
+                    logMessage(`Updated item: ${data.data.orderItem.itemName}`, 'info');
+                } else {
                     logMessage(`Failed to update OrderItem: ${data.message}`, 'error');
                 }
             } catch (error) {
