@@ -94,6 +94,46 @@ export function clearGuestOrderIds() {
   }
 }
 
+// Validate và dọn dẹp guest order IDs
+export async function validateAndCleanGuestOrderIds() {
+  try {
+    const orderIds = getGuestOrderIds();
+    if (orderIds.length === 0) return [];
+
+    const validOrderIds = [];
+    
+    // Kiểm tra từng order ID với database
+    for (const orderId of orderIds) {
+      try {
+        const response = await fetch(`http://localhost:5000/api/customer/orders/${orderId}`);
+        const data = await response.json();
+        
+        if (data.success) {
+          validOrderIds.push(orderId);
+        } else {
+          console.log(`Removing invalid order ID from guest cookie: ${orderId}`);
+        }
+      } catch (err) {
+        console.log(`Error validating order ID ${orderId}, removing from cookie`);
+      }
+    }
+
+    // Cập nhật cookie với chỉ các order ID hợp lệ
+    if (validOrderIds.length !== orderIds.length) {
+      if (validOrderIds.length === 0) {
+        clearGuestOrderIds();
+      } else {
+        setCookie(GUEST_ORDER_IDS_COOKIE, JSON.stringify(validOrderIds), 365);
+      }
+    }
+
+    return validOrderIds;
+  } catch (error) {
+    console.error('Error validating guest order IDs:', error);
+    return [];
+  }
+}
+
 
 
 
