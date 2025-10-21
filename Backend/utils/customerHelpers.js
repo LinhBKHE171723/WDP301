@@ -96,6 +96,7 @@ const createOrderItemsFromCart = async (orderItems) => {
       itemType: orderItem.type,
       quantity: orderItem.quantity, // Sử dụng số lượng từ frontend
       price: item.price,
+      status: "pending", // Đảm bảo status là pending
       note: orderItem.note || "",
     });
 

@@ -315,6 +315,11 @@ const OrderStatus = React.memo(({ orderId, onBack }) => {
         type: 'approved'
       });
       setShowWaiterResponseModal(true);
+    } else if (lastMessage && lastMessage.type === 'order:item_updated' && lastMessage.orderId === orderId) {
+      console.log('🍽️ Order item status updated:', lastMessage.data);
+      setOrder(lastMessage.data.order);
+      setHasNewUpdate(true);
+      setTimeout(() => setHasNewUpdate(false), 2000);
     } else if (lastMessage && lastMessage.type === 'order:not_found' && lastMessage.orderId === orderId) {
       // Clear cookie if WebSocket reports order not found
       eraseCookie('current_order_id');
@@ -759,7 +764,7 @@ const OrderStatus = React.memo(({ orderId, onBack }) => {
           )}
         </div>
 
-        <div className="order-info">
+        <div className="order-info" style={{maxWidth: '98%'}}>
           <div className="info-row">
             <span className="label">Mã đơn hàng:</span>
             <span className="value">{order._id.slice(-8).toUpperCase()}</span>
@@ -1121,7 +1126,7 @@ const OrderStatus = React.memo(({ orderId, onBack }) => {
             <div className="feedback-modal-body">
               <FeedbackForm 
                 orderId={orderId}
-                onSubmit={handleFeedbackSubmitted}
+                onFeedbackSubmitted={handleFeedbackSubmitted}
               />
             </div>
           </div>

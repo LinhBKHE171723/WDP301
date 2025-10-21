@@ -506,6 +506,36 @@ exports.updateOrderStatus = async (req, res) => {
       });
     }
 
+    // Nếu order status là 'paid', tự động cập nhật payment status
+    if (status === 'paid' && order.paymentId) {
+      await Payment.findByIdAndUpdate(
+        order.paymentId._id,
+        { 
+          status: 'paid',
+          payTime: new Date(),
+          amountPaid: order.totalAmount
+        }
+      );
+      
+      // Reload order để có payment data mới nhất
+      const updatedOrder = await Order.findById(orderId)
+        .populate("orderItems")
+        .populate("tableId")
+        .populate("paymentId");
+      
+      // Emit WebSocket với order đã cập nhật payment
+      const webSocketService = req.app.get("webSocketService");
+      if (webSocketService) {
+        webSocketService.broadcastToOrder(order._id, "order:updated", updatedOrder);
+      }
+      
+      return res.status(200).json({
+        success: true,
+        message: "Cập nhật trạng thái đơn hàng và thanh toán thành công",
+        data: updatedOrder
+      });
+    }
+
     // Emit WebSocket event để cập nhật real-time
     const webSocketService = req.app.get("webSocketService");
     if (webSocketService) {
@@ -723,6 +753,105 @@ exports.canFeedback = async (req, res) => {
     res.status(500).json({ 
       success: false, 
       message: error.message 
+    });
+  }
+};
+
+// Update order item status
+exports.updateOrderItemStatus = async (req, res) => {
+  try {
+    const { orderItemId } = req.params;
+    const { status } = req.body;
+
+    // Validate status
+    const validStatuses = ['pending', 'preparing', 'ready', 'served'];
+    if (!validStatuses.includes(status)) {
+      return res.status(400).json({
+        success: false,
+        message: "Trạng thái không hợp lệ"
+      });
+    }
+
+    // Find and update order item
+    const orderItem = await OrderItem.findByIdAndUpdate(
+      orderItemId,
+      { status },
+      { new: true }
+    ).populate('itemId');
+
+    if (!orderItem) {
+      return res.status(404).json({
+        success: false,
+        message: "Không tìm thấy món ăn trong đơn hàng"
+      });
+    }
+
+    // Get the order to broadcast update
+    const order = await Order.findById(orderItem.orderId)
+      .populate("orderItems")
+      .populate("tableId")
+      .populate("paymentId");
+
+    if (!order) {
+      return res.status(404).json({
+        success: false,
+        message: "Không tìm thấy đơn hàng"
+      });
+    }
+
+    // Emit WebSocket event để cập nhật real-time
+    const webSocketService = req.app.get("webSocketService");
+    if (webSocketService) {
+      webSocketService.broadcastToOrder(order._id, "order:item_updated", {
+        orderItem: orderItem,
+        order: order
+      });
+    }
+
+    res.status(200).json({
+      success: true,
+      message: "Cập nhật trạng thái món ăn thành công",
+      data: {
+        orderItem: orderItem,
+        order: order
+      }
+    });
+  } catch (error) {
+    res.status(500).json({ 
+      success: false, 
+      message: error.message 
+    });
+  }
+};
+
+// Get latest order (for testing purposes)
+exports.getLatestOrder = async (req, res) => {
+  try {
+    const latestOrder = await Order.findOne()
+      .populate('tableId', 'tableNumber')
+      .populate('orderItems')
+      .populate('paymentId')
+      .sort({ createdAt: -1 }); // Sắp xếp theo thời gian tạo mới nhất
+
+    if (!latestOrder) {
+      return res.status(404).json({
+        success: false,
+        message: "Không tìm thấy đơn hàng nào"
+      });
+    }
+
+    // Populate thông tin item trong orderItems
+    await populateOrderItemDetails(latestOrder.orderItems);
+
+    res.status(200).json({
+      success: true,
+      message: "Lấy đơn hàng mới nhất thành công",
+      data: latestOrder
+    });
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      message: error.message
     });
   }
 };

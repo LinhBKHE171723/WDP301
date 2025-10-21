@@ -86,7 +86,10 @@ const GuestOrderHistory = ({ onBack }) => {
 
   // Filter and sort orders
   const filteredAndSortedOrders = orders.filter(order => {
-    const statusMatch = statusFilter === 'all' || order.status === statusFilter;
+    // Status filter - gộp "paid" vào "served"
+    const statusMatch = statusFilter === 'all' || 
+      (statusFilter === 'served' ? (order.status === 'served' || order.status === 'paid') : order.status === statusFilter);
+    
     const paymentMatch = paymentFilter === 'all' || 
       (paymentFilter === 'paid' && order.paymentId?.status === 'paid') ||
       (paymentFilter === 'unpaid' && (!order.paymentId || order.paymentId?.status === 'unpaid'));
@@ -185,7 +188,6 @@ const GuestOrderHistory = ({ onBack }) => {
                 <option value="preparing">Đang chuẩn bị</option>
                 <option value="ready">Sẵn sàng</option>
                 <option value="served">Đã phục vụ</option>
-                <option value="paid">Đã thanh toán</option>
                 <option value="cancelled">Đã hủy</option>
               </select>
             </div>
@@ -233,7 +235,7 @@ const GuestOrderHistory = ({ onBack }) => {
               {filteredAndSortedOrders.map((order) => (
                 <div key={order._id} className="order-card">
                   <div className="order-header">
-                    <div className="order-info" style={{ fontSize: '50px' }}>
+                    <div className="order-info-compact">
                       <h3>Đơn hàng #{order._id.slice(-8).toUpperCase()}</h3>
                       <p className="order-date">{formatOrderDate(order.createdAt)}</p>
                     </div>
