@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
-import { getCookie, setCookie, eraseCookie, addOrderIdToCookie, getGuestOrderIds } from '../utils/cookie';
+import { getCookie, setCookie, eraseCookie, addOrderIdToCookie, getGuestOrderIds, validateAndCleanGuestOrderIds } from '../utils/cookie';
 import LoginModal from './LoginModal';
 import ItemDetail from './ItemDetail';
 import OrderStatus from './OrderStatus';
@@ -28,11 +28,37 @@ const MenuView = ({ table, onBack }) => {
   const [currentOrderId, setCurrentOrderId] = useState(null);
 
   useEffect(() => {
-    // Khôi phục order id từ cookie nếu có
-    const savedOrderId = getCookie('current_order_id');
-    if (savedOrderId) {
-      setCurrentOrderId(savedOrderId);
-    }
+    // Khôi phục và validate order id từ cookie
+    const validateAndSetOrderId = async () => {
+      // Dọn dẹp guest order IDs trước
+      await validateAndCleanGuestOrderIds();
+      
+      const savedOrderId = getCookie('current_order_id');
+      
+      if (savedOrderId) {
+        try {
+          // Kiểm tra order có tồn tại trong database không
+          const response = await fetch(API_ENDPOINTS.CUSTOMER.ORDER_BY_ID(savedOrderId));
+          const data = await response.json();
+          
+          if (data.success) {
+            // Order tồn tại, set currentOrderId
+            setCurrentOrderId(savedOrderId);
+            console.log('Valid order found in cookie:', savedOrderId);
+          } else {
+            // Order không tồn tại, xóa khỏi cookie
+            console.log('Invalid order ID in cookie, removing:', savedOrderId);
+            eraseCookie('current_order_id');
+          }
+        } catch (err) {
+          // Lỗi kết nối, xóa cookie để tránh lỗi
+          console.log('Error validating order, removing from cookie:', savedOrderId);
+          eraseCookie('current_order_id');
+        }
+      }
+    };
+
+    validateAndSetOrderId();
     fetchData();
   }, []);
 

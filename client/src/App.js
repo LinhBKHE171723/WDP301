@@ -30,6 +30,13 @@ function GuestOrderHistoryRoute() {
 function OrderStatusRoute() {
   const navigate = useNavigate()
   const orderId = window.location.pathname.split('/').pop()
+  
+  // Nếu không có orderId thì chuyển về menu
+  if (!orderId) {
+    navigate('/reservation')
+    return null
+  }
+  
   return <OrderStatus orderId={orderId} onBack={() => navigate('/reservation')} />
 }
 

@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
-import { eraseCookie, getCookie, setCookie } from '../utils/cookie';
+import { useNavigate } from 'react-router-dom';
+import { eraseCookie, getCookie, setCookie, getGuestOrderIds } from '../utils/cookie';
 import FeedbackForm from './FeedbackForm';
 import { useOrderWebSocket } from '../hooks/useOrderWebSocket';
 import { groupOrderItems, getStatusText, getStatusColor, getItemStatusText } from '../utils/orderUtils';
@@ -7,6 +8,7 @@ import { API_ENDPOINTS } from '../utils/apiConfig';
 import './OrderStatus.css';
 
 const OrderStatus = React.memo(({ orderId, onBack }) => {
+  const navigate = useNavigate();
   const [order, setOrder] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
@@ -48,6 +50,43 @@ const OrderStatus = React.memo(({ orderId, onBack }) => {
 
   // Ref để lưu trữ trạng thái order trước đó
   const prevOrderRef = useRef(null);
+
+  // Kiểm tra cookie và validate order ngay khi component mount
+  useEffect(() => {
+    const checkCookieAndValidateOrder = async () => {
+      const currentOrderId = getCookie('current_order_id');
+      const guestOrderIds = getGuestOrderIds();
+      
+      console.log('Initial cookie check - currentOrderId:', currentOrderId);
+      console.log('Initial cookie check - guestOrderIds:', guestOrderIds);
+      console.log('Initial cookie check - orderId:', orderId);
+      console.log('Initial cookie check - includes:', guestOrderIds.includes(orderId));
+      
+      // Nếu orderId không có trong cookie, kiểm tra trực tiếp với database
+      if (!currentOrderId && !guestOrderIds.includes(orderId)) {
+        try {
+          const response = await fetch(API_ENDPOINTS.CUSTOMER.ORDER_BY_ID(orderId));
+          const data = await response.json();
+          
+          if (!data.success) {
+            console.log('Order not found in database, redirecting to menu immediately');
+            navigate('/reservation');
+            return true; // Indicate redirect happened
+          }
+        } catch (err) {
+          console.log('Error validating order, redirecting to menu');
+          navigate('/reservation');
+          return true;
+        }
+      }
+      return false; // No redirect needed
+    };
+
+    const shouldRedirect = checkCookieAndValidateOrder();
+    if (shouldRedirect) {
+      return; // Don't proceed with other effects if redirecting
+    }
+  }, [orderId, navigate]);
 
   // Load editing state từ cookie khi component mount
   useEffect(() => {
@@ -141,6 +180,7 @@ const OrderStatus = React.memo(({ orderId, onBack }) => {
       setLoading(false);
       return;
     }
+
 
     try {
       setLoading(true);
