@@ -1,16 +1,16 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
+import { eraseCookie } from '../utils/cookie';
 import FeedbackForm from './FeedbackForm';
+import { useOrderWebSocket } from '../hooks/useOrderWebSocket';
+import { groupOrderItems, getStatusText, getStatusColor, getItemStatusText } from '../utils/orderUtils';
+import { API_ENDPOINTS } from '../utils/apiConfig';
 import './OrderStatus.css';
 
-const OrderStatus = ({ orderId, onBack }) => {
+const OrderStatus = React.memo(({ orderId, onBack }) => {
   const [order, setOrder] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
-  const [lastUpdated, setLastUpdated] = useState(null);
-  const [nextUpdate, setNextUpdate] = useState(5);
-  const [isInitialLoad, setIsInitialLoad] = useState(true);
   const [hasNewUpdate, setHasNewUpdate] = useState(false);
-  const [lastFetchTime, setLastFetchTime] = useState(null);
   const [showAddItemModal, setShowAddItemModal] = useState(false);
   const [menus, setMenus] = useState([]);
   const [items, setItems] = useState([]);
@@ -21,34 +21,82 @@ const OrderStatus = ({ orderId, onBack }) => {
   const [note, setNote] = useState('');
   const [showFeedbackModal, setShowFeedbackModal] = useState(false);
 
+  // WebSocket connection
+  const { connectionState, lastMessage, manualRefresh } = useOrderWebSocket(orderId);
+
+  // Fetch order status function
+  const fetchOrderStatus = useCallback(async () => {
+    if (!orderId) {
+      setError('Không tìm thấy ID đơn hàng');
+      setLoading(false);
+      return;
+    }
+
+    try {
+      setLoading(true);
+      const response = await fetch(API_ENDPOINTS.CUSTOMER.ORDER_BY_ID(orderId));
+      const data = await response.json();
+
+      if (data.success) {
+        setOrder(data.data);
+        setError('');
+        
+        // Auto clear cookie when order completed/cancelled
+        if (data.data.status === 'paid' || data.data.status === 'cancelled') {
+          eraseCookie('current_order_id');
+        }
+      } else {
+        setError(data.message || 'Không thể tải thông tin đơn hàng');
+        
+        // Clear cookie if order not found or should be cleared
+        if (data.shouldClearCookie || response.status === 404) {
+          eraseCookie('current_order_id');
+        }
+      }
+    } catch (err) {
+      setError('Lỗi kết nối server');
+    } finally {
+      setLoading(false);
+    }
+  }, [orderId]);
+
+  // Initial load
   useEffect(() => {
     if (orderId) {
       fetchOrderStatus();
-      
-      // Countdown timer cho next update - chỉ fetch khi order có thể thay đổi
-      const countdownInterval = setInterval(() => {
-        setNextUpdate(prev => {
-          if (prev <= 1) {
-            // Chỉ fetch nếu order status có thể thay đổi
-            if (order && ['pending', 'waiting_confirm', 'confirmed', 'preparing', 'ready'].includes(order.status)) {
-              fetchOrderStatus();
-            }
-            return 5;
-          }
-          return prev - 1;
-        });
-      }, 1000);
-      
-      // Cleanup interval khi component unmount
-      return () => clearInterval(countdownInterval);
     }
-  }, [orderId]);
+  }, [orderId, fetchOrderStatus]);
+
+  // Handle WebSocket messages
+  useEffect(() => {
+    if (lastMessage && lastMessage.type === 'order:updated' && lastMessage.orderId === orderId) {
+      setOrder(lastMessage.data);
+      setHasNewUpdate(true);
+      setTimeout(() => setHasNewUpdate(false), 2000);
+      
+      // Auto clear cookie when order completed/cancelled
+      if (lastMessage.data.status === 'paid' || lastMessage.data.status === 'cancelled') {
+        eraseCookie('current_order_id');
+      }
+    } else if (lastMessage && lastMessage.type === 'order:not_found' && lastMessage.orderId === orderId) {
+      // Clear cookie if WebSocket reports order not found
+      eraseCookie('current_order_id');
+      setError('Đơn hàng không tồn tại');
+    }
+  }, [lastMessage, orderId]);
+
+  // Auto clear cookie when order completed/cancelled
+  useEffect(() => {
+    if (order && (order.status === 'paid' || order.status === 'cancelled')) {
+      eraseCookie('current_order_id');
+    }
+  }, [order]);
 
   const fetchMenusAndItems = async () => {
     try {
       const [menusRes, itemsRes] = await Promise.all([
-        fetch('http://localhost:5000/api/customer/menus'),
-        fetch('http://localhost:5000/api/customer/items')
+        fetch(API_ENDPOINTS.CUSTOMER.MENUS),
+        fetch(API_ENDPOINTS.CUSTOMER.ITEMS)
       ]);
       
       const menusData = await menusRes.json();
@@ -77,7 +125,7 @@ const OrderStatus = ({ orderId, onBack }) => {
         note
       });
       
-      const response = await fetch(`http://localhost:5000/api/customer/orders/${orderId}/items`, {
+      const response = await fetch(API_ENDPOINTS.CUSTOMER.ADD_ITEMS_TO_ORDER(orderId), {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -119,7 +167,7 @@ const OrderStatus = ({ orderId, onBack }) => {
     }
 
     try {
-      const response = await fetch(`http://localhost:5000/api/customer/orders/${orderId}`, {
+      const response = await fetch(API_ENDPOINTS.CUSTOMER.ORDER_BY_ID(orderId), {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
@@ -133,6 +181,7 @@ const OrderStatus = ({ orderId, onBack }) => {
 
       if (response.ok) {
         alert('Đơn hàng đã được hủy thành công!');
+        eraseCookie('current_order_id');
         fetchOrderStatus(); // Refresh order status
       } else {
         alert(`Lỗi: ${data.message || 'Không thể hủy đơn hàng'}`);
@@ -153,160 +202,14 @@ const OrderStatus = ({ orderId, onBack }) => {
     setShowFeedbackModal(true);
   };
 
-  const fetchOrderStatus = async (isBackground = false) => {
-    try {
-      // Chỉ show loading cho lần đầu tiên
-      if (isInitialLoad) {
-        setLoading(true);
-      }
-      
-      const response = await fetch(`http://localhost:5000/api/customer/orders/${orderId}`);
-      const data = await response.json();
-
-      if (data.success) {
-        // Chỉ update nếu data thực sự thay đổi (chỉ so sánh những field quan trọng)
-        setOrder(prevOrder => {
-          if (!prevOrder) {
-            return data.data;
-          }
-          
-          // So sánh chỉ những field quan trọng
-          const prevImportant = {
-            status: prevOrder.status,
-            orderItems: prevOrder.orderItems?.map(item => ({
-              status: item.status,
-              quantity: item.quantity
-            }))
-          };
-          
-          const newImportant = {
-            status: data.data.status,
-            orderItems: data.data.orderItems?.map(item => ({
-              status: item.status,
-              quantity: item.quantity
-            }))
-          };
-          
-          if (JSON.stringify(prevImportant) !== JSON.stringify(newImportant)) {
-            setHasNewUpdate(true);
-            setTimeout(() => setHasNewUpdate(false), 2000);
-            return data.data;
-          }
-          
-          return prevOrder; // Giữ nguyên nếu không có thay đổi quan trọng
-        });
-        setLastUpdated(new Date());
-        setNextUpdate(5); // Reset countdown
-        setError(''); // Clear any previous errors
-      } else {
-        // Chỉ set error nếu chưa có data (lần đầu)
-        if (isInitialLoad) {
-          setError(data.message || 'Không thể tải thông tin đơn hàng');
-        }
-      }
-    } catch (err) {
-      // Chỉ set error nếu chưa có data (lần đầu)
-      if (isInitialLoad) {
-        setError('Lỗi kết nối server');
-      }
-    } finally {
-      if (isInitialLoad) {
-        setLoading(false);
-        setIsInitialLoad(false);
-      }
+  // Manual refresh function
+  const handleManualRefresh = async () => {
+    const refreshedOrder = await manualRefresh(orderId);
+    if (refreshedOrder) {
+      setOrder(refreshedOrder);
+      setHasNewUpdate(true);
+      setTimeout(() => setHasNewUpdate(false), 2000);
     }
-  };
-
-  const getStatusText = (status) => {
-    switch (status) {
-      case 'pending':
-        return 'Chờ xác nhận';
-      case 'waiting_confirm':
-        return 'Chờ xác nhận';
-      case 'confirmed':
-        return 'Đã xác nhận';
-      case 'preparing':
-        return 'Đang chuẩn bị';
-      case 'ready':
-        return 'Sẵn sàng phục vụ';
-      case 'served':
-        return 'Đã phục vụ';
-      case 'paid':
-        return 'Đã thanh toán';
-      case 'cancelled':
-        return 'Đã hủy';
-      default:
-        return status;
-    }
-  };
-
-  const getStatusColor = (status) => {
-    switch (status) {
-      case 'pending':
-        return '#ffc107';
-      case 'preparing':
-        return '#17a2b8';
-      case 'ready':
-        return '#28a745';
-      case 'served':
-        return '#6f42c1';
-      case 'paid':
-        return '#20c997';
-      case 'cancelled':
-        return '#dc3545';
-      default:
-        return '#6c757d';
-    }
-  };
-
-  const getItemStatusText = (status) => {
-    switch (status) {
-      case 'pending':
-        return 'Chờ xử lý';
-      case 'preparing':
-        return 'Đang chuẩn bị';
-      case 'ready':
-        return 'Sẵn sàng';
-      case 'served':
-        return 'Đã phục vụ';
-      default:
-        return status;
-    }
-  };
-
-  // Group items by name and note
-  const groupOrderItems = (orderItems) => {
-    const grouped = {};
-    
-    orderItems?.forEach((orderItem) => {
-      const itemName = orderItem.itemName || orderItem.itemId?.name || 'Món ăn';
-      const note = orderItem.note || '';
-      const key = `${itemName}-${note}`;
-      
-      if (!grouped[key]) {
-        grouped[key] = {
-          name: itemName,
-          note: note,
-          price: orderItem.price,
-          itemType: orderItem.itemType,
-          totalQuantity: 0,
-          items: [],
-          statusCounts: {}
-        };
-      }
-      
-      grouped[key].totalQuantity += orderItem.quantity;
-      grouped[key].items.push(orderItem);
-      
-      // Count items by status
-      const status = orderItem.status || 'pending';
-      if (!grouped[key].statusCounts[status]) {
-        grouped[key].statusCounts[status] = 0;
-      }
-      grouped[key].statusCounts[status] += orderItem.quantity;
-    });
-    
-    return Object.values(grouped);
   };
 
   if (loading) {
@@ -433,16 +336,17 @@ const OrderStatus = ({ orderId, onBack }) => {
         </div>
 
         <div className="actions">
-          <div className="auto-update-info">
-            {lastUpdated && (
-              <span className="last-updated">
-                Cập nhật lần cuối: {lastUpdated.toLocaleTimeString('vi-VN')}
-                {hasNewUpdate && <span className="new-update-indicator"> ✨ Có cập nhật mới!</span>}
-              </span>
-            )}
+          <div className="connection-status">
+            <div className={`status-indicator ${connectionState}`}>
+              {connectionState === 'connected' && '🟢 Đang kết nối realtime'}
+              {connectionState === 'connecting' && '🟡 Đang kết nối...'}
+              {connectionState === 'reconnecting' && '🟡 Đang kết nối lại...'}
+              {connectionState === 'disconnected' && '🔴 Mất kết nối - hãy kiểm tra mạng'}
+            </div>
+            {hasNewUpdate && <span className="new-update-indicator"> ✨ Có cập nhật mới!</span>}
           </div>
           <div className="action-buttons">
-            <button onClick={() => fetchOrderStatus()} className="refresh-btn">
+            <button onClick={handleManualRefresh} className="refresh-btn">
               Cập nhật trạng thái đơn hàng
             </button>
             {order && order.status === 'paid' && (
@@ -607,6 +511,6 @@ const OrderStatus = ({ orderId, onBack }) => {
       </div>
     </div>
   );
-};
+});
 
 export default OrderStatus;

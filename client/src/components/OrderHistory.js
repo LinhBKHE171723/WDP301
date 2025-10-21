@@ -1,5 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '../context/AuthContext';
+import { getCookie } from '../utils/cookie';
+import { groupOrderItems, getStatusText, getStatusClass, formatOrderDate } from '../utils/orderUtils';
+import { API_ENDPOINTS } from '../utils/apiConfig';
 import './OrderHistory.css';
 
 const OrderHistory = ({ onBack }) => {
@@ -17,8 +20,8 @@ const OrderHistory = ({ onBack }) => {
   const fetchUserOrders = async () => {
     try {
       setLoading(true);
-      const token = localStorage.getItem('customer_token');
-      const response = await fetch('http://localhost:5000/api/customer/user/orders', {
+      const token = getCookie('customer_token');
+      const response = await fetch(API_ENDPOINTS.CUSTOMER.USER_ORDERS, {
         headers: {
           'Authorization': `Bearer ${token}`
         }
@@ -35,75 +38,6 @@ const OrderHistory = ({ onBack }) => {
     } finally {
       setLoading(false);
     }
-  };
-
-  const getStatusText = (status) => {
-    const statusMap = {
-      'pending': 'Chờ xử lý',
-      'waiting_confirm': 'Chờ xác nhận',
-      'confirmed': 'Đã xác nhận',
-      'preparing': 'Đang chuẩn bị',
-      'ready': 'Sẵn sàng',
-      'served': 'Đã phục vụ',
-      'paid': 'Đã thanh toán',
-      'cancelled': 'Đã hủy'
-    };
-    return statusMap[status] || status;
-  };
-
-  const getStatusClass = (status) => {
-    const classMap = {
-      'pending': 'status-pending',
-      'waiting_confirm': 'status-waiting',
-      'confirmed': 'status-confirmed',
-      'preparing': 'status-preparing',
-      'ready': 'status-ready',
-      'served': 'status-served',
-      'paid': 'status-paid',
-      'cancelled': 'status-cancelled'
-    };
-    return classMap[status] || 'status-default';
-  };
-
-  const formatDate = (dateString) => {
-    const date = new Date(dateString);
-    return date.toLocaleString('vi-VN', {
-      year: 'numeric',
-      month: '2-digit',
-      day: '2-digit',
-      hour: '2-digit',
-      minute: '2-digit'
-    });
-  };
-
-  const groupOrderItems = (orderItems) => {
-    const grouped = {};
-    orderItems?.forEach((orderItem) => {
-      const itemName = orderItem.itemName || orderItem.itemId?.name || 'Món ăn';
-      const note = orderItem.note || '';
-      const key = `${itemName}-${note}`;
-
-      if (!grouped[key]) {
-        grouped[key] = {
-          name: itemName,
-          note: note,
-          price: orderItem.price,
-          itemType: orderItem.itemType,
-          totalQuantity: 0,
-          items: [],
-          statusCounts: {}
-        };
-      }
-      grouped[key].totalQuantity += orderItem.quantity;
-      grouped[key].items.push(orderItem);
-      
-      const status = orderItem.status || 'pending';
-      if (!grouped[key].statusCounts[status]) {
-        grouped[key].statusCounts[status] = 0;
-      }
-      grouped[key].statusCounts[status] += orderItem.quantity;
-    });
-    return Object.values(grouped);
   };
 
   if (!isLoggedIn) {

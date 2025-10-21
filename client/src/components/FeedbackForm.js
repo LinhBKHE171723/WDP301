@@ -1,4 +1,6 @@
 import React, { useState, useEffect } from 'react';
+import { getRatingText } from '../utils/ratingUtils';
+import { API_ENDPOINTS } from '../utils/apiConfig';
 import './FeedbackForm.css';
 
 const FeedbackForm = ({ orderId, onFeedbackSubmitted }) => {
@@ -17,7 +19,7 @@ const FeedbackForm = ({ orderId, onFeedbackSubmitted }) => {
   const checkCanFeedback = async () => {
     try {
       setCheckingFeedback(true);
-      const response = await fetch(`http://localhost:5000/api/customer/orders/${orderId}/can-feedback`);
+      const response = await fetch(API_ENDPOINTS.CUSTOMER.ORDER_CAN_FEEDBACK(orderId));
       const data = await response.json();
 
       if (data.success) {
@@ -47,7 +49,7 @@ const FeedbackForm = ({ orderId, onFeedbackSubmitted }) => {
       setLoading(true);
       setError('');
 
-      const response = await fetch(`http://localhost:5000/api/customer/orders/${orderId}/feedback`, {
+      const response = await fetch(API_ENDPOINTS.CUSTOMER.ORDER_FEEDBACK(orderId), {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -91,11 +93,7 @@ const FeedbackForm = ({ orderId, onFeedbackSubmitted }) => {
           </button>
         ))}
         <span className="rating-text">
-          {rating === 0 ? 'Chọn số sao' : 
-           rating === 1 ? 'Rất tệ' :
-           rating === 2 ? 'Tệ' :
-           rating === 3 ? 'Bình thường' :
-           rating === 4 ? 'Tốt' : 'Rất tốt'}
+          {getRatingText(rating)}
         </span>
       </div>
     );
@@ -133,10 +131,7 @@ const FeedbackForm = ({ orderId, onFeedbackSubmitted }) => {
               </span>
             ))}
             <span className="rating-text">
-              {existingFeedback.rating === 1 ? 'Rất tệ' :
-               existingFeedback.rating === 2 ? 'Tệ' :
-               existingFeedback.rating === 3 ? 'Bình thường' :
-               existingFeedback.rating === 4 ? 'Tốt' : 'Rất tốt'}
+              {getRatingText(existingFeedback.rating)}
             </span>
           </div>
           {existingFeedback.comment && (
