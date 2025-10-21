@@ -7,7 +7,7 @@ const orderItemSchema = new Schema({
   itemName: String, // Lưu tên món để không cần populate
   itemType: String, // 'item' hoặc 'menu'
   quantity: Number,
-  price: Number, // Giá tại thời điểm đặt món
+  price: Number, // Giá tại thời điểm đặt món = price của item bán ra thị trường
   assignedChef: { type: Schema.Types.ObjectId, ref: "User" },
   status: {
     type: String,
