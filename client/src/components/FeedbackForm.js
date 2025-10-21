@@ -12,10 +12,6 @@ const FeedbackForm = ({ orderId, onFeedbackSubmitted }) => {
   const [existingFeedback, setExistingFeedback] = useState(null);
   const [checkingFeedback, setCheckingFeedback] = useState(true);
 
-  useEffect(() => {
-    checkCanFeedback();
-  }, [orderId, checkCanFeedback]);
-
   const checkCanFeedback = useCallback(async () => {
     try {
       setCheckingFeedback(true);
@@ -36,6 +32,10 @@ const FeedbackForm = ({ orderId, onFeedbackSubmitted }) => {
       setCheckingFeedback(false);
     }
   }, [orderId]);
+
+  useEffect(() => {
+    checkCanFeedback();
+  }, [orderId, checkCanFeedback]);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -76,7 +76,7 @@ const FeedbackForm = ({ orderId, onFeedbackSubmitted }) => {
     } finally {
       setLoading(false);
     }
-  };
+  }
 
   const renderStars = () => {
     return (

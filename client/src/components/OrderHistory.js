@@ -31,7 +31,13 @@ const OrderHistory = ({ onBack }) => {
 
     // Status filter
     if (statusFilter !== 'all') {
-      filtered = filtered.filter(order => order.status === statusFilter);
+      filtered = filtered.filter(order => {
+        // Gộp "paid" vào "served" - nếu order đã thanh toán thì hiển thị như "served"
+        if (statusFilter === 'served') {
+          return order.status === 'served' || order.status === 'paid';
+        }
+        return order.status === statusFilter;
+      });
     }
 
     // Payment filter
@@ -215,7 +221,6 @@ const OrderHistory = ({ onBack }) => {
                 <option value="preparing">Đang chuẩn bị</option>
                 <option value="ready">Sẵn sàng</option>
                 <option value="served">Đã phục vụ</option>
-                <option value="paid">Đã thanh toán</option>
                 <option value="cancelled">Đã hủy</option>
               </select>
             </div>

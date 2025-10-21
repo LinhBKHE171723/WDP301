@@ -173,6 +173,26 @@
   max-width: 30%;
 }
 
+.order-info-compact {
+  min-width: 60px;
+  flex-shrink: 0;
+  max-width: 100%;
+}
+
+.order-info-compact h3 {
+  margin: 0 0 2px 0;
+  color: #2c3e50;
+  font-size: 50px;
+  line-height: 1.1;
+}
+
+.order-info-compact .order-date {
+  font-size: 20px;
+  margin: 0;
+  line-height: 1.1;
+  color: #6c757d;
+}
+
 .order-info h3 {
   margin: 0 0 2px 0;
   color: #2c3e50;

@@ -16,7 +16,9 @@ const {
   createFeedback,
   getOrderFeedback,
   canFeedback,
-  confirmOrder
+  confirmOrder,
+  updateOrderItemStatus,
+  getLatestOrder
 } = require("../controllers/customer.controller");
 
 // Routes cho khách hàng (không cần authentication)
@@ -38,10 +40,13 @@ router.get("/items/:itemId", getItemById);
 // 6. Tạo đơn hàng mới
 router.post("/orders", createOrder);
 
-// 7. Lấy thông tin đơn hàng theo ID
+// 7. Lấy đơn hàng mới nhất (cho testing) - phải đặt TRƯỚC route /orders/:orderId
+router.get("/orders/latest", getLatestOrder);
+
+// 7.1. Lấy thông tin đơn hàng theo ID
 router.get("/orders/:orderId", getOrderById);
 
-// 7.1. Lấy danh sách đơn hàng của user đã đăng nhập (cần authentication)
+// 7.2. Lấy danh sách đơn hàng của user đã đăng nhập (cần authentication)
 router.get("/user/orders", authRequired, getUserOrders);
 
 // 8. Thêm món mới vào order hiện có
@@ -64,5 +69,8 @@ router.get("/orders/:orderId/feedback", getOrderFeedback);
 
 // 13. Tạo feedback cho order đã thanh toán
 router.post("/orders/:orderId/feedback", createFeedback);
+
+// 14. Cập nhật trạng thái món ăn trong đơn hàng
+router.put("/order-items/:orderItemId/status", updateOrderItemStatus);
 
 module.exports = router;
