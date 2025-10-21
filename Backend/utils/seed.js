@@ -213,27 +213,34 @@ const seedDatabase = async () => {
     }
 
     // 7️⃣ Purchase Orders
-    await PurchaseOrder.insertMany([
+    const purchaseOrders = await PurchaseOrder.insertMany([
       {
-        supplierName: "Nhà cung cấp Thực Phẩm A",
-        items: [
-          { ingredient: ingredients.find((i) => i.name === "Thịt bò")._id, quantity: 20, price: 2000000 },
-          { ingredient: ingredients.find((i) => i.name === "Khoai tây")._id, quantity: 30, price: 900000 },
-        ],
-        totalAmount: 2900000,
-        status: "completed",
+        ingredientId: ingredients.find((i) => i.name === "Thịt bò")._id,
+        quantity: 20,
+        unit: "kg",
+        price: 2000000,
+        expiryDate: new Date(Date.now() + 1000 * 60 * 60 * 24 * 90), // +90 ngày
+        status: "valid",
       },
       {
-        supplierName: "Nhà cung cấp Rau Củ B",
-        items: [
-          { ingredient: ingredients.find((i) => i.name === "Rau xà lách")._id, quantity: 40, price: 400000 },
-          { ingredient: ingredients.find((i) => i.name === "Cà chua")._id, quantity: 25, price: 250000 },
-        ],
-        totalAmount: 650000,
-        status: "pending",
+        ingredientId: ingredients.find((i) => i.name === "Cá hồi")._id,
+        quantity: 15,
+        unit: "kg",
+        price: 1500000,
+        expiryDate: new Date(Date.now() + 1000 * 60 * 60 * 24 * 45), // +45 ngày
+        status: "valid",
+      },
+      {
+        ingredientId: ingredients.find((i) => i.name === "Rau xà lách")._id,
+        quantity: 50,
+        unit: "bó",
+        price: 500000,
+        expiryDate: new Date(Date.now() - 1000 * 60 * 60 * 24 * 10), // hết hạn 10 ngày trước
+        status: "expired",
       },
     ]);
-    console.log("📦 Đã tạo các Purchase Order mẫu.");
+    console.log("📦 Đã tạo các PurchaseOrder mẫu.");
+
 
     // 8️⃣ Feedbacks
     await Feedback.insertMany([
