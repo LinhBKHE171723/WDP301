@@ -209,7 +209,8 @@ const OrderStatus = React.memo(({ orderId, onBack }) => {
         
         // Không reset canEditOrder từ fetchOrderStatus - để cookie quản lý
         
-        // Auto clear cookie when order completed/cancelled
+        // Auto clear current_order_id cookie when order completed/cancelled
+        // But keep the order in guest_order_ids for history
         if (data.data.status === 'paid' || data.data.status === 'cancelled') {
           eraseCookie('current_order_id');
         }
@@ -246,7 +247,8 @@ const OrderStatus = React.memo(({ orderId, onBack }) => {
       setHasNewUpdate(true);
       setTimeout(() => setHasNewUpdate(false), 2000);
       
-      // Auto clear cookie when order completed/cancelled
+      // Auto clear current_order_id cookie when order completed/cancelled
+      // But keep the order in guest_order_ids for history
       if (lastMessage.data.status === 'paid' || lastMessage.data.status === 'cancelled') {
         eraseCookie('current_order_id');
       }
@@ -280,7 +282,8 @@ const OrderStatus = React.memo(({ orderId, onBack }) => {
     }
   }, [lastMessage, orderId]);
 
-  // Auto clear cookie when order completed/cancelled
+  // Auto clear current_order_id cookie when order completed/cancelled
+  // But keep the order in guest_order_ids for history
   useEffect(() => {
     if (order && (order.status === 'paid' || order.status === 'cancelled')) {
       eraseCookie('current_order_id');
@@ -407,6 +410,7 @@ const OrderStatus = React.memo(({ orderId, onBack }) => {
 
       if (response.ok) {
         alert('Đơn hàng đã được hủy thành công!');
+        // Clear current_order_id but keep in guest_order_ids for history
         eraseCookie('current_order_id');
         fetchOrderStatus(); // Refresh order status
       } else {
@@ -708,7 +712,7 @@ const OrderStatus = React.memo(({ orderId, onBack }) => {
               Hủy đơn hàng
             </button>
           )}
-          {order && (order.status === 'paid' || order.status === 'cancelled') && (
+          {order && order.status !== 'pending' && (
             <button onClick={onBack} className="back-to-menu-btn">
               Quay lại menu
             </button>

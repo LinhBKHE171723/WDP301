@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
-import { getCookie, setCookie, eraseCookie } from '../utils/cookie';
+import { getCookie, setCookie, eraseCookie, addOrderIdToCookie, getGuestOrderIds } from '../utils/cookie';
 import LoginModal from './LoginModal';
 import ItemDetail from './ItemDetail';
 import OrderStatus from './OrderStatus';
@@ -151,8 +151,10 @@ const MenuView = ({ table, onBack }) => {
       const data = await response.json();
       if (data.success) {
         setCurrentOrderId(data.data._id);
-        // Lưu order id vào cookie trong 2 ngày
+        // Lưu order id vào cookie trong 2 ngày (cho order hiện tại)
         setCookie('current_order_id', data.data._id, 2);
+        // Thêm order ID vào danh sách guest order history
+        addOrderIdToCookie(data.data._id);
         setCart([]);
         setShowCart(false);
       } else {
@@ -224,9 +226,16 @@ const MenuView = ({ table, onBack }) => {
               </button>
             </div>
           ) : (
-            <button onClick={() => setShowLoginModal(true)} className="login-btn">
-              Đăng nhập
-            </button>
+            <div className="guest-actions">
+              <button onClick={() => setShowLoginModal(true)} className="login-btn">
+                Đăng nhập
+              </button>
+              {getGuestOrderIds().length > 0 && (
+                <button onClick={() => navigate('/guest-order-history')} className="guest-order-history-btn">
+                  📋 Đơn hàng đã đặt ({getGuestOrderIds().length})
+                </button>
+              )}
+            </div>
           )}
           <button onClick={() => setShowCart(true)} className="cart-btn">
             Giỏ hàng ({cart.length})
