@@ -212,6 +212,44 @@ const seedDatabase = async () => {
       await table.save();
     }
 
+    // 7️⃣ Purchase Orders
+    await PurchaseOrder.insertMany([
+      {
+        supplierName: "Nhà cung cấp Thực Phẩm A",
+        items: [
+          { ingredient: ingredients.find((i) => i.name === "Thịt bò")._id, quantity: 20, price: 2000000 },
+          { ingredient: ingredients.find((i) => i.name === "Khoai tây")._id, quantity: 30, price: 900000 },
+        ],
+        totalAmount: 2900000,
+        status: "completed",
+      },
+      {
+        supplierName: "Nhà cung cấp Rau Củ B",
+        items: [
+          { ingredient: ingredients.find((i) => i.name === "Rau xà lách")._id, quantity: 40, price: 400000 },
+          { ingredient: ingredients.find((i) => i.name === "Cà chua")._id, quantity: 25, price: 250000 },
+        ],
+        totalAmount: 650000,
+        status: "pending",
+      },
+    ]);
+    console.log("📦 Đã tạo các Purchase Order mẫu.");
+
+    // 8️⃣ Feedbacks
+    await Feedback.insertMany([
+      {
+        userId: customer._id,
+        rating: 5,
+        comment: "Đồ ăn rất ngon, phục vụ nhanh!",
+      },
+      {
+        userId: customer._id,
+        rating: 4,
+        comment: "Không gian đẹp, hơi ồn một chút.",
+      },
+    ]);
+    console.log("💬 Đã tạo các Feedback mẫu.");
+
     console.log("✅ SEED DATABASE THÀNH CÔNG!");
   } catch (error) {
     console.error("❌ Lỗi khi seed database:", error);
