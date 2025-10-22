@@ -331,9 +331,9 @@ const seedDatabase = async () => {
         category: "Món chính",
         price: 200000,
         ingredients: [
-          ingredients.find((i) => i.name === "Bột mì")._id,
-          ingredients.find((i) => i.name === "Phô mai")._id,
-          ingredients.find((i) => i.name === "Cà chua")._id,
+          { ingredient: ingredients.find((i) => i.name === "Bột mì")._id, quantity: 0.2 },
+          { ingredient: ingredients.find((i) => i.name === "Phô mai")._id, quantity: 0.15 },
+          { ingredient: ingredients.find((i) => i.name === "Cà chua")._id, quantity: 0.1 },
         ],
       },
       {
@@ -342,9 +342,9 @@ const seedDatabase = async () => {
         category: "Món chính",
         price: 180000,
         ingredients: [
-          ingredients.find((i) => i.name === "Bột mì")._id,
-          ingredients.find((i) => i.name === "Trứng gà")._id,
-          ingredients.find((i) => i.name === "Phô mai")._id,
+          { ingredient: ingredients.find((i) => i.name === "Bột mì")._id, quantity: 0.2 },
+          { ingredient: ingredients.find((i) => i.name === "Trứng gà")._id, quantity: 0.1 },
+          { ingredient: ingredients.find((i) => i.name === "Phô mai")._id, quantity: 0.1 },
         ],
       },
       {
@@ -353,9 +353,9 @@ const seedDatabase = async () => {
         category: "Món chính",
         price: 220000,
         ingredients: [
-          ingredients.find((i) => i.name === "Thịt gà")._id,
-          ingredients.find((i) => i.name === "Cà rốt")._id,
-          ingredients.find((i) => i.name === "Khoai tây")._id,
+          { ingredient: ingredients.find((i) => i.name === "Thịt gà")._id, quantity: 0.5 },
+          { ingredient: ingredients.find((i) => i.name === "Cà rốt")._id, quantity: 0.1 },
+          { ingredient: ingredients.find((i) => i.name === "Khoai tây")._id, quantity: 0.2 },
         ],
       },
       {
@@ -364,10 +364,10 @@ const seedDatabase = async () => {
         category: "Món chính",
         price: 350000,
         ingredients: [
-          ingredients.find((i) => i.name === "Tôm tươi")._id,
-          ingredients.find((i) => i.name === "Cá basa")._id,
-          ingredients.find((i) => i.name === "Mực tươi")._id,
-          ingredients.find((i) => i.name === "Rau muống")._id,
+          { ingredient: ingredients.find((i) => i.name === "Tôm tươi")._id, quantity: 0.3 },
+          { ingredient: ingredients.find((i) => i.name === "Cá basa")._id, quantity: 0.2 },
+          { ingredient: ingredients.find((i) => i.name === "Mực tươi")._id, quantity: 0.2 },
+          { ingredient: ingredients.find((i) => i.name === "Rau muống")._id, quantity: 0.1 },
         ],
       },
       {
@@ -376,9 +376,9 @@ const seedDatabase = async () => {
         category: "Món chính",
         price: 120000,
         ingredients: [
-          ingredients.find((i) => i.name === "Bún tươi")._id,
-          ingredients.find((i) => i.name === "Thịt bò")._id,
-          ingredients.find((i) => i.name === "Rau muống")._id,
+          { ingredient: ingredients.find((i) => i.name === "Bún tươi")._id, quantity: 0.2 },
+          { ingredient: ingredients.find((i) => i.name === "Thịt bò")._id, quantity: 0.2 },
+          { ingredient: ingredients.find((i) => i.name === "Rau muống")._id, quantity: 0.1 },
         ],
       },
       {
@@ -387,9 +387,9 @@ const seedDatabase = async () => {
         category: "Món chính",
         price: 100000,
         ingredients: [
-          ingredients.find((i) => i.name === "Phở tươi")._id,
-          ingredients.find((i) => i.name === "Thịt bò")._id,
-          ingredients.find((i) => i.name === "Hành tây")._id,
+          { ingredient: ingredients.find((i) => i.name === "Phở tươi")._id, quantity: 0.2 },
+          { ingredient: ingredients.find((i) => i.name === "Thịt bò")._id, quantity: 0.15 },
+          { ingredient: ingredients.find((i) => i.name === "Hành tây")._id, quantity: 0.05 },
         ],
       },
       {
@@ -398,9 +398,9 @@ const seedDatabase = async () => {
         category: "Món chính",
         price: 80000,
         ingredients: [
-          ingredients.find((i) => i.name === "Gạo")._id,
-          ingredients.find((i) => i.name === "Thịt heo")._id,
-          ingredients.find((i) => i.name === "Dưa chuột")._id,
+          { ingredient: ingredients.find((i) => i.name === "Gạo")._id, quantity: 0.2 },
+          { ingredient: ingredients.find((i) => i.name === "Thịt heo")._id, quantity: 0.2 },
+          { ingredient: ingredients.find((i) => i.name === "Dưa chuột")._id, quantity: 0.05 },
         ],
       },
       {
@@ -409,9 +409,9 @@ const seedDatabase = async () => {
         category: "Món chính",
         price: 150000,
         ingredients: [
-          ingredients.find((i) => i.name === "Cá basa")._id,
-          ingredients.find((i) => i.name === "Nước mắm")._id,
-          ingredients.find((i) => i.name === "Đường")._id,
+          { ingredient: ingredients.find((i) => i.name === "Cá basa")._id, quantity: 0.3 },
+          { ingredient: ingredients.find((i) => i.name === "Nước mắm")._id, quantity: 0.05 },
+          { ingredient: ingredients.find((i) => i.name === "Đường")._id, quantity: 0.02 },
         ],
       },
       // Khai vị
@@ -421,9 +421,9 @@ const seedDatabase = async () => {
         category: "Khai vị",
         price: 60000,
         ingredients: [
-          ingredients.find((i) => i.name === "Thịt gà")._id,
-          ingredients.find((i) => i.name === "Nấm hương")._id,
-          ingredients.find((i) => i.name === "Cà rốt")._id,
+          { ingredient: ingredients.find((i) => i.name === "Thịt gà")._id, quantity: 0.2 },
+          { ingredient: ingredients.find((i) => i.name === "Nấm hương")._id, quantity: 0.05 },
+          { ingredient: ingredients.find((i) => i.name === "Cà rốt")._id, quantity: 0.1 },
         ],
       },
       {
@@ -432,9 +432,9 @@ const seedDatabase = async () => {
         category: "Khai vị",
         price: 90000,
         ingredients: [
-          ingredients.find((i) => i.name === "Cá hồi")._id,
-          ingredients.find((i) => i.name === "Rau xà lách")._id,
-          ingredients.find((i) => i.name === "Cà chua")._id,
+          { ingredient: ingredients.find((i) => i.name === "Cá hồi")._id, quantity: 0.15 },
+          { ingredient: ingredients.find((i) => i.name === "Rau xà lách")._id, quantity: 0.1 },
+          { ingredient: ingredients.find((i) => i.name === "Cà chua")._id, quantity: 0.05 },
         ],
       },
       {
@@ -443,9 +443,9 @@ const seedDatabase = async () => {
         category: "Khai vị",
         price: 80000,
         ingredients: [
-          ingredients.find((i) => i.name === "Tôm tươi")._id,
-          ingredients.find((i) => i.name === "Thịt heo")._id,
-          ingredients.find((i) => i.name === "Rau xà lách")._id,
+          { ingredient: ingredients.find((i) => i.name === "Tôm tươi")._id, quantity: 0.1 },
+          { ingredient: ingredients.find((i) => i.name === "Thịt heo")._id, quantity: 0.1 },
+          { ingredient: ingredients.find((i) => i.name === "Rau xà lách")._id, quantity: 0.05 },
         ],
       },
       {
@@ -454,9 +454,9 @@ const seedDatabase = async () => {
         category: "Khai vị",
         price: 120000,
         ingredients: [
-          ingredients.find((i) => i.name === "Thịt heo")._id,
-          ingredients.find((i) => i.name === "Bánh mì")._id,
-          ingredients.find((i) => i.name === "Rau xà lách")._id,
+          { ingredient: ingredients.find((i) => i.name === "Thịt heo")._id, quantity: 0.15 },
+          { ingredient: ingredients.find((i) => i.name === "Bánh mì")._id, quantity: 0.1 },
+          { ingredient: ingredients.find((i) => i.name === "Rau xà lách")._id, quantity: 0.05 },
         ],
       },
       // Đồ uống
@@ -465,35 +465,35 @@ const seedDatabase = async () => {
         description: "Nước ngọt có ga",
         category: "Đồ uống",
         price: 25000,
-        ingredients: [ingredients.find((i) => i.name === "Coca Cola")._id],
+        ingredients: [{ ingredient: ingredients.find((i) => i.name === "Coca Cola")._id, quantity: 1 }],
       },
       {
         name: "Pepsi",
         description: "Nước ngọt có ga",
         category: "Đồ uống",
         price: 25000,
-        ingredients: [ingredients.find((i) => i.name === "Pepsi")._id],
+        ingredients: [{ ingredient: ingredients.find((i) => i.name === "Pepsi")._id, quantity: 1 }],
       },
       {
         name: "Nước Suối",
         description: "Nước suối tinh khiết",
         category: "Đồ uống",
         price: 15000,
-        ingredients: [ingredients.find((i) => i.name === "Nước suối")._id],
+        ingredients: [{ ingredient: ingredients.find((i) => i.name === "Nước suối")._id, quantity: 1 }],
       },
       {
         name: "Trà Đá",
         description: "Trà đá truyền thống",
         category: "Đồ uống",
         price: 10000,
-        ingredients: [ingredients.find((i) => i.name === "Trà đá")._id],
+        ingredients: [{ ingredient: ingredients.find((i) => i.name === "Trà đá")._id, quantity: 1 }],
       },
       {
         name: "Cà Phê Đen",
         description: "Cà phê đen đậm đà",
         category: "Đồ uống",
         price: 20000,
-        ingredients: [ingredients.find((i) => i.name === "Cà phê đen")._id],
+        ingredients: [{ ingredient: ingredients.find((i) => i.name === "Cà phê đen")._id, quantity: 1 }],
       },
       {
         name: "Sinh Tố Dâu",
@@ -501,8 +501,8 @@ const seedDatabase = async () => {
         category: "Đồ uống",
         price: 35000,
         ingredients: [
-          ingredients.find((i) => i.name === "Sữa tươi")._id,
-          ingredients.find((i) => i.name === "Đường")._id,
+          { ingredient: ingredients.find((i) => i.name === "Sữa tươi")._id, quantity: 0.2 },
+          { ingredient: ingredients.find((i) => i.name === "Đường")._id, quantity: 0.05 },
         ],
       },
       {
@@ -510,7 +510,7 @@ const seedDatabase = async () => {
         description: "Nước cam tươi ép",
         category: "Đồ uống",
         price: 30000,
-        ingredients: [ingredients.find((i) => i.name === "Chanh")._id],
+        ingredients: [{ ingredient: ingredients.find((i) => i.name === "Chanh")._id, quantity: 1 }],
       },
       {
         name: "Trà Sữa Trân Châu",
@@ -518,8 +518,8 @@ const seedDatabase = async () => {
         category: "Đồ uống",
         price: 40000,
         ingredients: [
-          ingredients.find((i) => i.name === "Sữa tươi")._id,
-          ingredients.find((i) => i.name === "Đường")._id,
+          { ingredient: ingredients.find((i) => i.name === "Sữa tươi")._id, quantity: 0.2 },
+          { ingredient: ingredients.find((i) => i.name === "Đường")._id, quantity: 0.05 },
         ],
       },
       // Tráng miệng
@@ -528,7 +528,7 @@ const seedDatabase = async () => {
         description: "Kem vani mát lạnh",
         category: "Tráng miệng",
         price: 25000,
-        ingredients: [ingredients.find((i) => i.name === "Kem vani")._id],
+        ingredients: [{ ingredient: ingredients.find((i) => i.name === "Kem vani")._id, quantity: 1 }],
       },
       {
         name: "Bánh Flan",
@@ -536,9 +536,9 @@ const seedDatabase = async () => {
         category: "Tráng miệng",
         price: 30000,
         ingredients: [
-          ingredients.find((i) => i.name === "Trứng gà")._id,
-          ingredients.find((i) => i.name === "Sữa tươi")._id,
-          ingredients.find((i) => i.name === "Đường")._id,
+          { ingredient: ingredients.find((i) => i.name === "Trứng gà")._id, quantity: 0.1 },
+          { ingredient: ingredients.find((i) => i.name === "Sữa tươi")._id, quantity: 0.2 },
+          { ingredient: ingredients.find((i) => i.name === "Đường")._id, quantity: 0.05 },
         ],
       },
       {
@@ -547,8 +547,8 @@ const seedDatabase = async () => {
         category: "Tráng miệng",
         price: 20000,
         ingredients: [
-          ingredients.find((i) => i.name === "Đường")._id,
-          ingredients.find((i) => i.name === "Sữa tươi")._id,
+          { ingredient: ingredients.find((i) => i.name === "Đường")._id, quantity: 0.05 },
+          { ingredient: ingredients.find((i) => i.name === "Sữa tươi")._id, quantity: 0.2 },
         ],
       },
       {
@@ -557,9 +557,9 @@ const seedDatabase = async () => {
         category: "Tráng miệng",
         price: 45000,
         ingredients: [
-          ingredients.find((i) => i.name === "Bánh ngọt")._id,
-          ingredients.find((i) => i.name === "Sữa tươi")._id,
-          ingredients.find((i) => i.name === "Cà phê đen")._id,
+          { ingredient: ingredients.find((i) => i.name === "Bánh ngọt")._id, quantity: 0.1 },
+          { ingredient: ingredients.find((i) => i.name === "Sữa tươi")._id, quantity: 0.2 },
+          { ingredient: ingredients.find((i) => i.name === "Cà phê đen")._id, quantity: 0.05 },
         ],
       },
       {
@@ -570,11 +570,6 @@ const seedDatabase = async () => {
         ingredients: [],
       },
     ]);
-
-    for (const data of itemData) {
-      const item = await Item.create(data); // pre-save sẽ tự tính expense
-      items.push(item);
-    }
     console.log("🍱 Đã tạo các Item mẫu và tính expense tự động.");
 
     // 5️⃣ Tạo menu mẫu
