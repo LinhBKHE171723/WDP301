@@ -278,6 +278,7 @@ const seedDatabase = async () => {
       { name: "Bánh mì", unit: "ổ", stockQuantity: 100, minStock: 20 },
       { name: "Bánh ngọt", unit: "cái", stockQuantity: 30, minStock: 5 },
     ]);
+    console.log("🥦 Đã tạo các Ingredient mẫu.");
 
     // 4️⃣ Món ăn
     const items = await Item.insertMany([
@@ -288,8 +289,8 @@ const seedDatabase = async () => {
         category: "Món chính",
         price: 250000,
         ingredients: [
-          ingredients.find((i) => i.name === "Thịt bò")._id,
-          ingredients.find((i) => i.name === "Khoai tây")._id,
+          { ingredient: ingredients.find((i) => i.name === "Thịt bò")._id, quantity: 0.3 }, // 300g
+          { ingredient: ingredients.find((i) => i.name === "Khoai tây")._id, quantity: 0.2 }, // 200g
         ],
       },
       {
@@ -297,7 +298,10 @@ const seedDatabase = async () => {
         description: "Cá hồi Na Uy sốt chanh dây",
         category: "Món chính",
         price: 280000,
-        ingredients: [ingredients.find((i) => i.name === "Cá hồi")._id],
+        ingredients: [
+          { ingredient: ingredients.find((i) => i.name === "Cá hồi")._id, quantity: 0.25 }, // 250g
+          { ingredient: ingredients.find((i) => i.name === "Bơ")._id, quantity: 0.05 },
+        ],
       },
       {
         name: "Tôm Tempura",
@@ -305,8 +309,8 @@ const seedDatabase = async () => {
         category: "Món chính",
         price: 180000,
         ingredients: [
-          ingredients.find((i) => i.name === "Tôm tươi")._id,
-          ingredients.find((i) => i.name === "Bột mì")._id,
+          { ingredient: ingredients.find((i) => i.name === "Tôm tươi")._id, quantity: 0.2 },
+          { ingredient: ingredients.find((i) => i.name === "Bột mì")._id, quantity: 0.05 },
         ],
       },
       {
@@ -314,7 +318,11 @@ const seedDatabase = async () => {
         description: "Rau củ tươi trộn dầu giấm",
         category: "Khai vị",
         price: 70000,
-        ingredients: [ingredients.find((i) => i.name === "Rau xà lách")._id],
+        ingredients: [
+          { ingredient: ingredients.find((i) => i.name === "Rau xà lách")._id, quantity: 0.1 },
+          { ingredient: ingredients.find((i) => i.name === "Cà chua")._id, quantity: 0.05 },
+          { ingredient: ingredients.find((i) => i.name === "Hành tây")._id, quantity: 0.03 },
+        ],
       },
       // Thêm món chính mới
       {
@@ -563,7 +571,13 @@ const seedDatabase = async () => {
       },
     ]);
 
-    // 4.5️⃣ Tạo menu mẫu
+    for (const data of itemData) {
+      const item = await Item.create(data); // pre-save sẽ tự tính expense
+      items.push(item);
+    }
+    console.log("🍱 Đã tạo các Item mẫu và tính expense tự động.");
+
+    // 5️⃣ Tạo menu mẫu
     const menus = await Menu.insertMany([
       {
         name: "Combo Bò Bít Tết",
@@ -1151,24 +1165,21 @@ const seedDatabase = async () => {
         quantity: 20,
         unit: "kg",
         price: 2000000,
-        expiryDate: new Date(Date.now() + 1000 * 60 * 60 * 24 * 90), // +90 ngày
-        status: "valid",
+        expiryDate: new Date(Date.now() + 1000 * 60 * 60 * 24 * 90),
       },
       {
         ingredientId: ingredients.find((i) => i.name === "Cá hồi")._id,
         quantity: 15,
         unit: "kg",
         price: 1500000,
-        expiryDate: new Date(Date.now() + 1000 * 60 * 60 * 24 * 45), // +45 ngày
-        status: "valid",
+        expiryDate: new Date(Date.now() + 1000 * 60 * 60 * 24 * 45),
       },
       {
         ingredientId: ingredients.find((i) => i.name === "Rau xà lách")._id,
         quantity: 50,
         unit: "bó",
         price: 500000,
-        expiryDate: new Date(Date.now() - 1000 * 60 * 60 * 24 * 10), // hết hạn 10 ngày trước
-        status: "expired",
+        expiryDate: new Date(Date.now() - 1000 * 60 * 60 * 24 * 10),
       },
       // Thêm purchase orders mới
       {
