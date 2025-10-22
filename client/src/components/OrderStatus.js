@@ -33,6 +33,9 @@ const OrderStatus = React.memo(({ orderId, onBack }) => {
   const [showWaiterResponseModal, setShowWaiterResponseModal] = useState(false);
   const [waiterResponseData, setWaiterResponseData] = useState(null);
   
+  // Ref để track đã hiển thị thông báo hủy đơn hàng chưa (tránh re-render)
+  const hasShownCancellationAlertRef = useRef(false);
+  
   // State cho editing mode - lưu các thay đổi tạm thời
   const [pendingChanges, setPendingChanges] = useState({
     itemsToAdd: [],
@@ -272,6 +275,7 @@ const OrderStatus = React.memo(({ orderId, onBack }) => {
   // Initial load
   useEffect(() => {
     if (orderId) {
+      hasShownCancellationAlertRef.current = false; // Reset alert flag for new order
       fetchOrderStatus();
     }
   }, [orderId, fetchOrderStatus]);
@@ -291,6 +295,19 @@ const OrderStatus = React.memo(({ orderId, onBack }) => {
       // But keep the order in guest_order_ids for history
       if (lastMessage.data.status === 'paid' || lastMessage.data.status === 'cancelled') {
         eraseCookie('current_order_id');
+        
+        // Close waiter response modal if order is cancelled
+        if (lastMessage.data.status === 'cancelled') {
+          console.log('🔄 Closing waiter response modal due to order cancellation');
+          setShowWaiterResponseModal(false);
+          setWaiterResponseData(null);
+          setCanEditOrder(false); // Also disable edit mode
+          // Show cancellation notification only once
+          if (!hasShownCancellationAlertRef.current) {
+            alert('❌ Đơn hàng đã bị hủy!');
+            hasShownCancellationAlertRef.current = true;
+          }
+        }
       }
     } else if (lastMessage && lastMessage.type === 'order:waiter_rejected' && lastMessage.orderId === orderId) {
       console.log('🚫 Order rejected by waiter:', lastMessage.data);
@@ -320,6 +337,24 @@ const OrderStatus = React.memo(({ orderId, onBack }) => {
       setOrder(lastMessage.data.order);
       setHasNewUpdate(true);
       setTimeout(() => setHasNewUpdate(false), 2000);
+    } else if (lastMessage && lastMessage.type === 'order:cancelled' && lastMessage.orderId === orderId) {
+      console.log('❌ Order cancelled:', lastMessage.data);
+      setOrder(lastMessage.data);
+      setHasNewUpdate(true);
+      setTimeout(() => setHasNewUpdate(false), 2000);
+      
+      // Clear cookie and close waiter response modal
+      eraseCookie('current_order_id');
+      console.log('🔄 Closing waiter response modal due to order:cancelled event');
+      setShowWaiterResponseModal(false);
+      setWaiterResponseData(null);
+      setCanEditOrder(false); // Also disable edit mode
+      
+      // Show cancellation notification only once
+      if (!hasShownCancellationAlertRef.current) {
+        alert('❌ Đơn hàng đã bị hủy!');
+        hasShownCancellationAlertRef.current = true;
+      }
     } else if (lastMessage && lastMessage.type === 'order:not_found' && lastMessage.orderId === orderId) {
       // Clear cookie if WebSocket reports order not found
       eraseCookie('current_order_id');
@@ -332,6 +367,14 @@ const OrderStatus = React.memo(({ orderId, onBack }) => {
   useEffect(() => {
     if (order && (order.status === 'paid' || order.status === 'cancelled')) {
       eraseCookie('current_order_id');
+      
+      // Close waiter response modal if order is cancelled
+      if (order.status === 'cancelled') {
+        console.log('🔄 Order status changed to cancelled, closing modal');
+        setShowWaiterResponseModal(false);
+        setWaiterResponseData(null);
+        setCanEditOrder(false);
+      }
     }
   }, [order]);
 
@@ -454,10 +497,10 @@ const OrderStatus = React.memo(({ orderId, onBack }) => {
       const data = await response.json();
 
       if (response.ok) {
-        alert('Đơn hàng đã được hủy thành công!');
         // Clear current_order_id but keep in guest_order_ids for history
         eraseCookie('current_order_id');
         fetchOrderStatus(); // Refresh order status
+        // Note: Alert will be shown via WebSocket event
       } else {
         alert(`Lỗi: ${data.message || 'Không thể hủy đơn hàng'}`);
       }
@@ -1133,8 +1176,8 @@ const OrderStatus = React.memo(({ orderId, onBack }) => {
         </div>
       )}
 
-      {/* Waiter Response Popup Modal */}
-      {showWaiterResponseModal && waiterResponseData && (
+      {/* Waiter Response Popup Modal - Only show if order is not cancelled */}
+      {showWaiterResponseModal && waiterResponseData && order?.status !== 'cancelled' && (
         <div className="modal-overlay">
           <div className="waiter-response-modal">
             <div className="modal-header">
