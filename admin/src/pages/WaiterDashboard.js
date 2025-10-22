@@ -22,7 +22,7 @@ export default function WaiterDashboard() {
     const [pendingLoading, setPendingLoading] = useState(true);
 
     // WebSocket connection
-    const { connectionState, lastMessage } = useWaiterWebSocket();
+    const { connectionState, lastMessage, subscribeToOrders, subscribeToOrder, unsubscribeFromAllOrders } = useWaiterWebSocket();
 
     /**
      * 🔹 Lấy danh sách order đang phục vụ
@@ -31,7 +31,14 @@ export default function WaiterDashboard() {
     const fetchOrders = async () => {
         try {
             const res = await waiterApi.getActiveOrders();
-            setOrders(res.data || []);
+            const ordersData = res.data || [];
+            setOrders(ordersData);
+            
+            // Subscribe to all active orders for real-time updates
+            if (ordersData.length > 0) {
+                const orderIds = ordersData.map(order => order._id);
+                subscribeToOrders(orderIds);
+            }
         } catch (err) {
             console.error("Error loading orders:", err.message);
             toast.error("Không thể tải danh sách đơn hàng!");
@@ -47,7 +54,14 @@ export default function WaiterDashboard() {
     const fetchPendingOrders = async () => {
         try {
             const res = await waiterApi.getPendingOrders();
-            setPendingOrders(res.data || []);
+            const pendingData = res.data || [];
+            setPendingOrders(pendingData);
+            
+            // Subscribe to all pending orders for real-time updates
+            if (pendingData.length > 0) {
+                const orderIds = pendingData.map(order => order._id);
+                subscribeToOrders(orderIds);
+            }
         } catch (err) {
             console.error("Error loading pending orders:", err.message);
             toast.error("Không thể tải danh sách đơn hàng chờ xác nhận!");
@@ -98,6 +112,11 @@ export default function WaiterDashboard() {
     useEffect(() => {
         fetchOrders();
         fetchPendingOrders();
+        
+        // Cleanup: unsubscribe from all orders when component unmounts
+        return () => {
+            unsubscribeFromAllOrders();
+        };
     }, []);
 
     // Handle WebSocket messages
@@ -109,6 +128,9 @@ export default function WaiterDashboard() {
                 case 'order:needs_waiter_confirm':
                     // Có đơn hàng mới hoặc được sửa đổi cần xác nhận
                     console.log('🆕 Order needs confirmation:', lastMessage.data);
+                    
+                    // Subscribe to this order for real-time updates
+                    subscribeToOrder(lastMessage.data._id);
                     
                     // Kiểm tra xem đây có phải đơn hàng mới hay được sửa đổi
                     const isExistingOrder = pendingOrders.some(o => o._id === lastMessage.data._id);

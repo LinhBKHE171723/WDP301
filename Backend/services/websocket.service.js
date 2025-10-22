@@ -202,6 +202,8 @@ class WebSocketService {
     if (subscribers.size === 0) {
       this.connections.delete(orderIdStr);
     }
+    
+    console.log(`📡 Broadcasted ${eventType} to ${sentCount} subscriber(s) for order ${orderIdStr}`, data);
   }
 
   // Broadcast to all waiter connections
@@ -212,15 +214,19 @@ class WebSocketService {
       timestamp: new Date().toISOString()
     };
 
+    let sentCount = 0;
     this.wss.clients.forEach(ws => {
       try {
         if (ws.readyState === WebSocket.OPEN && ws.userRole === 'waiter') {
           ws.send(JSON.stringify(message));
+          sentCount++;
         }
       } catch (error) {
         console.error('❌ Error sending WebSocket message to waiter:', error);
       }
     });
+    
+    console.log(`📡 Broadcasted ${eventType} to ${sentCount} waiter(s)`, data);
   }
 
   // Broadcast to all kitchen connections
