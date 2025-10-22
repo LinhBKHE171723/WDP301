@@ -109,7 +109,7 @@ export default function AddItemModal({ show, onClose, setItems, editItem }) {
   };
 
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-40 flex justify-center items-center z-50">
+    <div className="fixed inset-0 bg-black bg-opacity-20 flex justify-center items-center z-50">
       <div className="bg-white rounded-xl shadow-2xl w-full max-w-lg p-6 relative animate-fadeIn">
         {/* Header */}
         <div className="flex justify-between items-center mb-5 border-b pb-2">
