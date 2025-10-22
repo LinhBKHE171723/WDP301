@@ -7,6 +7,7 @@ const useWaiterWebSocket = () => {
   const reconnectTimeoutRef = useRef(null);
   const reconnectAttempts = useRef(0);
   const maxReconnectAttempts = 5;
+  const subscribedOrders = useRef(new Set());
 
   const connect = () => {
     try {
@@ -73,6 +74,43 @@ const useWaiterWebSocket = () => {
     }
   };
 
+  const subscribeToOrder = (orderId) => {
+    if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
+      wsRef.current.send(JSON.stringify({
+        type: 'subscribe',
+        orderId: orderId
+      }));
+      subscribedOrders.current.add(orderId);
+      console.log(`📡 Subscribed to order: ${orderId}`);
+    }
+  };
+
+  const unsubscribeFromOrder = (orderId) => {
+    if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
+      wsRef.current.send(JSON.stringify({
+        type: 'unsubscribe',
+        orderId: orderId
+      }));
+      subscribedOrders.current.delete(orderId);
+      console.log(`📡 Unsubscribed from order: ${orderId}`);
+    }
+  };
+
+  const subscribeToOrders = (orderIds) => {
+    orderIds.forEach(orderId => {
+      if (!subscribedOrders.current.has(orderId)) {
+        subscribeToOrder(orderId);
+      }
+    });
+  };
+
+  const unsubscribeFromAllOrders = () => {
+    subscribedOrders.current.forEach(orderId => {
+      unsubscribeFromOrder(orderId);
+    });
+    subscribedOrders.current.clear();
+  };
+
   useEffect(() => {
     connect();
     
@@ -85,9 +123,14 @@ const useWaiterWebSocket = () => {
     connectionState,
     lastMessage,
     connect,
-    disconnect
+    disconnect,
+    subscribeToOrder,
+    unsubscribeFromOrder,
+    subscribeToOrders,
+    unsubscribeFromAllOrders
   };
 };
 
 export default useWaiterWebSocket;
+
 
