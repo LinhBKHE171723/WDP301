@@ -72,7 +72,7 @@ const waiterTableController = {
   getAvailableTables: async (req, res) => {
     try {
       const availableTables = await Table.find({ status: 'available' }).lean();
-      res.status(200).json({ success: true, tables: availableTables });
+      res.status(200).json(availableTables);
     }
     catch (error) {
       console.error("❌ Lỗi khi lấy danh sách bàn trống:", error);
