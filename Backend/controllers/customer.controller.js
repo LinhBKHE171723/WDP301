@@ -137,8 +137,8 @@ exports.createOrder = async (req, res) => {
       }
     }
 
-    // Tạo OrderItems từ cart data
-    const { createdOrderItems, totalAmount } = await createOrderItemsFromCart(orderItems, order._id);
+    // Tạo OrderItems từ cart data (không cần order._id vì chưa có)
+    const { createdOrderItems, totalAmount } = await createOrderItemsFromCart(orderItems);
 
     // Tạo Payment
     const payment = new Payment({
