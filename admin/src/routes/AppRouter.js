@@ -6,6 +6,13 @@ import WaiterDashboard from "../pages/WaiterDashboard";
 import TableMap from "../components/waiter/TableMap";
 import TableDetail from "../components/waiter/TableDetail";
 
+
+import CashierShiftManager from "../components/cashier/CashierShiftManager";
+import CashierDashboard from "../components/cashier/CashierDashboard";
+import UnpaidOrdersList from "../components/cashier/Unpaid-orders-list";
+import TableManagement from "../components/cashier/table-management";
+import OrderPayment from "../components/cashier/order-payment";
+
 export default function AppRouter() {
   const { user, token, isLoggedIn, loading } = useAuth();
   
@@ -46,6 +53,13 @@ export default function AppRouter() {
           <Route path="/waiter/tables/details/:tableId" element={<TableDetail />} />  
         </>
       )}
+
+        <Route path="/cashier/shift" element={<CashierShiftManager />} />
+      <Route path="/cashier/dashboard" element={<CashierDashboard />} />
+      <Route path="/cashier/unpaid-orders" element={<UnpaidOrdersList />} />
+      <Route path="/cashier/table-management" element={<TableManagement />} />
+      <Route path="/cashier/order-payment/:orderId" element={<OrderPayment />} />
+
 
       {/* Nếu user điền URL linh tinh hoặc cố tình điền url ko thuộc role của mình */}
       <Route

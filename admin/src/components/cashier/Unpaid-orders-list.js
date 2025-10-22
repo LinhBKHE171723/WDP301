@@ -3,49 +3,75 @@ import "./unpaid-orders-list.css"
 import { useState } from "react"
 import OrderPayment from "./order-payment"
 
+// Dữ liệu seed lần đầu (chỉ dùng khi chưa có gì trong localStorage)
+const SEED_ORDERS = [
+  {
+    id: 1,
+    orderNumber: "ĐH-006",
+    tableNumber: "Bàn 5",
+    items: [
+      { id: 1, name: "Phở Bò Đặc Biệt", quantity: 2, price: 85000 },
+      { id: 2, name: "Gỏi Cuốn", quantity: 1, price: 45000 },
+      { id: 3, name: "Trà Đá", quantity: 2, price: 10000 },
+    ],
+    totalAmount: 225000,
+    orderTime: new Date(Date.now() - 15 * 60000).toISOString(),
+    waitTime: 15,
+  },
+  {
+    id: 2,
+    orderNumber: "ĐH-007",
+    tableNumber: "Bàn 12",
+    items: [
+      { id: 4, name: "Cơm Gà Xối Mỡ", quantity: 1, price: 65000 },
+      { id: 5, name: "Canh Chua", quantity: 1, price: 55000 },
+      { id: 6, name: "Nước Chanh", quantity: 1, price: 20000 },
+    ],
+    totalAmount: 140000,
+    orderTime: new Date(Date.now() - 8 * 60000).toISOString(),
+    waitTime: 8,
+  },
+  {
+    id: 3,
+    orderNumber: "ĐH-008",
+    tableNumber: "Bàn 3",
+    items: [
+      { id: 7, name: "Bún Chả Hà Nội", quantity: 3, price: 75000 },
+      { id: 8, name: "Nem Rán", quantity: 2, price: 40000 },
+      { id: 9, name: "Trà Chanh", quantity: 3, price: 25000 },
+    ],
+    totalAmount: 380000,
+    orderTime: new Date(Date.now() - 22 * 60000).toISOString(),
+    waitTime: 22,
+  },
+]
+
+// Load danh sách đơn chờ từ localStorage, nếu chưa có thì seed
+const loadUnpaid = () => {
+  const FORCE_TEST_SEED = true; // <-- khi hết test, đổi thành false
+
+  try {
+    if (FORCE_TEST_SEED) {
+      localStorage.setItem("unpaidOrders", JSON.stringify(SEED_ORDERS))
+      return SEED_ORDERS
+    }
+
+    const raw = localStorage.getItem("unpaidOrders")
+    if (raw) {
+      const arr = JSON.parse(raw)
+      if (Array.isArray(arr) && arr.length > 0) return arr
+    }
+    // chưa có thì seed mặc định
+    localStorage.setItem("unpaidOrders", JSON.stringify(SEED_ORDERS))
+    return SEED_ORDERS
+  } catch {
+    return SEED_ORDERS
+  }
+}
+
 function UnpaidOrdersList({ onBack, onPaymentComplete }) {
   const [selectedOrder, setSelectedOrder] = useState(null)
-  const [unpaidOrders, setUnpaidOrders] = useState([
-    {
-      id: 1,
-      orderNumber: "ĐH-006",
-      tableNumber: "Bàn 5",
-      items: [
-        { id: 1, name: "Phở Bò Đặc Biệt", quantity: 2, price: 85000 },
-        { id: 2, name: "Gỏi Cuốn", quantity: 1, price: 45000 },
-        { id: 3, name: "Trà Đá", quantity: 2, price: 10000 },
-      ],
-      totalAmount: 225000,
-      orderTime: new Date(Date.now() - 15 * 60000).toISOString(),
-      waitTime: 15,
-    },
-    {
-      id: 2,
-      orderNumber: "ĐH-007",
-      tableNumber: "Bàn 12",
-      items: [
-        { id: 4, name: "Cơm Gà Xối Mỡ", quantity: 1, price: 65000 },
-        { id: 5, name: "Canh Chua", quantity: 1, price: 55000 },
-        { id: 6, name: "Nước Chanh", quantity: 1, price: 20000 },
-      ],
-      totalAmount: 140000,
-      orderTime: new Date(Date.now() - 8 * 60000).toISOString(),
-      waitTime: 8,
-    },
-    {
-      id: 3,
-      orderNumber: "ĐH-008",
-      tableNumber: "Bàn 3",
-      items: [
-        { id: 7, name: "Bún Chả Hà Nội", quantity: 3, price: 75000 },
-        { id: 8, name: "Nem Rán", quantity: 2, price: 40000 },
-        { id: 9, name: "Trà Chanh", quantity: 3, price: 25000 },
-      ],
-      totalAmount: 380000,
-      orderTime: new Date(Date.now() - 22 * 60000).toISOString(),
-      waitTime: 22,
-    },
-  ])
+  const [unpaidOrders, setUnpaidOrders] = useState(loadUnpaid())
 
   const formatCurrency = (amount) =>
     new Intl.NumberFormat("vi-VN", { style: "currency", currency: "VND" }).format(amount)
@@ -60,21 +86,23 @@ function UnpaidOrdersList({ onBack, onPaymentComplete }) {
       const subtotal = paidOrder.items.reduce((sum, item) => sum + item.price * item.quantity, 0)
       const total = subtotal * (1 + VAT_RATE)
 
-      // XÓA ĐƠN KHỎI LIST NGAY LẬP TỨC
-      setUnpaidOrders((prev) => prev.filter((order) => order.id !== orderId))
+      // Cập nhật state + localStorage
+      setUnpaidOrders((prev) => {
+        const next = prev.filter((order) => order.id !== orderId)
+        localStorage.setItem("unpaidOrders", JSON.stringify(next))
+        return next
+      })
 
-      // Báo về Dashboard để trừ “Đơn Chờ” và ghi lịch sử
-      if (onPaymentComplete) {
-        onPaymentComplete({
-          orderNumber: paidOrder.orderNumber,
-          amount: total,
-          method: paymentMethod === "cash" ? "Tiền mặt" : "QR Code",
-          time: new Date().toISOString(),
-        })
-      }
+      // Báo về Dashboard
+      onPaymentComplete?.({
+        orderNumber: paidOrder.orderNumber,
+        amount: total,
+        method: paymentMethod === "cash" ? "Tiền mặt" : "QR Code",
+        time: new Date().toISOString(),
+      })
     }
 
-    // Thoát màn chi tiết và quay lại list (đơn đã biến mất)
+    // Quay lại list
     setSelectedOrder(null)
   }
 

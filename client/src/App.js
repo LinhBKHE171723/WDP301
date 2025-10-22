@@ -6,13 +6,6 @@ import MenuView from "./components/MenuView"
 import OrderHistory from "./components/OrderHistory"
 import GuestOrderHistory from "./components/GuestOrderHistory"
 import OrderStatus from "./components/OrderStatus"
-
-import CashierShiftManager from "./components/cashier/CashierShiftManager"
-import CashierDashboard from "./components/cashier/CashierDashboard"
-import OrderPayment from "./components/cashier/order-payment"
-import TableManagement from "./components/cashier/table-management"
-import UnpaidOrdersList from "./components/cashier/Unpaid-orders-list" 
-
 import "./App.css"
 
 /* ---------- Demo wrappers để truyền props & điều hướng ---------- */
@@ -172,17 +165,7 @@ function App() {
             {/* Trang menu demo */}
             <Route path="/menu" element={<div>Menu Page - Coming Soon!</div>} />
 
-            {/* Khu vực cashier */}
-            <Route path="/cashier" element={<Navigate to="/cashier/dashboard" replace />} />
-            <Route path="/cashier/shift" element={<CashierShiftManager />} />
-            <Route
-              path="/cashier/dashboard"
-              element={<DashboardRoute shiftInfo={shiftInfo} shiftData={shiftData} setShiftData={setShiftData} />}
-            />
-            <Route path="/cashier/orderpayment" element={<OrderPaymentRoute />} />
-            <Route path="/cashier/unpaid" element={<UnpaidOrdersRoute />} />
-            <Route path="/cashier/tables" element={<TableManagementRoute />} />
-
+            
             {/* 404 */}
             <Route path="*" element={<div style={{ padding: 24 }}>404 - Không tìm thấy trang</div>} />
           </Routes>

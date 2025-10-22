@@ -30,6 +30,8 @@ export default function CashierShiftManager() {
     { denomination: 2000, count: 0 },
     { denomination: 1000, count: 0 },
   ])
+  // === Key doanh thu ca (đồng bộ với Dashboard) ===
+  const getShiftKey = (shiftStart) => `cashier_sales_${new Date(shiftStart || Date.now()).getTime()}`
 
   const formatCurrency = (amount) => {
     return new Intl.NumberFormat("vi-VN", {
@@ -102,45 +104,91 @@ export default function CashierShiftManager() {
   }
 
   const generateXReport = () => {
-    const pettyCashTotal = shiftData.pettyCashTransactions.reduce(
-      (sum, t) => sum + (t.type === "in" ? t.amount : -t.amount),
-      0
-    )
-    const expectedCash = (shiftData.openingCash || 0) + pettyCashTotal
+  // Tổng hợp phiếu thu/chi
+  const pettyCashIn = shiftData.pettyCashTransactions
+    .filter((t) => t.type === "in")
+    .reduce((s, t) => s + Number(t.amount || 0), 0);
 
-    return {
-      reportType: "X-Report",
-      reportTime: new Date().toISOString(),
-      shiftStart: shiftData.startTime,
-      openingCash: shiftData.openingCash,
-      pettyCashIn: shiftData.pettyCashTransactions.filter((t) => t.type === "in").reduce((s, t) => s + t.amount, 0),
-      pettyCashOut: shiftData.pettyCashTransactions.filter((t) => t.type === "out").reduce((s, t) => s + t.amount, 0),
-      expectedCash,
+  const pettyCashOut = shiftData.pettyCashTransactions
+    .filter((t) => t.type === "out")
+    .reduce((s, t) => s + Number(t.amount || 0), 0);
+
+  // Doanh thu ca (đã lưu ở Dashboard)
+  let cashSales = 0, cardSales = 0;
+  try {
+    const key = `cashier_sales_${new Date(shiftData.startTime || Date.now()).getTime()}`;
+    const raw = localStorage.getItem(key);
+    if (raw) {
+      const sales = JSON.parse(raw);
+      cashSales = Number(sales.cash || 0);
+      cardSales = Number(sales.card || 0);
     }
-  }
+  } catch {}
+
+  // === CÔNG THỨC MỚI ===
+  const openingCash = Number(shiftData.openingCash || 0);
+  const expectedCash = openingCash + pettyCashIn - pettyCashOut + cashSales;
+
+  return {
+    reportType: "X-Report",
+    reportTime: new Date().toISOString(),
+    shiftStart: shiftData.startTime,
+    openingCash,
+    pettyCashIn,
+    pettyCashOut,
+    cashSales,
+    cardSales,
+    salesTotal: cashSales + cardSales,
+    expectedCash, // dùng giá trị này để hiển thị "Tiền dự kiến"
+  };
+};
+
 
   const generateZReport = () => {
-    const pettyCashTotal = shiftData.pettyCashTransactions.reduce(
-      (sum, t) => sum + (t.type === "in" ? t.amount : -t.amount),
-      0
-    )
-    const expectedCash = (shiftData.openingCash || 0) + pettyCashTotal
-    const difference = (shiftData.closingCash || 0) - expectedCash
+  const pettyCashIn = shiftData.pettyCashTransactions
+    .filter((t) => t.type === "in")
+    .reduce((s, t) => s + Number(t.amount || 0), 0);
 
-    return {
-      reportType: "Z-Report",
-      reportTime: shiftData.endTime,
-      shiftStart: shiftData.startTime,
-      shiftEnd: shiftData.endTime,
-      openingCash: shiftData.openingCash,
-      closingCash: shiftData.closingCash,
-      pettyCashIn: shiftData.pettyCashTransactions.filter((t) => t.type === "in").reduce((s, t) => s + t.amount, 0),
-      pettyCashOut: shiftData.pettyCashTransactions.filter((t) => t.type === "out").reduce((s, t) => s + t.amount, 0),
-      expectedCash,
-      difference,
-      denominationBreakdown: denominations.filter((d) => d.count > 0),
+  const pettyCashOut = shiftData.pettyCashTransactions
+    .filter((t) => t.type === "out")
+    .reduce((s, t) => s + Number(t.amount || 0), 0);
+
+  let cashSales = 0, cardSales = 0;
+  try {
+    const key = `cashier_sales_${new Date(shiftData.startTime || Date.now()).getTime()}`;
+    const raw = localStorage.getItem(key);
+    if (raw) {
+      const sales = JSON.parse(raw);
+      cashSales = Number(sales.cash || 0);
+      cardSales = Number(sales.card || 0);
     }
-  }
+  } catch {}
+
+  const openingCash = Number(shiftData.openingCash || 0);
+  const closingCash = Number(shiftData.closingCash || 0);
+
+  // === CÔNG THỨC MỚI ===
+  const expectedCash = openingCash + pettyCashIn - pettyCashOut + cashSales;
+  const difference = closingCash - expectedCash;
+
+  return {
+    reportType: "Z-Report",
+    reportTime: shiftData.endTime,
+    shiftStart: shiftData.startTime,
+    shiftEnd: shiftData.endTime,
+    openingCash,
+    closingCash,
+    pettyCashIn,
+    pettyCashOut,
+    cashSales,
+    cardSales,
+    salesTotal: cashSales + cardSales,
+    expectedCash,
+    difference,
+    denominationBreakdown: denominations.filter((d) => d.count > 0),
+  };
+};
+
 
   const handlePrintReport = (reportType) => {
     const report = reportType === "X" ? generateXReport() : generateZReport()
@@ -215,6 +263,18 @@ export default function CashierShiftManager() {
                   <span>Phiếu chi trong ca</span>
                   <span className="report-value report-value-destructive">-{formatCurrency(zReport.pettyCashOut)}</span>
                 </div>
+                <div className="report-line">
+                  <span>Doanh thu tiền mặt</span>
+                  <span className="report-value report-value-success">+{formatCurrency(zReport.cashSales || 0)}</span>
+                </div>
+                <div className="report-line">
+                  <span>Doanh thu thẻ/QR</span>
+                  <span className="report-value">{formatCurrency(zReport.cardSales || 0)}</span>
+                </div>
+                <div className="report-line">
+                  <span>Tổng doanh thu</span>
+                  <span className="report-value">{formatCurrency((zReport.salesTotal) || 0)}</span>
+                </div>
                 <div className="report-line report-line-total">
                   <span>Tiền dự kiến</span>
                   <span className="report-value">{formatCurrency(zReport.expectedCash)}</span>
@@ -224,9 +284,8 @@ export default function CashierShiftManager() {
                   <span className="report-value">{formatCurrency(zReport.closingCash || 0)}</span>
                 </div>
                 <div
-                  className={`report-line report-line-highlight ${
-                    zReport.difference >= 0 ? "report-line-positive" : "report-line-negative"
-                  }`}
+                  className={`report-line report-line-highlight ${zReport.difference >= 0 ? "report-line-positive" : "report-line-negative"
+                    }`}
                 >
                   <span>Chênh lệch</span>
                   <span className="report-value">
@@ -612,8 +671,8 @@ export default function CashierShiftManager() {
                   <p className="summary-box-value">
                     {shiftData.startTime && shiftData.endTime
                       ? `${Math.round(
-                          (new Date(shiftData.endTime).getTime() - new Date(shiftData.startTime).getTime()) / (1000 * 60 * 60)
-                        )} giờ`
+                        (new Date(shiftData.endTime).getTime() - new Date(shiftData.startTime).getTime()) / (1000 * 60 * 60)
+                      )} giờ`
                       : "N/A"}
                   </p>
                 </div>

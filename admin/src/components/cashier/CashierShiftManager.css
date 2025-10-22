@@ -731,3 +731,70 @@
 /* (tùy chọn) ép thắng nếu vẫn bị CSS cũ ghi đè */
 .card .input-group { max-width: 520px !important; }
 .card .input-group .input-with-icon { padding-left: 2.75rem !important; }
+
+/* === OVERRIDES: làm form thoáng & cân đối hơn === */
+
+/* Tăng khoảng cách giữa header và phần nội dung card */
+.card-content {
+  padding-top: 1rem !important;   /* trước = 0 nên nhìn bị dính */
+}
+
+/* Nhãn không bị dính vào input */
+.input-label {
+  display: block;
+  margin-bottom: 0.5rem !important; /* thêm khoảng cách dưới nhãn */
+  line-height: 1.25rem;
+}
+
+/* Khoảng cách trong nhóm input “tiền đầu/tiền cuối ca” */
+.card .input-group {
+  max-width: 520px !important;
+  gap: 0.625rem !important;        /* nhỉnh hơn 0.5rem */
+}
+
+/* Input cao hơn một chút cho dễ bấm, chữ to hơn xíu */
+.input {
+  height: 2.75rem !important;
+  font-size: 0.95rem !important;
+}
+
+/* Icon $ cách chữ thoải mái hơn */
+.card .input-group .input-with-icon {
+  padding-left: 2.85rem !important;  /* trước 2.75rem */
+}
+
+/* Hai card Mở Ca / Đóng Ca cao đều nhau trên desktop */
+@media (min-width: 1024px) {
+  .grid-lg-2-cols {
+    grid-auto-rows: 1fr;           /* các item có cùng chiều cao hàng */
+    align-items: stretch;
+  }
+  .grid-lg-2-cols > .card {
+    display: flex;
+    flex-direction: column;
+  }
+  .grid-lg-2-cols > .card .card-content {
+    flex: 1;                        /* phần content giãn đều */
+  }
+}
+
+/* Làm header card đậm thông tin hơn nhưng vẫn giữ màu hệ thống */
+.card-header {
+  padding-bottom: 1rem !important;
+}
+.card-title {
+  margin-bottom: 0.125rem !important;
+}
+.card-description {
+  margin-top: 0.25rem !important;
+}
+
+/* Badge trạng thái gọn hơn 1 chút và luôn bám mép phải */
+.status-badge {
+  padding: 0.4rem 0.9rem !important;
+}
+
+/* Khoảng thở tổng thể trang */
+.shift-manager-content {
+  gap: 1.75rem !important;
+}

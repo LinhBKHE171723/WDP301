@@ -72,8 +72,8 @@ function OrderPayment({ order, onBack, onPaymentComplete }) {
             <div className="receipt-logo">
               <div className="logo-placeholder">LOGO</div>
             </div>
-            <h1 className="receipt-restaurant-name">NHÀ HÀNG ABC</h1>
-            <p className="receipt-restaurant-info">123 Đường XYZ, Quận 1, TP.HCM</p>
+            <h1 className="receipt-restaurant-name">Le Calandre</h1>
+            <p className="receipt-restaurant-info">Rubano, Ý</p>
             <p className="receipt-restaurant-info">Hotline: 0123 456 789</p>
           </div>
 
