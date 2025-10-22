@@ -164,8 +164,8 @@ export default function OrderCard({
               >
                 <option value="">-- Chọn bàn trống --</option>
                 {availableTables.map((t) => (
-                  <option key={t._id} value={t._id}>
-                    Bàn {t.tableNumber}
+                  <option key={t?._id} value={t?._id}>
+                    Bàn {t?.tableNumber}
                   </option>
                 ))}
               </Form.Select>

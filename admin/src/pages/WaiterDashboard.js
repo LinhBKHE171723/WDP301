@@ -29,7 +29,7 @@ export default function WaiterDashboard() {
     const fetchAvailableTables = async () => {
         try {
             const res = await waiterApi.getAvailableTables();
-            setAvailableTables(res?.data || []);
+            setAvailableTables(res || []); // vì interceptor của axios đã trả về res.data rồi
         } catch (error) {
             console.error("Error fetching available tables:", error);
             toast.error("Không thể tải danh sách bàn trống!");
