@@ -11,6 +11,8 @@ export default function Sidebar() {
     { to: "/item-report", label: "Báo cáo Món ăn", icon: Utensils }, // <-- TRANG MỚI
     { to: "/accounts", label: "Tài khoản", icon: Users },
     { to: "/feedback", label: "Feedback", icon: MessageSquare },
+    { to: "/customers", label: "khách hàng thân thiết", icon: Users },
+
     { to: "/settings", label: "Cài đặt", icon: Settings },
   ];
 

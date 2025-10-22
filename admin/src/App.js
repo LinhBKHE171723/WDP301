@@ -9,6 +9,7 @@ import FeedbackPage from "./pages/admin/FeedbackPage";
 import SettingsPage from "./pages/admin/SettingsPage";
 import { Toaster } from "sonner";
 import ItemReportPage from "./pages/admin/ItemReportPage";
+import CustomerReportPage from "./pages/admin/CustomerReportPage";
 
 export default function App() {
   return (
@@ -22,11 +23,14 @@ export default function App() {
               <Route path="/" element={<DashboardPage />} />
               <Route path="/analytics" element={<AnalyticsPage />} />
               <Route path="/item-report" element={<ItemReportPage />} />
-              <Route path="/item-analytics" element={<AnalyticsPage2 />} />
-
+              <Route
+                path="/item-analytics/:itemId"
+                element={<AnalyticsPage2 />}
+              />
               <Route path="/accounts" element={<AccountsPage />} />
               <Route path="/feedback" element={<FeedbackPage />} />
               <Route path="/settings" element={<SettingsPage />} />
+               <Route path="/customers" element={<CustomerReportPage/>} />
             </Routes>
           </div>
         </main>

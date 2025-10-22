@@ -253,16 +253,20 @@ const processRawData = (rawData) => {
 
     const chartData = rawData.map(day => {
         const label = day.timeLabel ? day.timeLabel.substring(5) : 'N/A'; 
-        
+        const waste = Number(day.waste) || 0;
         const revenue = Number(day.revenue) || 0;
         const cost = Number(day.cost) || 0;
-        const profit = Number(day.profit) || (revenue - cost) || 0; 
+        const profit = Number(day.profit) 
+          || ((Number(day.revenue)||0) 
+              - (Number(day.cost)||0) 
+              - (Number(day.waste)||0)); 
 
         return {
             label: label, 
             revenue: revenue, 
             cost: cost,       
-            profit: profit, 
+            profit: profit,
+            waste: waste 
         };
     });
     
@@ -312,12 +316,13 @@ export const ProfitCharts = () => {
         
     }, [range, customFrom, customTo]);
 
-    // --- TÍNH TOÁN METRICS TỔNG QUAN ---
-    const totalRevenue = chartData.reduce((sum, item) => sum + item.revenue, 0);
-    const totalCost = chartData.reduce((sum, item) => sum + item.cost, 0);
-    const totalProfit = totalRevenue - totalCost;
-    const profitMargin = totalRevenue > 0 ? (totalProfit / totalRevenue) * 100 : 0;
-    // --- KẾT THÚC TÍNH TOÁN ---
+   // --- TÍNH TOÁN TỔNG QUAN CHUẨN ---
+const totalRevenue = chartData.reduce((sum, item) => sum + (item.revenue || 0), 0);  // 1️⃣
+const totalCost = chartData.reduce((sum, item) => sum + (item.cost || 0), 0);        // 2️⃣
+const totalWaste = chartData.reduce((sum, item) => sum + (item.waste || 0), 0);      // 3️⃣
+const totalProfit = totalRevenue - totalCost - totalWaste;                            // 4️⃣
+const profitMargin = totalRevenue > 0 ? (totalProfit / totalRevenue) * 100 : 0;       // 5️⃣
+// --- KẾT THÚC ---
 
     // Hàm xử lý khi thay đổi range
     const handleRangeChange = (newRange) => {
@@ -367,6 +372,13 @@ export const ProfitCharts = () => {
                     color="text-purple-600" 
                     icon={PercentIcon}
                 />
+                <MetricCard 
+  title="Tổng Lãng Phí" 
+  value={formatVND(totalWaste)} 
+  color="text-red-600" 
+  icon={ReceiptIcon} // có thể thay icon khác nếu muốn
+/>
+
             </div>
 
             {/* --- 2. BIỂU ĐỒ CỘT DOANH THU VÀ CHI PHÍ (CŨ) --- */}
@@ -454,6 +466,8 @@ export const ProfitCharts = () => {
                                     payload={[
                                         { value: 'Tổng Doanh thu', type: 'rect', color: '#f59e0b' },
                                         { value: 'Tổng Chi phí', type: 'rect', color: '#3b82f6' }
+                                   ,{ value: 'Tổng Lãng phí', type: 'rect', color: '#ef4444' } // ✅ THÊM
+
                                     ]}
                                 />
                                 <Bar 
@@ -470,6 +484,14 @@ export const ProfitCharts = () => {
                                     barSize={20}
                                     radius={[6, 6, 0, 0]} 
                                 />
+                                <Bar 
+  dataKey="waste" 
+  name="Tổng Lãng phí" 
+  fill="#ef4444" 
+  barSize={20} 
+  radius={[6, 6, 0, 0]} 
+/>
+
                             </BarChart>
                         </ResponsiveContainer>
                     )}
@@ -514,6 +536,8 @@ export const ProfitCharts = () => {
                                     name="Lợi nhuận Thuần" 
                                     dot={false} 
                                 />
+                                <Line type="monotone" dataKey="profit" stroke="#10b981" strokeWidth={3} dot={false} />
+
                             </LineChart>
                         </ResponsiveContainer>
                     )}

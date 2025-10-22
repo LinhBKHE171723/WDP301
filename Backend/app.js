@@ -5,9 +5,8 @@ const morgan = require("morgan");
 const dotenv = require("dotenv");
 const seedDatabase = require("./utils/seed");
 const authRoutes = require("./routes/auth.route");
-
-// load env
 dotenv.config();
+const { checkExpiryAndUpdateStock } = require("./utils/checkExpiryAndUpdateStock.js");
 
 const app = express();
 
@@ -15,12 +14,18 @@ const app = express();
 app.use(cors());
 app.use(express.json());
 app.use(morgan("dev"));
+app.disable("etag");
 
 // connect to MongoDB
 mongoose
+
+  // .connect(process.env.MONGO_URI)
   .connect(process.env.MONGO_URI)
   .then(() => {
-    // seedDatabase();
+    // Chạy 1 lần khi server khởi động
+checkExpiryAndUpdateStock();
+// Lên lịch chạy 1 lần/ngày
+setInterval(checkExpiryAndUpdateStock, 24 * 60 * 60 * 1000); // 24h
     console.log("✅ MongoDB connected");
   })
   .catch((err) => console.error(" MongoDB connection error:", err));
@@ -31,6 +36,8 @@ app.get("/", (req, res) => {
 });
 //auth
 app.use("/api/auth", authRoutes);
+
+
 //admin
 app.use("/api/admin", require("./routes/admin.route.js"));
 

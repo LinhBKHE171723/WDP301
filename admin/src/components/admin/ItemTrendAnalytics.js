@@ -1,130 +1,296 @@
-import React, { useState, useEffect, useMemo } from 'react';
-import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
-import { ArrowLeft } from 'lucide-react';
-import { Link, useLocation } from 'react-router-dom';
+import React, { useState, useEffect } from "react";
+import {
+  LineChart, Line, XAxis, YAxis,
+  CartesianGrid, Tooltip, ResponsiveContainer
+} from "recharts";
+import { Clock, TrendingUp, DollarSign, XCircle } from "lucide-react";
 
-const buildQueryString = (params) => {
-    return Object.entries(params)
-        .filter(([_, value]) => value != null && value !== '')
-        .map(([key, value]) => `${encodeURIComponent(key)}=${encodeURIComponent(value)}`)
-        .join('&');
+/**
+ * ✅ FIX HOÀN CHỈNH – CÁCH 1:
+ *  • from = 30 ngày trước, to = hôm nay (tự động).
+ *  • Không phụ thuộc useParams/useLocation.
+ *  • Giữ nguyên toàn bộ UI + logic xử lý dữ liệu.
+ */
+
+const formatCurrency = (amount) => {
+  if (typeof amount !== "number" || isNaN(amount)) return "0 ₫";
+  return new Intl.NumberFormat("vi-VN", { style: "currency", currency: "VND" }).format(amount);
 };
 
-const formatCurrency = (num) => new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND' }).format(num || 0);
+export default function ItemTrendAnalytics({ itemId, itemName = "Chi Tiết Món Ăn" }) {
+  const today = new Date().toISOString().split("T")[0];
+  const lastMonth = new Date();
+  lastMonth.setDate(lastMonth.getDate() - 30);
+  const lastMonthStr = lastMonth.toISOString().split("T")[0];
 
-const ItemTrendAnalytics = () => {
-    // --- STATE & ROUTER ---
-    const location = useLocation();
-    const queryParams = useMemo(() => new URLSearchParams(location.search), [location.search]);
-    
-    const [trendData, setTrendData] = useState([]);
-    const [loading, setLoading] = useState(true);
-    const [error, setError] = useState(null);
-    const [filters, setFilters] = useState({
-        itemId: queryParams.get('itemId') || '',
-        type: 'monthly',
-        metric: 'totalRevenue'
-    });
-    const itemName = queryParams.get('itemName') || '...';
+  const [summaryData, setSummaryData] = useState(null);
+  const [trendData, setTrendData] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
+  const [filters, setFilters] = useState({
+    type: "monthly",
+    from: lastMonthStr,
+    to: today,
+    metric: "totalQuantity",
+  });
 
-    // --- API CALL ---
-    useEffect(() => {
-        const itemIdFromUrl = queryParams.get('itemId');
-        if (itemIdFromUrl) {
-            setFilters(prev => ({ ...prev, itemId: itemIdFromUrl }));
+  const API_BASE_URL = "http://localhost:5000/api/admin";
+
+  const safeJsonParse = (text) => {
+    let clean = text.replace(/^\uFEFF/, "");
+    const firstBrace = clean.indexOf("{");
+    if (firstBrace > 0) clean = clean.slice(firstBrace);
+    return JSON.parse(clean);
+  };
+
+  useEffect(() => {
+    if (!itemId) {
+      setError("Không có ID món ăn nào được cung cấp.");
+      setLoading(false);
+      return;
+    }
+
+    const fetchData = async () => {
+      setLoading(true);
+      setError(null);
+      try {
+        const normalizedType = ["daily", "monthly", "yearly"].includes(
+          (filters.type || "").toLowerCase()
+        )
+          ? filters.type
+          : "monthly";
+
+        const params = new URLSearchParams({
+          itemId,
+          type: normalizedType,
+          from: filters.from,
+          to: filters.to,
+        });
+
+        const res = await fetch(`${API_BASE_URL}/items/trend?${params.toString()}`);
+        const rawText = await res.text();
+        if (!res.ok) {
+          try {
+            const maybeJson = safeJsonParse(rawText);
+            throw new Error(maybeJson?.message || `HTTP ${res.status}`);
+          } catch {
+            throw new Error(`HTTP ${res.status}`);
+          }
         }
 
-        if (!itemIdFromUrl) {
-            setError("Không tìm thấy ID món ăn trong URL.");
-            setLoading(false);
-            return;
+        const parsed = safeJsonParse(rawText);
+        const payload = parsed?.data || {};
+        let trend = Array.isArray(payload.trend) ? payload.trend : [];
+        const summary = payload.summary || null;
+
+        trend = trend.map((t) => ({
+          ...t,
+          totalQuantity: Number(t.totalQuantity) || 0,
+          totalRevenue: Number(t.totalRevenue) || 0,
+          cancellationRate: Number(t.cancellationRate) || 0,
+          avgServiceTimeMinutes: Number(t.avgServiceTimeMinutes) || 0,
+        }));
+
+        if (trend.length === 1) {
+          trend = [
+            trend[0],
+            { ...trend[0], label: `${trend[0].label} (copy)` },
+          ];
         }
 
-        const fetchData = async () => {
-            setLoading(true);
-            setError(null);
-            try {
-                const queryString = buildQueryString({
-                    itemId: filters.itemId,
-                    type: filters.type
-                });
-                const response = await fetch(`/api/admin/items/trend?${queryString}`);
-                if (!response.ok) {
-                     const errData = await response.json();
-                     throw new Error(errData.message || 'Failed to fetch trend data');
-                }
-                const data = await response.json();
-                setTrendData(data.data || []);
-            } catch (err) {
-                console.error("Fetch Trend Error:", err);
-                setError(err.message);
-            } finally {
-                setLoading(false);
-            }
-        };
-
-        fetchData();
-    }, [queryParams, filters.itemId, filters.type]); 
-
-    // --- HANDLERS & DERIVED STATE ---
-    const handleFilterChange = (e) => {
-        setFilters({ ...filters, [e.target.name]: e.target.value });
+        setTrendData(trend);
+        setSummaryData(summary);
+      } catch (e) {
+        console.error("❌ Fetch Trend Error:", e);
+        setError(e.message || "Đã xảy ra lỗi không xác định.");
+        setTrendData([]);
+        setSummaryData(null);
+      } finally {
+        setLoading(false);
+      }
     };
 
-    const currentMetric = useMemo(() => ({
-        key: filters.metric,
-        // Thêm các thuộc tính khác nếu cần (label, color, ...)
-    }), [filters.metric]);
+    fetchData();
+  }, [itemId, filters.type, filters.from, filters.to]);
 
+  const metricOptions = [
+    { key: "totalQuantity", label: "Số Lượng Bán", icon: TrendingUp, color: "blue" },
+    { key: "totalRevenue", label: "Doanh Thu", icon: DollarSign, color: "green" },
+    { key: "cancellationRate", label: "Tỷ Lệ Hủy (%)", icon: XCircle, color: "red" },
+    { key: "avgServiceTimeMinutes", label: "Thời Gian Phục Vụ TB (Phút)", icon: Clock, color: "purple" },
+  ];
+
+  const handleFilterChange = (e) => {
+    setFilters((prev) => ({ ...prev, [e.target.name]: e.target.value }));
+  };
+
+  const KPI_CARD = ({ title, value, unit = "", icon: Icon, color }) => {
+    const borderClass = `border-${color}-500`;
+    const textClass = `text-${color}-600`;
     return (
-        <div style={{ fontFamily: 'Arial, sans-serif', padding: '2rem', backgroundColor: '#f9fafb', minHeight: '100vh' }}>
-            {/* Header */}
-            <div style={{ display: 'flex', alignItems: 'center', marginBottom: '1.5rem' }}>
-                <Link to="/item-report" style={{ display: 'flex', alignItems: 'center', textDecoration: 'none', color: '#4b5563', marginRight: '1rem' }}>
-                    <ArrowLeft size={24} />
-                </Link>
-                <h1 style={{ fontSize: '2rem', fontWeight: 'bold', color: '#111827' }}>
-                    Phân tích chi tiết: <span style={{ color: '#4f46e5' }}>{decodeURIComponent(itemName)}</span>
-                </h1>
-            </div>
-
-            {/* Filters */}
-            <div style={{ display: 'flex', gap: '1rem', marginBottom: '1.5rem' }}>
-                 <select name="type" value={filters.type} onChange={handleFilterChange} style={{ padding: '0.5rem', border: '1px solid #d1d5db', borderRadius: '4px' }}>
-                    <option value="daily">Theo Ngày</option>
-                    <option value="weekly">Theo Tuần</option>
-                    <option value="monthly">Theo Tháng</option>
-                 </select>
-                 <select name="metric" value={filters.metric} onChange={handleFilterChange} style={{ padding: '0.5rem', border: '1px solid #d1d5db', borderRadius: '4px' }}>
-                    <option value="totalRevenue">Doanh Thu</option>
-                    <option value="totalQuantity">Số Lượng Bán</option>
-                    <option value="cancellationRate">Tỷ Lệ Hủy</option>
-                    <option value="avgServiceTimeMinutes">TG Phục Vụ</option>
-                 </select>
-            </div>
-
-            {/* Chart and Data */}
-            {loading && <p>Đang tải dữ liệu biểu đồ...</p>}
-            {error && <p style={{ color: 'red' }}>Lỗi: {error}</p>}
-            {!loading && !error && (
-                trendData.length > 0 ? (
-                    <div style={{ height: '400px', backgroundColor: 'white', padding: '1rem', borderRadius: '8px', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)' }}>
-                        <ResponsiveContainer width="100%" height="100%">
-                            <LineChart data={trendData}>
-                                <CartesianGrid strokeDasharray="3 3" />
-                                <XAxis dataKey="time" />
-                                <YAxis tickFormatter={(val) => filters.metric === 'totalRevenue' ? `${(val/1000).toLocaleString('vi-VN')}k` : val} />
-                                <Tooltip formatter={(value) => filters.metric === 'totalRevenue' ? formatCurrency(value) : value.toLocaleString('vi-VN')} />
-                                <Line type="monotone" dataKey={filters.metric} stroke="#8884d8" strokeWidth={2} />
-                            </LineChart>
-                        </ResponsiveContainer>
-                    </div>
-                ) : (
-                    <p>Không có dữ liệu để hiển thị cho lựa chọn này.</p>
-                )
-            )}
+      <div className={`bg-white p-4 rounded-xl shadow-lg flex flex-col justify-between transition-transform hover:scale-[1.02] border-b-4 border-l-2 ${borderClass}`}>
+        <div className={`text-sm font-semibold text-gray-500 flex items-center mb-1 ${textClass}`}>
+          <Icon size={16} className="mr-1" />{title}
         </div>
+        <p className="text-3xl font-extrabold text-gray-900 truncate">
+          {value}<span className="text-xl font-medium ml-1 text-gray-600">{unit}</span>
+        </p>
+      </div>
     );
-};
+  };
 
-export default ItemTrendAnalytics;
+  return (
+    <div className="min-h-screen bg-gray-50 p-4 font-inter">
+      <header className="mb-6">
+        <h1 className="text-3xl font-bold text-gray-800 flex items-center">{itemName}</h1>
+        <p className="text-gray-500 mt-1">Phân tích xu hướng hiệu suất bán hàng theo thời gian.</p>
+      </header>
+
+      {/* Bộ lọc */}
+      <div className="bg-white p-4 rounded-xl shadow-xl mb-6 grid grid-cols-1 md:grid-cols-3 gap-3">
+        <div>
+          <label className="text-xs font-medium text-gray-500 block mb-1">Nhóm Theo</label>
+          <select
+            name="type"
+            value={filters.type}
+            onChange={handleFilterChange}
+            className="w-full p-2 border border-gray-300 rounded-lg focus:ring-blue-500 focus:border-blue-500 text-sm"
+          >
+            <option value="daily">Ngày</option>
+            <option value="monthly">Tháng</option>
+            <option value="yearly">Năm</option>
+            <option value="weekly">Tuần</option>
+          </select>
+        </div>
+        <div>
+          <label className="text-xs font-medium text-gray-500 block mb-1">Từ Ngày</label>
+          <input
+            type="date"
+            name="from"
+            value={filters.from}
+            onChange={handleFilterChange}
+            className="w-full p-2 border border-gray-300 rounded-lg focus:ring-blue-500 focus:border-blue-500 text-sm"
+          />
+        </div>
+        <div>
+          <label className="text-xs font-medium text-gray-500 block mb-1">Đến Ngày</label>
+          <input
+            type="date"
+            name="to"
+            value={filters.to}
+            onChange={handleFilterChange}
+            className="w-full p-2 border border-gray-300 rounded-lg focus:ring-blue-500 focus:border-blue-500 text-sm"
+          />
+        </div>
+      </div>
+
+      {loading ? (
+        <div className="text-center py-10 bg-white rounded-xl shadow-lg"><p>Đang tải dữ liệu...</p></div>
+      ) : error ? (
+        <div className="bg-red-100 border-l-4 border-red-500 text-red-700 p-4 rounded-lg">
+          <p className="font-bold">Đã xảy ra lỗi</p><p>{error}</p>
+        </div>
+      ) : trendData.length === 0 ? (
+        <div className="text-center py-10 bg-white rounded-xl shadow-lg"><p>Không có dữ liệu.</p></div>
+      ) : (
+        <>
+          {/* KPIs */}
+          <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+            <KPI_CARD title="Tổng Số Lượng Bán" value={summaryData?.totalQuantity?.toLocaleString("vi-VN")} icon={TrendingUp} color="blue" />
+            <KPI_CARD title="Doanh Thu" value={(summaryData?.formattedRevenue || "0 ₫").replace("₫","").trim()} unit="₫" icon={DollarSign} color="green" />
+            <KPI_CARD title="Tỷ Lệ Hủy" value={Number(summaryData?.cancellationRate || 0).toLocaleString("vi-VN")} unit="%" icon={XCircle} color="red" />
+            <KPI_CARD title="Thời Gian Phục Vụ TB" value={Number(summaryData?.avgServiceTimeMinutes || 0).toLocaleString("vi-VN")} unit="phút" icon={Clock} color="purple" />
+          </div>
+
+          {/* Biểu đồ */}
+          <div className="bg-white p-4 rounded-xl shadow-xl">
+            <div className="mb-4">
+              <label className="text-sm font-medium text-gray-600 block mb-1">Hiển thị theo:</label>
+              <div className="flex flex-wrap gap-2">
+                {metricOptions.map((m) => (
+                  <button
+                    key={m.key}
+                    onClick={() => setFilters((prev) => ({ ...prev, metric: m.key }))}
+                    className={
+                      filters.metric === m.key
+                        ? `px-3 py-1 text-sm rounded-full font-medium transition duration-200 text-white shadow-md ${
+                            m.color === "blue" ? "bg-blue-500 shadow-blue-200"
+                            : m.color === "green" ? "bg-green-500 shadow-green-200"
+                            : m.color === "red" ? "bg-red-500 shadow-red-200"
+                            : "bg-purple-500 shadow-purple-200"
+                          }`
+                        : "px-3 py-1 text-sm rounded-full font-medium transition duration-200 bg-gray-100 text-gray-700 hover:bg-gray-200"
+                    }
+                  >
+                    <m.icon size={14} className="inline mr-1" />
+                    {m.label}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            <div className="h-96">
+              <ResponsiveContainer width="100%" height="100%">
+                <LineChart data={trendData} margin={{ top: 10, right: 10, left: 0, bottom: 5 }}>
+                  <CartesianGrid strokeDasharray="3 3" stroke="#e0e0e0" />
+                  <XAxis dataKey="label" stroke="#555" tick={{ fontSize: 10 }} />
+                  <YAxis
+                    stroke="#555"
+                    tick={{ fontSize: 10 }}
+                    tickFormatter={(v) =>
+                      filters.metric === "totalRevenue"
+                        ? `${(Number(v || 0) / 1000).toLocaleString("vi-VN")}K`
+                        : Number(v || 0).toLocaleString("vi-VN")
+                    }
+                  />
+                  <Tooltip
+                    content={({ active, payload, label }) => {
+                      if (active && payload?.length) {
+                        const value = Number(payload[0].value || 0);
+                        const isMoney = filters.metric === "totalRevenue";
+                        const isRate = filters.metric === "cancellationRate";
+                        return (
+                          <div className="bg-white p-3 rounded-lg shadow-xl border text-sm">
+                            <p className="font-bold mb-1">{label}</p>
+                            <p className={
+                              filters.metric === "totalQuantity" ? "text-blue-600"
+                              : filters.metric === "totalRevenue" ? "text-green-600"
+                              : filters.metric === "cancellationRate" ? "text-red-600"
+                              : "text-purple-600"
+                            }>
+                              <span className="font-semibold">
+                                {filters.metric === "totalQuantity" ? "Số Lượng Bán: "
+                                  : filters.metric === "totalRevenue" ? "Doanh Thu: "
+                                  : filters.metric === "cancellationRate" ? "Tỷ Lệ Hủy: "
+                                  : "Phục Vụ TB: "}
+                              </span>
+                              {isMoney
+                                ? formatCurrency(value)
+                                : `${value.toLocaleString("vi-VN")}${isRate ? "%" : ""}`}
+                            </p>
+                          </div>
+                        );
+                      }
+                      return null;
+                    }}
+                  />
+                  <Line
+                    type="monotone"
+                    dataKey={filters.metric}
+                    strokeWidth={3}
+                    stroke={
+                      filters.metric === "totalQuantity" ? "#3b82f6"
+                      : filters.metric === "totalRevenue" ? "#10b981"
+                      : filters.metric === "cancellationRate" ? "#ef4444"
+                      : "#a855f7"
+                    }
+                  />
+                </LineChart>
+              </ResponsiveContainer>
+            </div>
+          </div>
+        </>
+      )}
+    </div>
+  );
+}

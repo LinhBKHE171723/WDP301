@@ -4,7 +4,10 @@ const { Schema } = mongoose;
 const orderItemSchema = new Schema({
   orderId: { type: Schema.Types.ObjectId, ref: "Order" },
   itemId: { type: Schema.Types.ObjectId, ref: "Item" },
+  itemName: String, // Lưu tên món để không cần populate
+  itemType: String, // 'item' hoặc 'menu'
   quantity: Number,
+  price: Number, // Giá tại thời điểm đặt món = price của item bán ra thị trường
   assignedChef: { type: Schema.Types.ObjectId, ref: "User" },
   status: {
     type: String,

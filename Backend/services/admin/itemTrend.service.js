@@ -1,190 +1,135 @@
-const Order = require("../../models/Order");
-const OrderItem = require("../../models/OrderItem");
-const Item = require("../../models/Item"); // Chú ý đường dẫn tương đối
 const mongoose = require('mongoose');
+const Order = require("../../models/Order");
+const Item = require("../../models/Item");
 
-// ===============================================
-// HÀM CHÍNH (getItemTrend)
-// ===============================================
-
-/**
- * Lấy dữ liệu xu hướng hiệu suất của một món ăn cụ thể theo các khoảng thời gian (ngày, tuần, tháng, năm).
- * @param {string} itemId ID của món ăn cần phân tích.
- * @param {('daily'|'weekly'|'monthly'|'yearly')} type Loại phân tích thời gian.
- * @param {string} from Ngày bắt đầu (ISO Date string).
- * @param {string} to Ngày kết thúc (ISO Date string).
- * @returns {Array<Object>} Mảng chứa các điểm dữ liệu xu hướng theo thời gian.
- */
-exports.getItemTrend = async ({ itemId, type = "monthly", from, to }) => {
+exports.getItemTrend = async ({ itemId, type, from, to }) => {
     if (!itemId || !mongoose.Types.ObjectId.isValid(itemId)) {
         throw new Error("Item ID không hợp lệ.");
     }
+    const item = await Item.findById(itemId).select('price');
+    if (!item) {
+        throw new Error("Không tìm thấy món ăn.");
+    }
+    const itemPrice = item.price || 0;
+    const { conf, fromDate, toDate } = normalizeTimeInputs(type, from, to);
 
-    // 1. Kiểm tra Item và lấy giá để tính doanh thu
-    const itemExists = await Item.findById(itemId).select('price');
-    if (!itemExists) {
-        throw new Error("Không tìm thấy món ăn với Item ID đã cung cấp.");
+    const ordersInDateRange = await Order.find({
+        createdAt: { $gte: fromDate, $lte: toDate }
+    }).populate('orderItems'); // Lấy kèm các món ăn trong đơn hàng
+
+    const relevantOrderItems = [];
+    for (const order of ordersInDateRange) {
+        for (const orderItem of order.orderItems) {
+            // Chỉ lấy các orderItem của món ăn đang cần phân tích
+            if (orderItem.itemId.toString() === itemId) {
+                relevantOrderItems.push({
+                    ...orderItem.toObject(),
+                    orderStatus: order.status,
+                    orderCreatedAt: order.createdAt,
+                    orderServedAt: order.servedAt,
+                });
+            }
+        }
     }
     
-    // 2. Chuẩn hóa đầu vào thời gian
-    const { conf, fromDate, toDate } = normalizeTimeInputs(type, from, to);
-    const itemObjectId = new mongoose.Types.ObjectId(itemId);
-    const itemPrice = itemExists.price || 0;
-
-    // 3. Xây dựng Aggregation Pipeline
-    const pipeline = [
-        // 1. Lọc OrderItem theo itemId (Bắt buộc phải có)
-        { $match: { itemId: itemObjectId } },
-        
-        // 2. Lookup để lấy thông tin Order
-        // CHÚ Ý QUAN TRỌNG: Chúng ta không lọc Order theo thời gian ở đây nữa, 
-        // mà sẽ lọc sau khi lookup để đảm bảo dữ liệu đầy đủ.
-        { $lookup: {
-            from: 'orders',
-            localField: 'orderId',
-            foreignField: '_id',
-            as: 'order',
-            pipeline: [
-                { $project: { createdAt: 1, status: 1, servedAt: 1 } }
-            ]
-        }},
-        // Flatten mảng 'order'
-        { $unwind: "$order" }, 
-        
-        // 3. Lọc Order theo khoảng thời gian sau khi $unwind
-        // Nếu không có Order nào trong khoảng thời gian, pipeline sẽ dừng ở đây.
-        { $match: { 
-            "order.createdAt": { $gte: fromDate, $lte: toDate } 
-        } },
-
-        // 4. Tính toán trạng thái và thời gian phục vụ
-        { $addFields: {
-            orderStatus: "$order.status", 
-            isCancelled: { $eq: ["$order.status", "cancelled"] }, 
-            isCompleted: { $in: ["$order.status", ["served", "paid"]] }, 
-            timeBucket: { $dateTrunc: { date: "$order.createdAt", unit: conf.unit, timezone: VN_TZ } },
-            
-            // Tính thời gian phục vụ chỉ khi món đã hoàn tất VÀ có servedAt
-            serviceTimeMs: { 
-                $cond: {
-                    if: { $and: ["$isCompleted", "$order.servedAt"] }, 
-                    then: { $subtract: ["$order.servedAt", "$order.createdAt"] }, 
-                    else: 0
-                } 
+    const groupedData = {};
+    for (const orderItem of relevantOrderItems) {
+        const timeLabel = conf.label(orderItem.orderCreatedAt);
+        // Khởi tạo nhóm nếu chưa tồn tại
+        if (!groupedData[timeLabel]) {
+            groupedData[timeLabel] = {
+                time: orderItem.orderCreatedAt,
+                totalQuantity: 0,
+                totalRevenue: 0,
+                totalQuantityCancelled: 0,
+                totalServiceTimeMs: 0,
+                completedCount: 0,
+            };
+        }
+        // Cộng dồn dữ liệu vào nhóm tương ứng
+        const group = groupedData[timeLabel];
+        group.totalQuantity += orderItem.quantity;
+        const isCompleted = ["served", "paid"].includes(orderItem.orderStatus);
+        if (isCompleted) {
+            group.completedCount += 1;
+            group.totalRevenue += orderItem.quantity * itemPrice;
+            if (orderItem.orderServedAt) {
+                const serviceTime = orderItem.orderServedAt.getTime() - orderItem.orderCreatedAt.getTime();
+                group.totalServiceTimeMs += serviceTime;
             }
-        }},
-        
-        // 5. Nhóm theo timeBucket
-        { $group: {
-            _id: "$timeBucket",
-            totalQuantity: { $sum: "$quantity" }, 
-            totalQuantityCancelled: { $sum: { $cond: ["$isCancelled", "$quantity", 0] } }, 
-            totalRevenue: { 
-                $sum: { 
-                    $cond: {
-                        if: "$isCompleted", 
-                        then: { $multiply: ["$quantity", itemPrice] },
-                        else: 0
-                    }
-                } 
-            },
-            totalServiceTimeMs: { $sum: "$serviceTimeMs" }, 
-            serviceCount: { $sum: { $cond: ["$isCompleted", 1, 0] } } 
-        }},
-        
-        // 6. Tính toán các chỉ số phái sinh
-        { $addFields: {
-            cancellationRate: {
-                $cond: {
-                    if: { $gt: ["$totalQuantity", 0] },
-                    then: { $multiply: [{ $divide: ["$totalQuantityCancelled", "$totalQuantity"] }, 100] },
-                    else: 0
-                }
-            },
-            avgServiceTimeSeconds: {
-                $cond: {
-                    if: { $gt: ["$serviceCount", 0] },
-                    then: { $divide: ["$totalServiceTimeMs", { $multiply: ["$serviceCount", 1000] }] }, 
-                    else: 0
-                }
-            }
-        }},
+        }
+        if (orderItem.orderStatus === "cancelled") {
+            group.totalQuantityCancelled += orderItem.quantity;
+        }
+    }
 
-        // 7. Sắp xếp và Định dạng kết quả cuối cùng
-        { $sort: { _id: 1 } },
-        { $project: {
-            _id: 0,
-            time: "$_id", 
-            totalQuantity: 1,
-            totalRevenue: 1,
-            totalQuantityCancelled: 1,
-            cancellationRate: { $round: ["$cancellationRate", 2] },
-            avgServiceTimeMinutes: { $round: [{ $divide: ["$avgServiceTimeSeconds", 60] }, 2] },
-        }}
-    ];
+    const trend = Object.values(groupedData).sort((a, b) => a.time - b.time);
+    const summary = calculateSummary(trend);
 
-    const results = await OrderItem.aggregate(pipeline);
+    // Trả về kết quả cuối cùng cho controller
+    return {
+        summary: {
+            ...summary,
+            cancellationRate: parseFloat(
+                (summary.totalQuantity > 0 ? (summary.totalQuantityCancelled / summary.totalQuantity) * 100 : 0).toFixed(2)
+            ),
+            avgServiceTimeMinutes: parseFloat(
+                (summary.completedCount > 0 ? (summary.totalServiceTimeMs / summary.completedCount / 60000) : 0).toFixed(2)
+            ),
+            formattedRevenue: fmtVND(summary.totalRevenue),
+        },
+        trend: formatTrendData(trend, conf),
+    };
+};
 
-    // Xử lý và định dạng kết quả (thêm nhãn thời gian và định dạng VND)
-    return results.map(r => ({
-        ...r,
-        label: conf.label(r.time),
-        formattedRevenue: fmtVND(r.totalRevenue),
+
+// Tính toán các chỉ số tổng hợp
+function calculateSummary(trendData) {
+    return trendData.reduce((acc, current) => {
+        acc.totalQuantity += current.totalQuantity;
+        acc.totalRevenue += current.totalRevenue;
+        acc.totalQuantityCancelled += current.totalQuantityCancelled;
+        acc.totalServiceTimeMs += current.totalServiceTimeMs;
+        acc.completedCount += current.completedCount;
+        return acc;
+    }, {
+        totalQuantity: 0, totalRevenue: 0, totalQuantityCancelled: 0,
+        totalServiceTimeMs: 0, completedCount: 0,
+    });
+}
+
+// Định dạng dữ liệu trend để trả về cho FE
+function formatTrendData(trendData, conf) {
+    return trendData.map(item => ({
+        time: item.time,
+        label: conf.label(item.time),
+        totalQuantity: item.totalQuantity,
+        totalRevenue: item.totalRevenue,
+        formattedRevenue: fmtVND(item.totalRevenue),
+        cancellationRate: item.totalQuantity > 0 ? (item.totalQuantityCancelled / item.totalQuantity) * 100 : 0,
+        avgServiceTimeMinutes: item.completedCount > 0 ? (item.totalServiceTimeMs / item.completedCount / 60000) : 0, // 60000 ms = 1 min
     }));
+}
+
+// Cấu hình nhóm thời gian
+const TYPE_CONFIG = {
+    monthly: { label: (d) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}` },
+    daily:   { label: (d) => d.toISOString().split('T')[0] },
+    yearly:  { label: (d) => `${d.getFullYear()}` },
 };
 
-
-// ===============================================
-// HÀM HỖ TRỢ (ĐÃ TÍCH HỢP)
-// ===============================================
-
-const VN_TZ = "Asia/Ho_Chi_Minh";
-
-// Hàm tiện ích: Định dạng ngày thành YYYY-MM-DD
-function fmtDateYMD(date) {
-    const y = date.getFullYear();
-    const m = String(date.getMonth() + 1).padStart(2, "0");
-    const d = String(date.getDate()).padStart(2, "0");
-    return `${y}-${m}-${d}`;
-}
-
-// Hàm tiện ích: Trích xuất nhãn tuần ISO (ví dụ: 2025-W05)
-function isoWeekLabel(date) {
-    const year = date.getFullYear();
-    const dateCopy = new Date(date.valueOf());
-    // Điều chỉnh để tuần bắt đầu từ Thứ Hai (0=Chủ Nhật, 1=Thứ Hai)
-    dateCopy.setDate(dateCopy.getDate() + 4 - (dateCopy.getDay() || 7)); 
-    const yearStart = new Date(dateCopy.getFullYear(), 0, 1);
-    const weekNumber = Math.ceil((((dateCopy - yearStart) / 86400000) + yearStart.getDay() + 1) / 7);
-    return `${year}-W${String(weekNumber).padStart(2, '0')}`;
-}
-
-function parseDate(v, fallback) {
-  if (!v) return fallback;
-  const d = new Date(v);
-  return isNaN(d.getTime()) ? fallback : d;
-}
-
-function fmtVND(n) {
-  try {
-    return new Intl.NumberFormat("vi-VN", { style: "currency", currency: "VND" }).format(n || 0);
-  } catch {
-    return `${(n || 0).toLocaleString("vi-VN")} ₫`;
-  }
-}
-
-const TYPE_TO_TRUNC = {
-    daily:  { unit: "day",   label: (d) => fmtDateYMD(d) },
-    weekly: { unit: "week",  label: (d) => isoWeekLabel(d) },
-    monthly:{ unit: "month", label: (d) => `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}` },
-    yearly: { unit: "year",  label: (d) => `${d.getFullYear()}` },
-};
-
+// Chuẩn hóa đầu vào thời gian
 function normalizeTimeInputs(type, from, to) {
-    const conf = TYPE_TO_TRUNC[(type || "daily").toLowerCase()] || TYPE_TO_TRUNC.daily;
-    const now = new Date();
-    const toDate = parseDate(to, now);
-    const defaultFrom = new Date(toDate.getTime() - 30 * 24 * 60 * 60 * 1000); // Mặc định 30 ngày
-    const fromDate = parseDate(from, defaultFrom);
+    const conf = TYPE_CONFIG[(type || "monthly").toLowerCase()] || TYPE_CONFIG.monthly;
+    const toDate = to ? new Date(to) : new Date();
+    toDate.setHours(23, 59, 59, 999);
+    let fromDate = from ? new Date(from) : new Date(new Date().setDate(toDate.getDate() - 30));
+    fromDate.setHours(0, 0, 0, 0);
     return { conf, fromDate, toDate };
+}
+
+// Định dạng tiền tệ VND
+function fmtVND(n) {
+    if (typeof n !== 'number') return '0 ₫';
+    return new Intl.NumberFormat("vi-VN", { style: "currency", currency: "VND" }).format(n);
 }
