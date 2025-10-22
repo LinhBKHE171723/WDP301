@@ -43,7 +43,7 @@ export default function AppRouter() {
         <>
           <Route path="/waiter/dashboard" element={<WaiterDashboard />} />
           <Route path="/waiter/tables" element={<TableMap />} /> 
-          <Route path="/waiter/tables/:tableId" element={<TableDetail />} />  
+          <Route path="/waiter/tables/details/:tableId" element={<TableDetail />} />  
         </>
       )}
 

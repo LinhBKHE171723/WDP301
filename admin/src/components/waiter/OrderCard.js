@@ -1,28 +1,49 @@
 import React, { useState } from "react";
-import { Card, Button, Modal, Form } from "react-bootstrap";
+import { Card, Button, Modal, Form, Spinner } from "react-bootstrap";
 import waiterApi from "../../api/waiterApi";
+import { toast } from "react-toastify";
 
-export default function OrderCard({ order, onUpdateStatus, onWaiterResponse, isPending = false }) {
+export default function OrderCard({
+  order,
+  onUpdateStatus,
+  onWaiterResponse,
+  isPending = false,
+  availableTables = []
+}) {
   const { tableId, status, totalAmount, orderItems } = order;
   const [showRejectModal, setShowRejectModal] = useState(false);
   const [rejectReason, setRejectReason] = useState("");
+  const [selectedTable, setSelectedTable] = useState("");
   const [loading, setLoading] = useState(false);
 
+  // ✅ Xác nhận đơn hàng
   const handleApprove = async () => {
+    if (!selectedTable) {
+      toast.warning("⚠️ Vui lòng chọn bàn trước khi xác nhận!");
+      return;
+    }
+
     try {
       setLoading(true);
-      await waiterApi.respondToOrder(order._id, true);
+      await waiterApi.respondToOrder(order._id, true, selectedTable);
       onWaiterResponse(order._id, "approved");
+      toast.success("✅ Đã xác nhận đơn hàng và gán bàn thành công!");
     } catch (error) {
       console.error("Error approving order:", error);
+      if (error.response?.status === 409) {
+        toast.error("❌ Bàn này đã được chọn bởi waiter khác!");
+      } else {
+        toast.error("❌ Lỗi khi xác nhận đơn hàng!");
+      }
     } finally {
       setLoading(false);
     }
   };
 
+  // ❌ Từ chối đơn hàng
   const handleReject = async () => {
     if (!rejectReason.trim()) {
-      alert("Vui lòng nhập lý do từ chối");
+      toast.warning("⚠️ Vui lòng nhập lý do từ chối");
       return;
     }
 
@@ -32,8 +53,10 @@ export default function OrderCard({ order, onUpdateStatus, onWaiterResponse, isP
       onWaiterResponse(order._id, "rejected");
       setShowRejectModal(false);
       setRejectReason("");
+      toast.info("Đã từ chối đơn hàng!");
     } catch (error) {
       console.error("Error rejecting order:", error);
+      toast.error("❌ Lỗi khi từ chối đơn hàng!");
     } finally {
       setLoading(false);
     }
@@ -59,6 +82,27 @@ export default function OrderCard({ order, onUpdateStatus, onWaiterResponse, isP
             ))}
           </ul>
 
+          {/* ✅ Chọn bàn phục vụ (chỉ hiện khi isPending) */}
+          {isPending && (
+            <Form.Group className="mb-3">
+              <Form.Label className="small fw-bold text-secondary">
+                Chọn bàn phục vụ:
+              </Form.Label>
+              <Form.Select
+                value={selectedTable}
+                onChange={(e) => setSelectedTable(e.target.value)}
+                disabled={loading}
+              >
+                <option value="">-- Chọn bàn trống --</option>
+                {availableTables.map((t) => (
+                  <option key={t._id} value={t._id}>
+                    Bàn {t.tableNumber} ({t.capacity} người)
+                  </option>
+                ))}
+              </Form.Select>
+            </Form.Group>
+          )}
+
           {/* Tổng tiền + nút hành động */}
           <div className="d-flex flex-wrap justify-content-between align-items-center">
             <span className="fw-bold text-dark mb-2 mb-md-0">
@@ -73,7 +117,11 @@ export default function OrderCard({ order, onUpdateStatus, onWaiterResponse, isP
                   onClick={handleApprove}
                   disabled={loading}
                 >
-                  ✓ Xác nhận
+                  {loading ? (
+                    <Spinner size="sm" animation="border" />
+                  ) : (
+                    "✓ Xác nhận"
+                  )}
                 </Button>
                 <Button
                   variant="danger"
@@ -99,7 +147,7 @@ export default function OrderCard({ order, onUpdateStatus, onWaiterResponse, isP
         </Card.Body>
       </Card>
 
-      {/* Reject Modal */}
+      {/* 🟥 Modal nhập lý do từ chối */}
       <Modal show={showRejectModal} onHide={() => setShowRejectModal(false)}>
         <Modal.Header closeButton>
           <Modal.Title>Từ chối đơn hàng</Modal.Title>
@@ -107,15 +155,20 @@ export default function OrderCard({ order, onUpdateStatus, onWaiterResponse, isP
         <Modal.Body>
           <Form>
             <Form.Group className="mb-3">
-              <Form.Label>Lý do từ chối <span className="text-danger">*</span></Form.Label>
-              <Form.Control
-                as="textarea"
-                rows={3}
-                value={rejectReason}
-                onChange={(e) => setRejectReason(e.target.value)}
-                placeholder="VD: Món không có sẵn, bàn đã đầy..."
-                required
-              />
+              <Form.Label className="small fw-bold text-secondary">
+                Chọn bàn phục vụ:
+              </Form.Label>
+              <Form.Select
+                value={selectedTable}
+                onChange={(e) => setSelectedTable(e.target.value)}
+              >
+                <option value="">-- Chọn bàn trống --</option>
+                {availableTables.map((t) => (
+                  <option key={t?._id} value={t?._id}>
+                    Bàn {t?.tableNumber}
+                  </option>
+                ))}
+              </Form.Select>
             </Form.Group>
           </Form>
         </Modal.Body>

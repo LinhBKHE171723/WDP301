@@ -22,8 +22,19 @@ export default function WaiterDashboard() {
     const [pendingLoading, setPendingLoading] = useState(true);
 
     // WebSocket connection
-    const { connectionState, lastMessage } = useWaiterWebSocket();
+    const { connectionState, lastMessage, subscribeToOrders, subscribeToOrder, unsubscribeFromAllOrders } = useWaiterWebSocket();
 
+    const [availableTables, setAvailableTables] = useState([]);
+
+    const fetchAvailableTables = async () => {
+        try {
+            const res = await waiterApi.getAvailableTables();
+            setAvailableTables(res || []); // vì interceptor của axios đã trả về res.data rồi
+        } catch (error) {
+            console.error("Error fetching available tables:", error);
+            toast.error("Không thể tải danh sách bàn trống!");
+        }
+    };
     /**
      * 🔹 Lấy danh sách order đang phục vụ
      * Gọi API GET /api/waiter/orders/active
@@ -31,7 +42,14 @@ export default function WaiterDashboard() {
     const fetchOrders = async () => {
         try {
             const res = await waiterApi.getActiveOrders();
-            setOrders(res.data || []);
+            const ordersData = res.data || [];
+            setOrders(ordersData);
+
+            // Subscribe to all active orders for real-time updates
+            if (ordersData.length > 0) {
+                const orderIds = ordersData.map(order => order._id);
+                subscribeToOrders(orderIds);
+            }
         } catch (err) {
             console.error("Error loading orders:", err.message);
             toast.error("Không thể tải danh sách đơn hàng!");
@@ -47,7 +65,14 @@ export default function WaiterDashboard() {
     const fetchPendingOrders = async () => {
         try {
             const res = await waiterApi.getPendingOrders();
-            setPendingOrders(res.data || []);
+            const pendingData = res.data || [];
+            setPendingOrders(pendingData);
+
+            // Subscribe to all pending orders for real-time updates
+            if (pendingData.length > 0) {
+                const orderIds = pendingData.map(order => order._id);
+                subscribeToOrders(orderIds);
+            }
         } catch (err) {
             console.error("Error loading pending orders:", err.message);
             toast.error("Không thể tải danh sách đơn hàng chờ xác nhận!");
@@ -79,13 +104,13 @@ export default function WaiterDashboard() {
         try {
             // Remove from pending orders
             setPendingOrders((prev) => prev.filter((o) => o._id !== orderId));
-            
+
             if (response === 'approved') {
                 toast.success(`✅ Đã xác nhận đơn hàng #${orderId.slice(-4)}`);
             } else if (response === 'rejected') {
                 toast.warning(`❌ Đã từ chối đơn hàng #${orderId.slice(-4)}`);
             }
-            
+
             // Refresh both lists
             fetchOrders();
             fetchPendingOrders();
@@ -98,69 +123,77 @@ export default function WaiterDashboard() {
     useEffect(() => {
         fetchOrders();
         fetchPendingOrders();
+        fetchAvailableTables(); // 🆕 gọi một lần duy nhất khi mount
+        // Cleanup: unsubscribe from all orders when component unmounts
+        return () => {
+            unsubscribeFromAllOrders();
+        };
     }, []);
 
     // Handle WebSocket messages
     useEffect(() => {
         if (lastMessage) {
             console.log('📨 Waiter received WebSocket message:', lastMessage);
-            
+
             switch (lastMessage.type) {
                 case 'order:needs_waiter_confirm':
                     // Có đơn hàng mới hoặc được sửa đổi cần xác nhận
                     console.log('🆕 Order needs confirmation:', lastMessage.data);
-                    
+
+                    // Subscribe to this order for real-time updates
+                    subscribeToOrder(lastMessage.data._id);
+
                     // Kiểm tra xem đây có phải đơn hàng mới hay được sửa đổi
                     const isExistingOrder = pendingOrders.some(o => o._id === lastMessage.data._id);
-                    const message = isExistingOrder 
+                    const message = isExistingOrder
                         ? `🔄 Đơn hàng từ bàn ${lastMessage.data.tableId?.tableNumber} đã được sửa đổi và cần xác nhận lại!`
                         : `🆕 Có đơn hàng mới từ bàn ${lastMessage.data.tableId?.tableNumber} cần xác nhận!`;
-                    
+
                     toast.info(message);
-                    
+
                     // Refresh pending orders
                     fetchPendingOrders();
-                    
+
                     // Auto switch to pending tab if not already there
                     if (activeTab !== 'pending') {
                         setActiveTab('pending');
                     }
                     break;
-                    
+
                 case 'order:updated':
                     // Đơn hàng được cập nhật
                     console.log('🔄 Order updated:', lastMessage.data);
-                    
+
                     // Refresh both lists
                     fetchOrders();
                     fetchPendingOrders();
                     break;
-                    
+
                 case 'order:confirmed':
                     // Đơn hàng đã được customer xác nhận, chuyển sang active
                     console.log('✅ Order confirmed by customer:', lastMessage.data);
                     toast.success(`✅ Đơn hàng từ bàn ${lastMessage.data.tableId?.tableNumber} đã được khách xác nhận!`);
-                    
+
                     // Refresh both lists
                     fetchOrders();
                     fetchPendingOrders();
-                    
+
                     // Auto switch to active tab
                     if (activeTab !== 'active') {
                         setActiveTab('active');
                     }
                     break;
-                    
+
                 case 'order:cancelled':
                     // Đơn hàng bị customer hủy
                     console.log('❌ Order cancelled by customer:', lastMessage.data);
                     toast.warning(`❌ Đơn hàng từ bàn ${lastMessage.data.tableId?.tableNumber} đã bị khách hủy!`);
-                    
+
                     // Refresh both lists
                     fetchOrders();
                     fetchPendingOrders();
                     break;
-                    
+
                 default:
                     console.log('📨 Unknown message type:', lastMessage.type);
             }
@@ -194,7 +227,7 @@ export default function WaiterDashboard() {
                 <div className="mb-4">
                     <ul className="nav nav-tabs">
                         <li className="nav-item">
-                            <button 
+                            <button
                                 className={`nav-link ${activeTab === 'pending' ? 'active' : ''}`}
                                 onClick={() => setActiveTab('pending')}
                                 data-count={pendingOrders.length}
@@ -203,7 +236,7 @@ export default function WaiterDashboard() {
                             </button>
                         </li>
                         <li className="nav-item">
-                            <button 
+                            <button
                                 className={`nav-link ${activeTab === 'active' ? 'active' : ''}`}
                                 onClick={() => setActiveTab('active')}
                                 data-count={orders.length}
@@ -233,6 +266,7 @@ export default function WaiterDashboard() {
                                             order={order}
                                             onUpdateStatus={handleUpdateStatus}
                                             onWaiterResponse={handleWaiterResponse}
+                                            availableTables={availableTables} 
                                             isPending={true}
                                         />
                                     </Col>
