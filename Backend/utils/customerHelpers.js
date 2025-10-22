@@ -66,10 +66,9 @@ const validateTableAvailability = (table) => {
 /**
  * Creates order items from cart data
  * @param {Array} orderItems - Cart items
- * @param {String} orderId - Order ID to associate with items
  * @returns {Object} Result with created order items and total amount
  */
-const createOrderItemsFromCart = async (orderItems, orderId) => {
+const createOrderItemsFromCart = async (orderItems) => {
   const createdOrderItems = [];
   let totalAmount = 0;
 
@@ -92,7 +91,7 @@ const createOrderItemsFromCart = async (orderItems, orderId) => {
     // Tạo OrderItem với số lượng được yêu cầu
     const OrderItem = require("../models/OrderItem");
     const newOrderItem = new OrderItem({
-      orderId: orderId, // ✅ Thêm orderId để liên kết với Order
+      orderId: null, // Sẽ được cập nhật sau khi tạo Order
       itemId: orderItem.itemId,
       itemName: item.name,
       itemType: orderItem.type,

@@ -90,3 +90,4 @@ const useWaiterWebSocket = () => {
 };
 
 export default useWaiterWebSocket;
+

@@ -137,8 +137,8 @@ exports.createOrder = async (req, res) => {
       }
     }
 
-    // Tạo OrderItems từ cart data
-    const { createdOrderItems, totalAmount } = await createOrderItemsFromCart(orderItems, order._id);
+    // Tạo OrderItems từ cart data (không cần order._id vì chưa có)
+    const { createdOrderItems, totalAmount } = await createOrderItemsFromCart(orderItems);
 
     // Tạo Payment
     const payment = new Payment({
@@ -506,16 +506,29 @@ exports.updateOrderStatus = async (req, res) => {
       });
     }
 
-    // Nếu order status là 'paid', tự động cập nhật payment status
-    if (status === 'paid' && order.paymentId) {
-      await Payment.findByIdAndUpdate(
-        order.paymentId._id,
-        { 
-          status: 'paid',
-          payTime: new Date(),
-          amountPaid: order.totalAmount
-        }
-      );
+    // Xử lý payment status dựa trên order status
+    if (order.paymentId) {
+      if (status === 'paid') {
+        // Nếu order status là 'paid', tự động cập nhật payment status thành 'paid'
+        await Payment.findByIdAndUpdate(
+          order.paymentId._id,
+          { 
+            status: 'paid',
+            payTime: new Date(),
+            amountPaid: order.totalAmount
+          }
+        );
+      } else {
+        // Nếu order status KHÔNG phải 'paid', chuyển payment status về 'unpaid'
+        await Payment.findByIdAndUpdate(
+          order.paymentId._id,
+          { 
+            status: 'unpaid',
+            payTime: null,
+            amountPaid: 0
+          }
+        );
+      }
       
       // Reload order để có payment data mới nhất
       const updatedOrder = await Order.findById(orderId)
@@ -531,7 +544,9 @@ exports.updateOrderStatus = async (req, res) => {
       
       return res.status(200).json({
         success: true,
-        message: "Cập nhật trạng thái đơn hàng và thanh toán thành công",
+        message: status === 'paid' 
+          ? "Cập nhật trạng thái đơn hàng và thanh toán thành công"
+          : "Cập nhật trạng thái đơn hàng thành công",
         data: updatedOrder
       });
     }
