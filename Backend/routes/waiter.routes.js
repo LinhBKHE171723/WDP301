@@ -11,7 +11,8 @@ const waiterOrderController = require("../controllers/waiter.order.controller");
 // 📌 TABLE ROUTES
 // ===========================
 router.get("/tables", waiterTableController.getAllTables);
-router.get("/tables/:tableId", waiterTableController.getTableDetails);
+router.get("/tables/details/:tableId", waiterTableController.getTableDetails);
+router.get("/tables/available", waiterTableController.getAvailableTables);
 
 // ===========================
 // 📌 ORDER ROUTES
