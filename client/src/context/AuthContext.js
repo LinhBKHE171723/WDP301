@@ -1,16 +1,21 @@
 import { createContext, useContext, useState, useEffect } from "react";
+import { getCookie, setCookie, eraseCookie } from "../utils/cookie";
 
 const AuthContext = createContext();
 
 export const AuthProvider = ({ children }) => {
-  // Khởi tạo user từ localStorage (nếu trước đó đã login)
+  // Khởi tạo user từ cookie (nếu trước đó đã login)
   const [user, setUser] = useState(() => {
-    const saved = localStorage.getItem("customer_user");
-    return saved ? JSON.parse(saved) : null;
+    const saved = getCookie("customer_user");
+    try {
+      return saved ? JSON.parse(saved) : null;
+    } catch (_) {
+      return null;
+    }
   });
 
   const [isLoggedIn, setIsLoggedIn] = useState(false);
-  const token = localStorage.getItem("customer_token");
+  const token = getCookie("customer_token");
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -30,7 +35,7 @@ export const AuthProvider = ({ children }) => {
           const data = await res.json();
           // Nếu hợp lệ thì cập nhật user và login state
           setUser(data.user);
-          localStorage.setItem("customer_user", JSON.stringify(data.user));
+          setCookie("customer_user", JSON.stringify(data.user));
           setIsLoggedIn(true);
         } else {
           throw new Error("Token không hợp lệ");
@@ -38,8 +43,8 @@ export const AuthProvider = ({ children }) => {
       } catch (err) {
         // Token sai hoặc hết hạn
         console.error("Token không hợp lệ:", err);
-        localStorage.removeItem("customer_token");
-        localStorage.removeItem("customer_user");
+        eraseCookie("customer_token");
+        eraseCookie("customer_user");
         setUser(null);
         setIsLoggedIn(false);
       } finally {
@@ -50,18 +55,20 @@ export const AuthProvider = ({ children }) => {
     verifyToken();
   }, [token]);
 
-  const login = (userData, token) => {
+  const login = (userData, tokenValue) => {
     setUser(userData);
     setIsLoggedIn(true);
-    localStorage.setItem("customer_user", JSON.stringify(userData));
-    localStorage.setItem("customer_token", token);
+    setCookie("customer_user", JSON.stringify(userData));
+    setCookie("customer_token", tokenValue);
   };
 
   const logout = () => {
     setUser(null);
     setIsLoggedIn(false);
-    localStorage.removeItem("customer_user");
-    localStorage.removeItem("customer_token");
+    eraseCookie("customer_user");
+    eraseCookie("customer_token");
+    // Xoá luôn order đang theo dõi nếu có
+    eraseCookie("current_order_id");
   };
 
   return (

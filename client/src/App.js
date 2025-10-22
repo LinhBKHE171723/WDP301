@@ -4,6 +4,8 @@ import { AuthProvider } from "./context/AuthContext"
 
 import MenuView from "./components/MenuView"
 import OrderHistory from "./components/OrderHistory"
+import GuestOrderHistory from "./components/GuestOrderHistory"
+import OrderStatus from "./components/OrderStatus"
 
 import CashierShiftManager from "./components/cashier/CashierShiftManager"
 import CashierDashboard from "./components/cashier/CashierDashboard"
@@ -18,6 +20,24 @@ import "./App.css"
 function OrderHistoryRoute() {
   const navigate = useNavigate()
   return <OrderHistory onBack={() => navigate('/reservation')} />
+}
+
+function GuestOrderHistoryRoute() {
+  const navigate = useNavigate()
+  return <GuestOrderHistory onBack={() => navigate('/reservation')} />
+}
+
+function OrderStatusRoute() {
+  const navigate = useNavigate()
+  const orderId = window.location.pathname.split('/').pop()
+  
+  // Nếu không có orderId thì chuyển về menu
+  if (!orderId) {
+    navigate('/reservation')
+    return null
+  }
+  
+  return <OrderStatus orderId={orderId} onBack={() => navigate('/reservation')} />
 }
 
 function DashboardRoute({ shiftInfo, shiftData, setShiftData }) {
@@ -135,6 +155,18 @@ function App() {
             <Route
               path="/order-history"
               element={<OrderHistoryRoute />}
+            />
+
+            {/* Lịch sử đơn hàng cho guest users */}
+            <Route
+              path="/guest-order-history"
+              element={<GuestOrderHistoryRoute />}
+            />
+
+            {/* Xem chi tiết đơn hàng */}
+            <Route
+              path="/order-status/:orderId"
+              element={<OrderStatusRoute />}
             />
 
             {/* Trang menu demo */}

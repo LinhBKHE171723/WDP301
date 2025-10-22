@@ -1,4 +1,5 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
+import { API_ENDPOINTS } from '../utils/apiConfig';
 import './ItemDetail.css';
 
 const ItemDetail = ({ itemId, type, onClose, onAddToCart }) => {
@@ -7,15 +8,11 @@ const ItemDetail = ({ itemId, type, onClose, onAddToCart }) => {
   const [error, setError] = useState('');
   const [quantity, setQuantity] = useState(1);
 
-  useEffect(() => {
-    fetchItemDetail();
-  }, [itemId, type]);
-
-  const fetchItemDetail = async () => {
+  const fetchItemDetail = useCallback(async () => {
     try {
       setLoading(true);
-      const endpoint = type === 'menu' ? 'menus' : 'items';
-      const response = await fetch(`http://localhost:5000/api/customer/${endpoint}/${itemId}`);
+      const endpoint = type === 'menu' ? API_ENDPOINTS.CUSTOMER.MENU_BY_ID(itemId) : API_ENDPOINTS.CUSTOMER.ITEM_BY_ID(itemId);
+      const response = await fetch(endpoint);
       const data = await response.json();
 
       if (data.success) {
@@ -28,7 +25,11 @@ const ItemDetail = ({ itemId, type, onClose, onAddToCart }) => {
     } finally {
       setLoading(false);
     }
-  };
+  }, [itemId, type]);
+
+  useEffect(() => {
+    fetchItemDetail();
+  }, [fetchItemDetail]);
 
   const handleAddToCart = () => {
     onAddToCart(item, type, quantity);

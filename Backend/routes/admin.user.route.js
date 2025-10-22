@@ -1,16 +1,14 @@
-const express = require("express");
-const router = express.Router();
-const userController = require("../controllers/admin.user.controller");
-const {
-  authRequired,
-  roleRequired,
-} = require("../middlewares/auth.middleware");
+// routes/admin.user.route.js
+const router = require("express").Router();
+const userCtrl = require("../controllers/admin/user.controller");
+const { authRequired, roleRequired } = require("../middlewares/auth.middleware");
 
-// router.use(authRequired, roleRequired("admin")); // Chỉ admin mới truy cập
-
-router.get("/users", userController.getAll);
-router.post("/users", userController.create);
-router.put("/users/:id", userController.update);
-router.delete("/users/:id", userController.remove);
+// "/api/admin"
+router.get("/users",  userCtrl.list);
+router.post("/users",  userCtrl.create);
+router.put("/users/:id",  userCtrl.update);
+router.patch("/users/:id/status",  userCtrl.updateStatus);
+router.patch("/users/:id/role",  userCtrl.updateRole);
+router.delete("/users/:id",  userCtrl.remove);
 
 module.exports = router;
