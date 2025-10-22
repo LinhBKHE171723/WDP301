@@ -1,0 +1,584 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>🍽️ WebSocket Test Tool - Order & OrderItem Status</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 1400px;
+            margin: 0 auto;
+            padding: 20px;
+            background: #f5f5f5;
+        }
+        .container {
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+            margin-bottom: 20px;
+        }
+        h1 {
+            color: #333;
+            text-align: center;
+            margin-bottom: 30px;
+        }
+        h2 {
+            color: #2c3e50;
+            margin-bottom: 15px;
+            border-bottom: 2px solid #e9ecef;
+            padding-bottom: 10px;
+        }
+        
+        /* WebSocket Status */
+        .websocket-status {
+            padding: 10px;
+            border-radius: 4px;
+            margin-bottom: 20px;
+            font-weight: 600;
+            text-align: center;
+        }
+        .connected { background: #d4edda; color: #155724; }
+        .disconnected { background: #f8d7da; color: #721c24; }
+        .connecting { background: #fff3cd; color: #856404; }
+        
+        /* Controls */
+        .controls {
+            display: flex;
+            gap: 10px;
+            margin: 10px 0;
+            flex-wrap: wrap;
+            align-items: center;
+        }
+        input, select, button {
+            padding: 8px 12px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            font-size: 14px;
+        }
+        button {
+            cursor: pointer;
+            font-weight: 600;
+            transition: all 0.3s ease;
+        }
+        button:hover {
+            transform: translateY(-1px);
+            box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+        }
+        
+        /* Order Items */
+        .order-item {
+            border: 1px solid #ddd;
+            padding: 15px;
+            margin: 10px 0;
+            border-radius: 8px;
+            background: #f9f9f9;
+        }
+        .order-item h3 {
+            margin: 0 0 10px 0;
+            color: #2c3e50;
+        }
+        .order-item p {
+            margin: 5px 0;
+            color: #666;
+        }
+        
+        /* Status Badges */
+        .status-badge {
+            padding: 4px 8px;
+            border-radius: 12px;
+            font-size: 12px;
+            font-weight: 600;
+            text-transform: uppercase;
+            margin-left: 10px;
+        }
+        .status-pending { background: #fff3cd; color: #856404; }
+        .status-preparing { background: #cce5ff; color: #004085; }
+        .status-ready { background: #d4edda; color: #155724; }
+        .status-served { background: #d1ecf1; color: #0c5460; }
+        
+        /* Status Buttons */
+        .status-buttons {
+            display: flex;
+            gap: 8px;
+            margin: 10px 0;
+            flex-wrap: wrap;
+        }
+        .btn-pending { background: #ffc107; color: white; }
+        .btn-preparing { background: #007bff; color: white; }
+        .btn-ready { background: #28a745; color: white; }
+        .btn-served { background: #17a2b8; color: white; }
+        
+        /* Order Status Buttons */
+        .order-status-buttons {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+            gap: 10px;
+            margin: 15px 0;
+        }
+        .order-status-btn {
+            padding: 12px;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            font-weight: bold;
+            transition: all 0.3s;
+        }
+        .order-status-btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 8px rgba(0,0,0,0.2);
+        }
+        .order-pending { background-color: #ffeb3b; color: #333; }
+        .order-preparing { background-color: #ff9800; color: white; }
+        .order-ready { background-color: #4caf50; color: white; }
+        .order-served { background-color: #2196f3; color: white; }
+        .order-paid { background-color: #9c27b0; color: white; }
+        .order-cancelled { background-color: #f44336; color: white; }
+        
+        /* Log */
+        .log {
+            background: #f8f9fa;
+            border: 1px solid #dee2e6;
+            padding: 15px;
+            border-radius: 4px;
+            max-height: 300px;
+            overflow-y: auto;
+            font-family: monospace;
+            font-size: 12px;
+        }
+        .log-entry {
+            margin: 5px 0;
+            padding: 5px;
+            border-left: 3px solid #007bff;
+            background: white;
+        }
+        .log-error { border-left-color: #dc3545; }
+        .log-success { border-left-color: #28a745; }
+        .log-warning { border-left-color: #ffc107; }
+        
+        /* Tabs */
+        .tabs {
+            display: flex;
+            border-bottom: 2px solid #e9ecef;
+            margin-bottom: 20px;
+        }
+        .tab {
+            padding: 10px 20px;
+            cursor: pointer;
+            border-bottom: 2px solid transparent;
+            transition: all 0.3s ease;
+        }
+        .tab.active {
+            border-bottom-color: #007bff;
+            color: #007bff;
+            font-weight: 600;
+        }
+        .tab-content {
+            display: none;
+        }
+        .tab-content.active {
+            display: block;
+        }
+        
+        /* Grid Layout */
+        .grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 20px;
+        }
+        @media (max-width: 768px) {
+            .grid {
+                grid-template-columns: 1fr;
+            }
+        }
+    </style>
+</head>
+<body>
+    <h1>🍽️ WebSocket Test Tool - Order & OrderItem Status</h1>
+    
+    <!-- WebSocket Connection -->
+    <div class="container">
+        <h2>🔌 WebSocket Connection</h2>
+        <div id="wsStatus" class="websocket-status disconnected">Disconnected</div>
+        <div class="controls">
+            <input type="text" id="orderIdInput" placeholder="Order ID" value="">
+            <button onclick="connectWebSocket()">Connect</button>
+            <button onclick="disconnectWebSocket()">Disconnect</button>
+            <button onclick="loadOrderData(document.getElementById('orderIdInput').value)" style="background: #28a745; color: white;">Load Order</button>
+            <button onclick="getLatestOrderId()" style="background: #17a2b8; color: white;">Get Latest Order</button>
+        </div>
+        </div>
+        
+    <!-- Tabs -->
+    <div class="container">
+        <div class="tabs">
+            <div class="tab active" onclick="switchTab('order')">📋 Order Status</div>
+            <div class="tab" onclick="switchTab('orderitem')">🍽️ OrderItem Status</div>
+            <div class="tab" onclick="switchTab('logs')">📝 Logs</div>
+        </div>
+        
+        <!-- Order Status Tab -->
+        <div id="order-tab" class="tab-content active">
+            <h3>Update Order Status</h3>
+            <div class="controls">
+                <select id="orderStatusSelect">
+                <option value="pending">Pending</option>
+                    <option value="confirmed">Confirmed</option>
+                <option value="preparing">Preparing</option>
+                <option value="ready">Ready</option>
+                <option value="served">Served</option>
+                <option value="paid">Paid</option>
+                <option value="cancelled">Cancelled</option>
+            </select>
+                <button onclick="updateOrderStatus()" style="background: #007bff; color: white;">Update Order Status</button>
+        </div>
+        
+            <div class="order-status-buttons">
+                <button class="order-status-btn order-pending" onclick="quickUpdateOrder('pending')">⏳ Pending</button>
+                <button class="order-status-btn order-preparing" onclick="quickUpdateOrder('preparing')">👨‍🍳 Preparing</button>
+                <button class="order-status-btn order-ready" onclick="quickUpdateOrder('ready')">✅ Ready</button>
+                <button class="order-status-btn order-served" onclick="quickUpdateOrder('served')">🍽️ Served</button>
+                <button class="order-status-btn order-paid" onclick="quickUpdateOrder('paid')">💳 Paid</button>
+                <button class="order-status-btn order-cancelled" onclick="quickUpdateOrder('cancelled')">❌ Cancelled</button>
+            </div>
+        </div>
+
+        <!-- OrderItem Status Tab -->
+        <div id="orderitem-tab" class="tab-content">
+            <h3>Order Items</h3>
+            <div id="orderItems">
+                <p>No order items loaded. Please connect to an order first.</p>
+            </div>
+        </div>
+        
+        <!-- Logs Tab -->
+        <div id="logs-tab" class="tab-content">
+            <h3>WebSocket Messages Log</h3>
+            <div id="messageLog" class="log"></div>
+            <button onclick="clearLog()" style="background: #6c757d; color: white;">Clear Log</button>
+        </div>
+    </div>
+
+    <script>
+        let ws = null;
+        let currentOrderId = null;
+        let orderItems = [];
+
+        // Tab switching
+        function switchTab(tabName) {
+            // Hide all tabs
+            document.querySelectorAll('.tab-content').forEach(tab => {
+                tab.classList.remove('active');
+            });
+            document.querySelectorAll('.tab').forEach(tab => {
+                tab.classList.remove('active');
+            });
+            
+            // Show selected tab
+            document.getElementById(tabName + '-tab').classList.add('active');
+            event.target.classList.add('active');
+        }
+
+        // WebSocket functions
+        function connectWebSocket() {
+            const orderId = document.getElementById('orderIdInput').value.trim();
+            if (!orderId) {
+                alert('Please enter an Order ID');
+                return;
+            }
+
+            if (ws) {
+                ws.close();
+            }
+
+            currentOrderId = orderId;
+            updateWSStatus('connecting', 'Connecting...');
+
+            ws = new WebSocket('ws://[::1]:5000/ws');
+            
+            ws.onopen = function() {
+                updateWSStatus('connected', 'Connected');
+                logMessage('WebSocket connected', 'success');
+                
+                // Subscribe to order
+                ws.send(JSON.stringify({
+                    type: 'subscribe',
+                    orderId: orderId
+                }));
+                logMessage(`Subscribed to order: ${orderId}`, 'success');
+                
+                // Load order data after connecting
+                loadOrderData(orderId);
+            };
+            
+            ws.onmessage = function(event) {
+                try {
+                    const message = JSON.parse(event.data);
+                    logMessage(`Received: ${JSON.stringify(message, null, 2)}`, 'success');
+                    
+                    if (message.type === 'order:item_updated') {
+                        handleOrderItemUpdate(message.data);
+                    } else if (message.type === 'order:updated') {
+                        handleOrderUpdate(message.data);
+                    }
+                } catch (error) {
+                    logMessage(`Error parsing message: ${error.message}`, 'error');
+                }
+            };
+
+            ws.onclose = function() {
+                updateWSStatus('disconnected', 'Disconnected');
+                logMessage('WebSocket disconnected', 'warning');
+            };
+            
+            ws.onerror = function(error) {
+                updateWSStatus('disconnected', 'Error');
+                logMessage(`WebSocket error: ${error}`, 'error');
+            };
+        }
+
+        function disconnectWebSocket() {
+            if (ws) {
+                ws.close();
+                ws = null;
+            }
+        }
+
+        function updateWSStatus(status, text) {
+            const statusEl = document.getElementById('wsStatus');
+            statusEl.className = `websocket-status ${status}`;
+            statusEl.textContent = text;
+        }
+
+        function logMessage(message, type = 'info') {
+            const log = document.getElementById('messageLog');
+            const entry = document.createElement('div');
+            entry.className = `log-entry log-${type}`;
+            entry.textContent = `[${new Date().toLocaleTimeString()}] ${message}`;
+            log.appendChild(entry);
+            log.scrollTop = log.scrollHeight;
+        }
+
+        function clearLog() {
+            document.getElementById('messageLog').innerHTML = '';
+        }
+
+        // Order data functions
+        async function loadOrderData(orderId) {
+            try {
+                logMessage(`Loading order data for: ${orderId}`, 'info');
+                
+                const response = await fetch(`http://[::1]:5000/api/customer/orders/${orderId}`);
+                const data = await response.json();
+                
+                if (data.success) {
+                    orderItems = data.data.orderItems || [];
+                    logMessage(`Loaded ${orderItems.length} order items`, 'success');
+                    renderOrderItems();
+                } else {
+                    logMessage(`Failed to load order: ${data.message}`, 'error');
+                }
+            } catch (error) {
+                logMessage(`Error loading order: ${error.message}`, 'error');
+            }
+        }
+
+        async function getLatestOrderId() {
+            try {
+                logMessage('Fetching latest order ID...', 'info');
+                
+                // Sử dụng endpoint mới để lấy order mới nhất
+                const response = await fetch(`http://[::1]:5000/api/customer/orders/latest`);
+                const data = await response.json();
+                
+                if (data.success && data.data) {
+                    const latestOrder = data.data;
+                    
+                    document.getElementById('orderIdInput').value = latestOrder._id;
+                    logMessage(`Latest order ID: ${latestOrder._id}`, 'success');
+                    logMessage(`Order created: ${new Date(latestOrder.createdAt).toLocaleString()}`, 'info');
+                    logMessage(`Order status: ${latestOrder.status}`, 'info');
+                    logMessage(`Table: ${latestOrder.tableId?.tableNumber || 'N/A'}`, 'info');
+                    
+                    // Tự động load order data với OrderItem IDs mới
+                    orderItems = latestOrder.orderItems || [];
+                    logMessage(`Loaded ${orderItems.length} order items`, 'success');
+                    
+                    // Log OrderItem IDs để debug
+                    orderItems.forEach((item, index) => {
+                        logMessage(`Item ${index + 1}: ${item.itemName} (ID: ${item._id})`, 'info');
+                    });
+                    
+                    renderOrderItems();
+                } else {
+                    logMessage(`Failed to get latest order: ${data.message}`, 'error');
+                }
+            } catch (error) {
+                logMessage(`Error fetching latest order: ${error.message}`, 'error');
+                logMessage('Please enter Order ID manually', 'warning');
+            }
+        }
+
+        function handleOrderUpdate(order) {
+            logMessage(`Order updated: ${order.status}`, 'success');
+            if (order.orderItems) {
+                orderItems = order.orderItems;
+                renderOrderItems();
+            }
+        }
+
+        function handleOrderItemUpdate(data) {
+            logMessage(`OrderItem updated: ${data.orderItem.itemName} -> ${data.orderItem.status}`, 'success');
+            
+            // Update the specific order item
+            const itemIndex = orderItems.findIndex(item => item._id === data.orderItem._id);
+            if (itemIndex !== -1) {
+                orderItems[itemIndex] = data.orderItem;
+                renderOrderItems();
+            }
+        }
+
+        function renderOrderItems() {
+            const container = document.getElementById('orderItems');
+            
+            if (orderItems.length === 0) {
+                container.innerHTML = '<p>No order items found.</p>';
+                return;
+            }
+
+            // Debug: Log order items
+            logMessage(`Rendering ${orderItems.length} order items:`, 'info');
+            orderItems.forEach((item, index) => {
+                logMessage(`Item ${index + 1}: ${item.itemName} (ID: ${item._id})`, 'info');
+            });
+
+            container.innerHTML = orderItems.map(item => `
+                <div class="order-item">
+                    <h3>${item.itemName || 'Unknown Item'}</h3>
+                    <p>Quantity: ${item.quantity}</p>
+                    <p>Price: ${item.price?.toLocaleString('vi-VN')}đ</p>
+                    <p>Status: 
+                        <span class="status-badge status-${item.status}">${item.status}</span>
+                    </p>
+                    <div class="status-buttons">
+                        <button class="btn-pending" onclick="updateItemStatus('${item._id}', 'pending')">Pending</button>
+                        <button class="btn-preparing" onclick="updateItemStatus('${item._id}', 'preparing')">Preparing</button>
+                        <button class="btn-ready" onclick="updateItemStatus('${item._id}', 'ready')">Ready</button>
+                        <button class="btn-served" onclick="updateItemStatus('${item._id}', 'served')">Served</button>
+                    </div>
+                </div>
+            `).join('');
+        }
+
+        // Order status functions
+        async function updateOrderStatus() {
+            const orderId = document.getElementById('orderIdInput').value.trim();
+            const status = document.getElementById('orderStatusSelect').value;
+            
+            if (!orderId) {
+                logMessage('Please enter Order ID', 'error');
+                return;
+            }
+            
+            try {
+                logMessage(`Updating order ${orderId} to status: ${status}`, 'info');
+                
+                const response = await fetch(`http://[::1]:5000/api/customer/orders/${orderId}`, {
+                    method: 'PUT',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({ status })
+                });
+                
+                const data = await response.json();
+                
+                if (data.success) {
+                    logMessage(`Order updated successfully: ${data.message}`, 'success');
+                } else {
+                    logMessage(`Failed to update order: ${data.message}`, 'error');
+                }
+            } catch (error) {
+                logMessage(`Error updating order: ${error.message}`, 'error');
+            }
+        }
+        
+        function quickUpdateOrder(status) {
+            document.getElementById('orderStatusSelect').value = status;
+            updateOrderStatus();
+        }
+        
+        // OrderItem status functions
+        async function updateItemStatus(orderItemId, status) {
+            try {
+                logMessage(`Updating OrderItem ${orderItemId} to ${status}...`, 'info');
+                
+                const response = await fetch(`http://[::1]:5000/api/customer/order-items/${orderItemId}/status`, {
+                    method: 'PUT',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({ status })
+                });
+
+                const data = await response.json();
+                
+                if (data.success) {
+                    logMessage(`OrderItem updated successfully: ${data.message}`, 'success');
+            } else {
+                    logMessage(`Failed to update OrderItem: ${data.message}`, 'error');
+                }
+            } catch (error) {
+                logMessage(`Error updating OrderItem: ${error.message}`, 'error');
+            }
+        }
+
+        // Test function để update order item status (không cần OrderItem ID cụ thể)
+        async function testUpdateOrderItemStatus(status) {
+            const orderId = document.getElementById('orderIdInput').value.trim();
+            
+            if (!orderId) {
+                logMessage('Please enter Order ID', 'error');
+                return;
+            }
+            
+            try {
+                logMessage(`Testing OrderItem status update to ${status} for Order ${orderId}...`, 'info');
+                
+                const response = await fetch(`http://[::1]:5000/api/customer/orders/${orderId}/test-update-item-status`, {
+                    method: 'PUT',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({ status })
+                });
+
+                const data = await response.json();
+                
+                if (data.success) {
+                    logMessage(`OrderItem updated successfully: ${data.message}`, 'success');
+                    logMessage(`Updated item: ${data.data.orderItem.itemName}`, 'info');
+                } else {
+                    logMessage(`Failed to update OrderItem: ${data.message}`, 'error');
+                }
+            } catch (error) {
+                logMessage(`Error updating OrderItem: ${error.message}`, 'error');
+            }
+        }
+
+        // Load order items when page loads (if orderId is provided)
+        window.onload = function() {
+            const urlParams = new URLSearchParams(window.location.search);
+            const orderId = urlParams.get('orderId');
+            if (orderId) {
+                document.getElementById('orderIdInput').value = orderId;
+            }
+            
+            logMessage('WebSocket Test Tool initialized', 'success');
+            logMessage('Enter an Order ID and click Connect to start testing', 'info');
+            logMessage('Or click "Get Latest Order" to automatically fetch the newest order', 'info');
+        };
+    </script>
+</body>
+</html>

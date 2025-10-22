@@ -1,7 +1,4 @@
-// backend/seed/seedDatabase.js
-
 const mongoose = require("mongoose");
-const bcrypt = require("bcryptjs");
 const User = require("../models/User");
 const Ingredient = require("../models/Ingredient");
 const Item = require("../models/Item");
@@ -17,7 +14,7 @@ const seedDatabase = async () => {
   try {
     console.log("🚀 Bắt đầu seed database...");
 
-    // 1️⃣ Xoá toàn bộ dữ liệu cũ
+    // 1️⃣ Xóa toàn bộ dữ liệu cũ
     await Promise.all([
       User.deleteMany(),
       Ingredient.deleteMany(),
@@ -32,12 +29,12 @@ const seedDatabase = async () => {
     ]);
     console.log("🧹 Đã xoá toàn bộ dữ liệu cũ.");
 
-    // 2️⃣ Tạo user mẫu (dùng create để chạy pre('save') → hash mật khẩu)
+    // 2️⃣ Tạo user mẫu (dùng for để trigger pre-save hash)
     const userData = [
       {
         name: "Nguyễn Văn Khách",
         username: "customer01",
-        password: "password123",
+        password: "customer123",
         email: "customer@example.com",
         phone: "0123456789",
         role: "customer",
@@ -46,7 +43,7 @@ const seedDatabase = async () => {
       {
         name: "Trần Thị Phục Vụ 1",
         username: "waiter01",
-        password: "password123",
+        password: "waiter1@123",
         email: "waiter1@example.com",
         phone: "0987654321",
         role: "waiter",
@@ -54,7 +51,7 @@ const seedDatabase = async () => {
       {
         name: "Phạm Văn Phục Vụ 2",
         username: "waiter02",
-        password: "password123",
+        password: "waiter2@123",
         email: "waiter2@example.com",
         phone: "0987654322",
         role: "waiter",
@@ -62,7 +59,7 @@ const seedDatabase = async () => {
       {
         name: "Lê Thị Phục Vụ 3",
         username: "waiter03",
-        password: "password123",
+        password: "waiter3@123",
         email: "waiter3@example.com",
         phone: "0987654323",
         role: "waiter",
@@ -70,7 +67,7 @@ const seedDatabase = async () => {
       {
         name: "Đầu Bếp Trưởng",
         username: "chef01",
-        password: "password123",
+        password: "chef@123",
         email: "chef@example.com",
         phone: "0908888999",
         role: "chef",
@@ -78,7 +75,7 @@ const seedDatabase = async () => {
       {
         name: "Quản Lý Bếp",
         username: "kitchen01",
-        password: "123456",
+        password: "kitchen@123",
         email: "kitchen@example.com",
         phone: "0908888988",
         role: "kitchen_manager",
@@ -86,7 +83,7 @@ const seedDatabase = async () => {
       {
         name: "Admin Nhà Hàng",
         username: "admin01",
-        password: "password123",
+        password: "admin@123",
         email: "admin@example.com",
         phone: "0909999000",
         role: "admin",
@@ -95,10 +92,10 @@ const seedDatabase = async () => {
 
     const users = [];
     for (const data of userData) {
-      const user = await User.create(data);
+      const user = await User.create(data); // middleware hash password
       users.push(user);
+      console.log(`✅ Tạo user: ${user.username}`);
     }
-    console.log("👤 Đã tạo user mẫu và hash mật khẩu thành công.");
 
     const customer = users.find((u) => u.role === "customer");
     const waiters = users.filter((u) => u.role === "waiter");
@@ -106,34 +103,36 @@ const seedDatabase = async () => {
 
     // 3️⃣ Nguyên liệu
     const ingredients = await Ingredient.insertMany([
-      { name: "Thịt bò", unit: "kg", stockQuantity: 50, minStock: 10 },
-      { name: "Cá hồi", unit: "kg", stockQuantity: 30, minStock: 5 },
-      { name: "Khoai tây", unit: "kg", stockQuantity: 40, minStock: 8 },
-      { name: "Rau xà lách", unit: "bó", stockQuantity: 60, minStock: 10 },
-      { name: "Trứng gà", unit: "quả", stockQuantity: 100, minStock: 20 },
-      { name: "Tôm tươi", unit: "kg", stockQuantity: 45, minStock: 10 },
-      { name: "Phô mai", unit: "kg", stockQuantity: 25, minStock: 5 },
-      { name: "Bột mì", unit: "kg", stockQuantity: 30, minStock: 8 },
-      { name: "Thịt gà", unit: "kg", stockQuantity: 35, minStock: 5 },
-      { name: "Ớt chuông", unit: "kg", stockQuantity: 20, minStock: 3 },
-      { name: "Cà chua", unit: "kg", stockQuantity: 40, minStock: 8 },
-      { name: "Hành tây", unit: "kg", stockQuantity: 25, minStock: 5 },
-      { name: "Bơ", unit: "hộp", stockQuantity: 15, minStock: 3 },
-      { name: "Nước mắm", unit: "chai", stockQuantity: 50, minStock: 10 },
-      { name: "Tỏi", unit: "kg", stockQuantity: 30, minStock: 6 },
+      { name: "Thịt bò", unit: "kg", stockQuantity: 50, minStock: 10, priceNow: 250000 },
+      { name: "Cá hồi", unit: "kg", stockQuantity: 30, minStock: 5, priceNow: 280000 },
+      { name: "Khoai tây", unit: "kg", stockQuantity: 40, minStock: 8, priceNow: 50000 },
+      { name: "Rau xà lách", unit: "bó", stockQuantity: 60, minStock: 10, priceNow: 15000 },
+      { name: "Trứng gà", unit: "quả", stockQuantity: 100, minStock: 20, priceNow: 5000 },
+      { name: "Tôm tươi", unit: "kg", stockQuantity: 45, minStock: 10, priceNow: 200000 },
+      { name: "Phô mai", unit: "kg", stockQuantity: 25, minStock: 5, priceNow: 300000 },
+      { name: "Bột mì", unit: "kg", stockQuantity: 30, minStock: 8, priceNow: 25000 },
+      { name: "Thịt gà", unit: "kg", stockQuantity: 35, minStock: 5, priceNow: 180000 },
+      { name: "Ớt chuông", unit: "kg", stockQuantity: 20, minStock: 3, priceNow: 40000 },
+      { name: "Cà chua", unit: "kg", stockQuantity: 40, minStock: 8, priceNow: 30000 },
+      { name: "Hành tây", unit: "kg", stockQuantity: 25, minStock: 5, priceNow: 25000 },
+      { name: "Bơ", unit: "hộp", stockQuantity: 15, minStock: 3, priceNow: 50000 },
+      { name: "Nước mắm", unit: "chai", stockQuantity: 50, minStock: 10, priceNow: 15000 },
+      { name: "Tỏi", unit: "kg", stockQuantity: 30, minStock: 6, priceNow: 40000 },
     ]);
-    console.log("🥬 Đã thêm nguyên liệu mẫu.");
+    console.log("🥦 Đã tạo các Ingredient mẫu.");
 
-    // 4️⃣ Món ăn
-    const items = await Item.insertMany([
+    // 4️⃣ Món ăn (Item)
+    const items = [];
+
+    const itemData = [
       {
         name: "Bò Bít Tết",
         description: "Thịt bò Úc nướng chảo gang, kèm khoai tây chiên",
         category: "Món chính",
         price: 250000,
         ingredients: [
-          ingredients.find((i) => i.name === "Thịt bò")._id,
-          ingredients.find((i) => i.name === "Khoai tây")._id,
+          { ingredient: ingredients.find((i) => i.name === "Thịt bò")._id, quantity: 0.3 }, // 300g
+          { ingredient: ingredients.find((i) => i.name === "Khoai tây")._id, quantity: 0.2 }, // 200g
         ],
       },
       {
@@ -141,7 +140,10 @@ const seedDatabase = async () => {
         description: "Cá hồi Na Uy sốt chanh dây",
         category: "Món chính",
         price: 280000,
-        ingredients: [ingredients.find((i) => i.name === "Cá hồi")._id],
+        ingredients: [
+          { ingredient: ingredients.find((i) => i.name === "Cá hồi")._id, quantity: 0.25 }, // 250g
+          { ingredient: ingredients.find((i) => i.name === "Bơ")._id, quantity: 0.05 },
+        ],
       },
       {
         name: "Tôm Tempura",
@@ -149,18 +151,8 @@ const seedDatabase = async () => {
         category: "Món chính",
         price: 180000,
         ingredients: [
-          ingredients.find((i) => i.name === "Tôm tươi")._id,
-          ingredients.find((i) => i.name === "Bột mì")._id,
-        ],
-      },
-      {
-        name: "Mì Ý Carbonara",
-        description: "Mì Ý kem trứng và thịt xông khói",
-        category: "Món chính",
-        price: 220000,
-        ingredients: [
-          ingredients.find((i) => i.name === "Trứng gà")._id,
-          ingredients.find((i) => i.name === "Bột mì")._id,
+          { ingredient: ingredients.find((i) => i.name === "Tôm tươi")._id, quantity: 0.2 },
+          { ingredient: ingredients.find((i) => i.name === "Bột mì")._id, quantity: 0.05 },
         ],
       },
       {
@@ -168,12 +160,57 @@ const seedDatabase = async () => {
         description: "Rau củ tươi trộn dầu giấm",
         category: "Khai vị",
         price: 70000,
-        ingredients: [ingredients.find((i) => i.name === "Rau xà lách")._id],
+        ingredients: [
+          { ingredient: ingredients.find((i) => i.name === "Rau xà lách")._id, quantity: 0.1 },
+          { ingredient: ingredients.find((i) => i.name === "Cà chua")._id, quantity: 0.05 },
+          { ingredient: ingredients.find((i) => i.name === "Hành tây")._id, quantity: 0.03 },
+        ],
+      },
+    ];
+
+    for (const data of itemData) {
+      const item = await Item.create(data); // pre-save sẽ tự tính expense
+      items.push(item);
+    }
+    console.log("🍱 Đã tạo các Item mẫu và tính expense tự động.");
+
+    // 5️⃣ Tạo menu mẫu
+    const menus = await Menu.insertMany([
+      {
+        name: "Combo Bò Bít Tết",
+        description: "Bò bít tết + Salad + Nước uống",
+        items: [
+          items.find((i) => i.name === "Bò Bít Tết")._id,
+          items.find((i) => i.name === "Salad Rau Củ")._id,
+        ],
+        price: 300000,
+        type: "combo",
+        isAvailable: true,
+      },
+      {
+        name: "Combo Hải Sản",
+        description: "Cá hồi + Tôm tempura + Salad",
+        items: [
+          items.find((i) => i.name === "Cá Hồi Áp Chảo")._id,
+          items.find((i) => i.name === "Tôm Tempura")._id,
+          items.find((i) => i.name === "Salad Rau Củ")._id,
+        ],
+        price: 450000,
+        type: "combo",
+        isAvailable: true,
+      },
+      {
+        name: "Combo Gia Đình",
+        description: "Tất cả món chính + Salad",
+        items: items.map((item) => item._id),
+        price: 600000,
+        type: "combo",
+        isAvailable: true,
       },
     ]);
-    console.log("🍽️ Đã thêm món ăn mẫu.");
+    console.log("🍽️ Đã tạo các Menu mẫu.");
 
-    // 5️⃣ Bàn ăn (20 bàn)
+    // 6️⃣ Bàn ăn (20 bàn)
     const tables = await Promise.all(
       Array.from({ length: 20 }, (_, i) =>
         Table.create({
@@ -183,12 +220,12 @@ const seedDatabase = async () => {
         })
       )
     );
-    console.log("🍽️ Đã tạo bàn ăn.");
 
-    // 6️⃣ Tạo order cho 10 bàn đầu
+    // 7️⃣ Order mẫu cho 10 bàn đang occupied
     for (let i = 0; i < 10; i++) {
       const table = tables[i];
       const selectedItems = [];
+
       for (let j = 0; j < 3; j++) {
         const randomItem = items[Math.floor(Math.random() * items.length)];
         const orderItem = await OrderItem.create({
@@ -226,6 +263,53 @@ const seedDatabase = async () => {
       table.orderNow = order._id;
       await table.save();
     }
+
+    // 8️⃣ PurchaseOrder — dùng create() để middleware cập nhật priceNow + stock
+    const purchaseData = [
+      {
+        ingredientId: ingredients.find((i) => i.name === "Thịt bò")._id,
+        quantity: 20,
+        unit: "kg",
+        price: 2000000,
+        expiryDate: new Date(Date.now() + 1000 * 60 * 60 * 24 * 90),
+      },
+      {
+        ingredientId: ingredients.find((i) => i.name === "Cá hồi")._id,
+        quantity: 15,
+        unit: "kg",
+        price: 1500000,
+        expiryDate: new Date(Date.now() + 1000 * 60 * 60 * 24 * 45),
+      },
+      {
+        ingredientId: ingredients.find((i) => i.name === "Rau xà lách")._id,
+        quantity: 50,
+        unit: "bó",
+        price: 500000,
+        expiryDate: new Date(Date.now() - 1000 * 60 * 60 * 24 * 10),
+      },
+    ];
+
+    for (const p of purchaseData) {
+      await PurchaseOrder.create(p);
+    }
+
+    console.log("📦 Đã tạo các PurchaseOrder và cập nhật Ingredient thành công.");
+
+
+    // 8️⃣ Feedbacks
+    await Feedback.insertMany([
+      {
+        userId: customer._id,
+        rating: 5,
+        comment: "Đồ ăn rất ngon, phục vụ nhanh!",
+      },
+      {
+        userId: customer._id,
+        rating: 4,
+        comment: "Không gian đẹp, hơi ồn một chút.",
+      },
+    ]);
+    console.log("💬 Đã tạo các Feedback mẫu.");
 
     console.log("✅ SEED DATABASE THÀNH CÔNG!");
   } catch (error) {

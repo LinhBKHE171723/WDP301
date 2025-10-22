@@ -4,8 +4,6 @@ const cors = require("cors");
 const morgan = require("morgan");
 const dotenv = require("dotenv");
 const seedDatabase = require("./utils/seed");
-const adminUserRoutes = require("./routes/admin.user.route");
-const adminFeedbackRoutes = require("./routes/admin.feedback.route");
 const kitchenRoutes = require("./routes/kitchen.routes");
 const customerRoutes = require("./routes/customer.routes");
 const authRoutes = require("./routes/auth.route");
@@ -37,9 +35,6 @@ app.get("/", (req, res) => {
 });
 //auth
 app.use("/api/auth", authRoutes);
-//admin
-app.use("/api/admin", adminUserRoutes);
-app.use("/api/admin", adminFeedbackRoutes);
 
 //chef
 app.use("/api/kitchen", kitchenRoutes);
@@ -48,6 +43,8 @@ app.use("/api/customer", customerRoutes);
 
 // waiter
 app.use("/api/waiter", waiterRoutes);
+//admin
+app.use("/api/admin", require("./routes/admin.route.js"));
 
 // export app để server.js dùng
 module.exports = app;
