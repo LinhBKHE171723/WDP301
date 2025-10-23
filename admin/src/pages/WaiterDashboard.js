@@ -21,7 +21,7 @@ export default function WaiterDashboard() {
     const [loading, setLoading] = useState(true);
     const [pendingLoading, setPendingLoading] = useState(true);
 
-    // WebSocket connection
+    // trả về các hàm từ hook WebSocket và chạy hook này ở đây
     const { connectionState, lastMessage, subscribeToOrders, subscribeToOrder, unsubscribeFromAllOrders } = useWaiterWebSocket();
 
     const [availableTables, setAvailableTables] = useState([]);
@@ -130,7 +130,17 @@ export default function WaiterDashboard() {
         };
     }, []);
 
-    // Handle WebSocket messages
+
+    /** Handle WebSocket messages
+     * Cấu trúc logic chính trong WaiterDashboard là:
+
+useWaiterWebSocket → kết nối tới server qua WebSocket để nhận tin nhắn realtime.
+
+Mỗi khi server gửi tin nhắn xuống (vd: đơn bị xác nhận, cập nhật, hủy, …),
+thì lastMessage trong hook sẽ thay đổi.
+
+WaiterDashboard có một useEffect lắng nghe lastMessage → xử lý cập nhật UI.
+     */
     useEffect(() => {
         if (lastMessage) {
             console.log('📨 Waiter received WebSocket message:', lastMessage);
