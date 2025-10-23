@@ -22,6 +22,7 @@ export default function WaiterDashboard() {
     const [pendingLoading, setPendingLoading] = useState(true);
 
     // trả về các hàm từ hook WebSocket và chạy hook này ở đây
+    // hook này thay đổi state mỗi khi có tin nhắn từ server và sẽ làm component cha WaiterDashboard re-render
     const { connectionState, lastMessage, subscribeToOrders, subscribeToOrder, unsubscribeFromAllOrders } = useWaiterWebSocket();
 
     const [availableTables, setAvailableTables] = useState([]);
