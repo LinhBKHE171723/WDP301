@@ -15,7 +15,7 @@ import axios from "axios";
 import { toast } from "react-toastify";
 
 export default function Profile() {
-    const { user, logout, setUser } = useAuth(); // setUser để cập nhật lại context
+    const {user, logout, setUser } = useAuth(); // setUser để cập nhật lại context
     const [showModal, setShowModal] = useState(false);
     const [saving, setSaving] = useState(false);
     const [form, setForm] = useState({
