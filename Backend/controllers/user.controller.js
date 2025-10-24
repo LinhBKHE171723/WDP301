@@ -1,5 +1,5 @@
 const User = require("../models/User");
-
+const cloudinary = require("../config/cloudinary");
 
 exports.getProfile = async (req, res) => {
     try {
@@ -16,8 +16,17 @@ exports.getProfile = async (req, res) => {
 
 exports.updateProfile = async (req, res) => {
     try {
-        const userId = req.user.id; // ✅ Lấy từ JWT middleware
-        const { name, phone, avatar } = req.body;
+        const userId = req.user.id; // lấy từ JWT middleware
+        const { name, phone } = req.body;
+        let avatar = req.body.avatar;
+
+        // Nếu có file upload từ frontend (multer)
+        if (req.file) {
+            const result = await cloudinary.uploader.upload(req.file.path, {
+                folder: "restaurant_profiles",
+            });
+            avatar = result.secure_url;
+        }
 
         const updatedUser = await User.findByIdAndUpdate(
             userId,
@@ -26,18 +35,21 @@ exports.updateProfile = async (req, res) => {
         ).select("-password"); // Ẩn mật khẩu
 
         if (!updatedUser) {
-            return res.status(404).json({ success: false, message: "Không tìm thấy người dùng" });
+            return res
+                .status(404)
+                .json({ success: false, message: "Không tìm thấy người dùng" });
         }
 
-        // ✅ Trả về kết quả thành công
+        // Trả về user đã cập nhật
         res.status(200).json({
             success: true,
             message: "Cập nhật thông tin thành công",
-            user, // user đã được cập nhật
+            user: updatedUser,
         });
     } catch (err) {
-        // ❗ Nếu có lỗi trong quá trình thực thi (DB, validate, v.v...)
         console.error("❌ Lỗi cập nhật profile:", err);
-        res.status(500).json({ success: false, message: err.message });
+        res
+            .status(500)
+            .json({ success: false, message: err.message || "Lỗi server" });
     }
 };
