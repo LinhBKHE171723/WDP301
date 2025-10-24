@@ -24,7 +24,7 @@ export default function Profile() {
         avatar: user?.avatar || "",
     });
     const [file, setFile] = useState(null); // file ảnh mới
-    const [preview, setPreview] = useState(user?.avatar || ""); // ảnh preview
+    const [preview, setPreview] = useState(user?.avatar || "https://cdn-icons-png.flaticon.com/512/149/149071.png"); // ảnh preview
 
     // 📸 Khi chọn file mới
     const handleFileChange = (e) => {
@@ -107,8 +107,8 @@ export default function Profile() {
                 />
                 <div>
                     <h5>{user?.name}</h5>
-                    <p className="mb-1">📧 Email: {user?.email}</p>
-                    <p className="mb-1">📞 Phone number: {user?.phone || "Chưa có số điện thoại"}</p>
+                    <p className="mb-1"> <span className="fw-bold">Email:</span>  {user?.email}</p>
+                    <p className="mb-1"> <span className="fw-bold">Phone number:</span> {user?.phone || "Chưa có số điện thoại"}</p>
                     <Button variant="outline-primary" onClick={() => setShowModal(true)}>
                         Chỉnh sửa
                     </Button>
