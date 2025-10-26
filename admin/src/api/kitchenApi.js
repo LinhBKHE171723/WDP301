@@ -45,6 +45,9 @@ const kitchenApi = {
 
   // --- CHEF ---
   getAllChefs: () => Client.get("/kitchen/chefs"),
+
+  //--- Cloudinary ---
+  getCloudinarySignature: () => Client.get("/cloudinary/upload/signature"),
 };
 
 export default kitchenApi;

@@ -36,12 +36,15 @@ export default function KitchenDashboard() {
       try {
         if (activeTab === "kds") {
           const res = await kitchenApi.getConfirmedOrders();
+          console.log("🍽️ Dữ liệu đơn hàng:", res.data || res);
           setOrders(res.data || []);
         } else if (activeTab === "items") {
           const res = await kitchenApi.getAllItems();
+          console.log("🍽️ Dữ liệu món ăn:", res.data || res);
           setItems(res.data || []);
         } else if (activeTab === "menus") {
           const res = await kitchenApi.getAllMenus();
+          console.log("🍽️ Dữ liệu thực đơn:", res.data || res);
           setMenus(res.data || []);
         } else if (activeTab === "inventory") {
           const res = await kitchenApi.getAllIngredients();
@@ -67,8 +70,7 @@ export default function KitchenDashboard() {
     const fetchChefs = async () => {
       try {
         const res = await kitchenApi.getAllChefs();
-        console.log("✅ Kết quả gọi API chefs:", res);
-        console.log("📦 res.data:", res?.data);
+
         setChefs(res?.chefs || []);
       } catch (err) {
         console.error("❌ Lỗi khi tải danh sách đầu bếp:", err);
@@ -157,7 +159,7 @@ export default function KitchenDashboard() {
                   : tab === "items"
                   ? "Quản lý Món ăn"
                   : tab === "menus"
-                  ? "Quản lý Thực đơn"
+                  ? "Quản lý Combo"
                   : tab === "inventory"
                   ? "Quản lý Kho"
                   : "Lịch sử Nhập hàng"}
