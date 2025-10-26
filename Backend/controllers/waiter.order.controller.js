@@ -64,8 +64,8 @@ exports.respondToOrder = async (req, res) => {
       if (!table) return res.status(404).json({ success: false, message: "Bàn không tồn tại" });
       if (table.status === 'occupied') return res.status(409).json({ success: false, message: "Bàn đã có người chọn" });
 
-      order.servedBy = mongoose.Types.ObjectId(waiterId);
-      order.tableId = mongoose.Types.ObjectId(table._id);
+      order.servedBy = new mongoose.Types.ObjectId(waiterId);
+      order.tableId = new mongoose.Types.ObjectId(table._id);
       order.waiterResponse.status = 'approved';
       order.waiterResponse.reason = null;
       order.waiterResponse.respondedAt = new Date();
