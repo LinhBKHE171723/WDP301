@@ -41,6 +41,9 @@ const kitchenApi = {
   createPurchaseOrder: (data) => Client.post("/kitchen/purchase-orders", data),
   getPurchaseOrders: () => Client.get("/kitchen/purchase-orders"),
   createIngredient: (data) => Client.post("/kitchen/ingredients", data),
+
+  // --- CHEF ---
+  getAllChefs: () => Client.get("/kitchen/chefs"),
 };
 
 export default kitchenApi;

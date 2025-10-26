@@ -33,6 +33,7 @@ const {
   markMenuAvailable,
   markMenuUnavailable,
 } = require("../controllers/kitchen.menu.controller");
+const { getAllChef } = require("../controllers/kitchen.chef.controller");
 
 const inv = require("../controllers/kitchen.inventory.controller");
 
@@ -113,4 +114,6 @@ router.patch("/ingredients/:ingredientId", inv.updateStock);
 router.post("/purchase-orders", inv.createPurchaseOrder);
 router.get("/purchase-orders", inv.getPurchaseHistory);
 
+// --- Quản lý nhân viên bếp ---
+router.get("/chefs", getAllChef);
 module.exports = router;

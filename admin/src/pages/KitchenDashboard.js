@@ -25,13 +25,7 @@ export default function KitchenDashboard() {
   const [currentItem, setCurrentItem] = useState(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
-
-  const [chefs] = useState([
-    { id: 1, name: "Anh Tuấn", specialty: "Món chính" },
-    { id: 2, name: "Chị Lan", specialty: "Đồ uống" },
-    { id: 3, name: "Anh Minh", specialty: "Cơm" },
-    { id: 4, name: "Chị Hoa", specialty: "Tráng miệng" },
-  ]);
+  const [chefs, setChefs] = useState([]);
 
   // ✅ Fetch dữ liệu theo tab
   useEffect(() => {
@@ -68,6 +62,20 @@ export default function KitchenDashboard() {
 
     fetchData();
   }, [activeTab]);
+
+  useEffect(() => {
+    const fetchChefs = async () => {
+      try {
+        const res = await kitchenApi.getAllChefs();
+        console.log("✅ Kết quả gọi API chefs:", res);
+        console.log("📦 res.data:", res?.data);
+        setChefs(res?.chefs || []);
+      } catch (err) {
+        console.error("❌ Lỗi khi tải danh sách đầu bếp:", err);
+      }
+    };
+    fetchChefs();
+  }, [showChefModal]);
 
   // ✅ Cập nhật thời gian chờ đơn hàng
   useEffect(() => {
