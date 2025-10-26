@@ -15,8 +15,8 @@ const waiterApi = {
   getOrderDetails: (orderId) => Client.get(`/waiter/orders/${orderId}`),
 
   // Waiter phản hồi đơn hàng (xác nhận hoặc từ chối)
-  respondToOrder: (orderId, approved, reason) =>
-    Client.post(`/waiter/orders/${orderId}/respond`, { approved, reason }),
+  respondToOrder: (orderId, approved, reason = null, selectedTable = null) =>
+    Client.post(`/waiter/orders/${orderId}/respond`, { approved, reason, selectedTable }),
 
   // Cập nhật trạng thái đơn hàng (confirmed → served)
   updateOrderStatus: (orderId, status) =>

@@ -6,7 +6,7 @@ import waiterApi from "../api/waiterApi";
 import useWaiterWebSocket from "../hooks/useWaiterWebSocket";
 import { Container, Spinner, Row, Col } from "react-bootstrap";
 import { useAuth } from "../context/AuthContext";
-import { toast, ToastContainer } from "react-toastify";
+import { toast } from "react-toastify";
 import "react-toastify/dist/ReactToastify.css";
 import "./WaiterDashboard.css";
 
@@ -313,9 +313,7 @@ WaiterDashboard có một useEffect lắng nghe lastMessage → xử lý cập n
                     </>
                 )}
             </Container>
-
-            {/* Toast hiển thị thông báo popup */}
-            <ToastContainer position="top-right" autoClose={3000} />
+        
         </div>
     );
 }

@@ -25,11 +25,11 @@ export default function OrderCard({
 
     try {
       setLoading(true);
-      await waiterApi.respondToOrder(order._id, true, selectedTable);
+      await waiterApi.respondToOrder(order._id, true, null, selectedTable);
       onWaiterResponse(order._id, "approved");
       toast.success("✅ Đã xác nhận đơn hàng và gán bàn thành công!");
     } catch (error) {
-      console.error("Error approving order:", error);
+      console.error(error);
       if (error.response?.status === 409) {
         toast.error("❌ Bàn này đã được chọn bởi waiter khác!");
       } else {
@@ -55,7 +55,7 @@ export default function OrderCard({
       setRejectReason("");
       toast.info("Đã từ chối đơn hàng!");
     } catch (error) {
-      console.error("Error rejecting order:", error);
+      console.error(error);
       toast.error("❌ Lỗi khi từ chối đơn hàng!");
     } finally {
       setLoading(false);
@@ -95,8 +95,8 @@ export default function OrderCard({
               >
                 <option value="">-- Chọn bàn trống --</option>
                 {availableTables.map((t) => (
-                  <option key={t._id} value={t._id}>
-                    Bàn {t.tableNumber} ({t.capacity} người)
+                  <option key={t?._id} value={t?._id}>
+                    Bàn {t?.tableNumber}
                   </option>
                 ))}
               </Form.Select>
@@ -148,7 +148,7 @@ export default function OrderCard({
       </Card>
 
       {/* 🟥 Modal nhập lý do từ chối */}
-      <Modal show={showRejectModal} onHide={() => setShowRejectModal(false)}>
+      <Modal show={showRejectModal} onHide={() => setShowRejectModal(false)} centered>
         <Modal.Header closeButton>
           <Modal.Title>Từ chối đơn hàng</Modal.Title>
         </Modal.Header>
@@ -156,19 +156,16 @@ export default function OrderCard({
           <Form>
             <Form.Group className="mb-3">
               <Form.Label className="small fw-bold text-secondary">
-                Chọn bàn phục vụ:
+                Lý do từ chối đơn hàng:
               </Form.Label>
-              <Form.Select
-                value={selectedTable}
-                onChange={(e) => setSelectedTable(e.target.value)}
-              >
-                <option value="">-- Chọn bàn trống --</option>
-                {availableTables.map((t) => (
-                  <option key={t?._id} value={t?._id}>
-                    Bàn {t?.tableNumber}
-                  </option>
-                ))}
-              </Form.Select>
+              <Form.Control
+                as="textarea"
+                rows={3}
+                placeholder="Nhập lý do từ chối (ví dụ: khách hủy, sai món, quá tải...)"
+                value={rejectReason}
+                onChange={(e) => setRejectReason(e.target.value)}
+                disabled={loading}
+              />
             </Form.Group>
           </Form>
         </Modal.Body>
@@ -181,6 +178,7 @@ export default function OrderCard({
           </Button>
         </Modal.Footer>
       </Modal>
+
     </>
   );
 }
