@@ -1,9 +1,11 @@
 import React from "react";
 import { Button, Navbar, Container, Nav } from "react-bootstrap";
 import { Link } from "react-router-dom";
+import { useAuth } from "../../context/AuthContext";
 import { useNavigate } from "react-router-dom";
 
-export default function Header({ onLogout, user }) {
+export default function Header() {
+    const { user, logout } = useAuth();
     const navigate = useNavigate();
     return (
         <Navbar
@@ -47,20 +49,22 @@ export default function Header({ onLogout, user }) {
 
                     {/* Phần profile bên phải */}
                     <div className="d-flex align-items-center justify-content-center gap-2 mt-3 mt-md-0">
-                        <img
-                            src="https://cdn-icons-png.flaticon.com/512/149/149071.png"
-                            alt="profile"
-                            width="35"
-                            height="35"
-                            className="rounded-circle border"
-                        />
+                        <Link to="/profile" className="text-dark text-decoration-none">
+                            <img
+                                src={user?.avatar || "https://cdn-icons-png.flaticon.com/512/149/149071.png"}
+                                alt="profile"
+                                width="35"
+                                height="35"
+                                className="rounded-circle border"
+                            />
+                        </Link>
                         <span className="fw-bold text-dark d-none d-sm-inline">
                             {user?.name}
                         </span>
                         <Button
                             variant="outline-danger"
                             size="sm"
-                            onClick={onLogout}
+                            onClick={logout}
                             className="fw-semibold"
                         >
                             Đăng xuất

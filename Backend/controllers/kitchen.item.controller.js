@@ -166,12 +166,10 @@ exports.markItemUnavailable = async (req, res) => {
     });
   } catch (error) {
     console.error("❌ markItemUnavailable ERROR:", error.message);
-    res
-      .status(500)
-      .json({
-        message: "Lỗi Server khi đánh dấu món hết hàng",
-        error: error.message,
-      });
+    res.status(500).json({
+      message: "Lỗi Server khi đánh dấu món hết hàng",
+      error: error.message,
+    });
   }
 };
 
@@ -195,11 +193,9 @@ exports.markItemAvailable = async (req, res) => {
     });
   } catch (error) {
     console.error("❌ markItemAvailable ERROR:", error.message);
-    res
-      .status(500)
-      .json({
-        message: "Lỗi Server khi phục hồi món ăn.",
-        error: error.message,
-      });
+    res.status(500).json({
+      message: "Lỗi Server khi phục hồi món ăn.",
+      error: error.message,
+    });
   }
 };

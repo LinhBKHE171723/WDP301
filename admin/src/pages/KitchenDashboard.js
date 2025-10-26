@@ -8,12 +8,16 @@ import MenusManager from "../components/kitchenmanager/MenusManager";
 import ChefModal from "../components/kitchenmanager/ChefModal";
 import AddItemModal from "../components/kitchenmanager/AddItemModal";
 import AddMenuModal from "../components/kitchenmanager/AddMenuModal";
+import InventoryManager from "../components/kitchenmanager/InventoryManager";
+import PurchaseHistoryManager from "../components/kitchenmanager/PurchaseHistoryManager"; // ✅ import mới
 
 export default function KitchenDashboard() {
   const [activeTab, setActiveTab] = useState("kds");
   const [orders, setOrders] = useState([]);
   const [items, setItems] = useState([]);
   const [menus, setMenus] = useState([]);
+  const [ingredients, setIngredients] = useState([]);
+  const [purchaseOrders, setPurchaseOrders] = useState([]);
   const [selectedOrder, setSelectedOrder] = useState(null);
   const [showChefModal, setShowChefModal] = useState(false);
   const [showAddItemModal, setShowAddItemModal] = useState(false);
@@ -45,6 +49,14 @@ export default function KitchenDashboard() {
         } else if (activeTab === "menus") {
           const res = await kitchenApi.getAllMenus();
           setMenus(res.data || []);
+        } else if (activeTab === "inventory") {
+          const res = await kitchenApi.getAllIngredients();
+          console.log("📦 Dữ liệu nguyên liệu:", res.data || res);
+          setIngredients(res.data || res || []);
+        } else if (activeTab === "purchase") {
+          const res = await kitchenApi.getPurchaseOrders();
+          console.log("📜 Dữ liệu đơn nhập hàng:", res.data || res);
+          setPurchaseOrders(res.data || res || []);
         }
       } catch (err) {
         console.error("Fetch error:", err);
@@ -57,7 +69,7 @@ export default function KitchenDashboard() {
     fetchData();
   }, [activeTab]);
 
-  // ✅ Tự động cập nhật thời gian chờ order
+  // ✅ Cập nhật thời gian chờ đơn hàng
   useEffect(() => {
     const interval = setInterval(() => {
       setOrders((prev) =>
@@ -69,7 +81,7 @@ export default function KitchenDashboard() {
     return () => clearInterval(interval);
   }, []);
 
-  // ✅ Refresh data helpers
+  // ✅ Refresh helpers
   const handleRefreshItems = async () => {
     const res = await kitchenApi.getAllItems();
     setItems(res.data || []);
@@ -78,6 +90,16 @@ export default function KitchenDashboard() {
   const handleRefreshMenus = async () => {
     const res = await kitchenApi.getAllMenus();
     setMenus(res.data || []);
+  };
+
+  const handleRefreshIngredients = async () => {
+    const res = await kitchenApi.getAllIngredients();
+    setIngredients(res.data || res || []);
+  };
+
+  const handleRefreshPurchaseOrders = async () => {
+    const res = await kitchenApi.getPurchaseOrders();
+    setPurchaseOrders(res.data || []);
   };
 
   return (
@@ -97,7 +119,7 @@ export default function KitchenDashboard() {
           </div>
 
           <nav className="flex space-x-2">
-            {["kds", "items", "menus"].map((tab) => (
+            {["kds", "items", "menus", "inventory", "purchase"].map((tab) => (
               <button
                 key={tab}
                 onClick={() => setActiveTab(tab)}
@@ -111,7 +133,11 @@ export default function KitchenDashboard() {
                   ? "Bảng điều khiển Bếp"
                   : tab === "items"
                   ? "Quản lý Món ăn"
-                  : "Quản lý Thực đơn"}
+                  : tab === "menus"
+                  ? "Quản lý Thực đơn"
+                  : tab === "inventory"
+                  ? "Quản lý Kho"
+                  : "Lịch sử Nhập hàng"}
               </button>
             ))}
           </nav>
@@ -157,6 +183,22 @@ export default function KitchenDashboard() {
         {/* TAB: Quản lý thực đơn */}
         {!loading && !error && activeTab === "menus" && (
           <MenusManager menus={menus} items={items} setMenus={setMenus} />
+        )}
+
+        {/* TAB: Quản lý kho nguyên liệu */}
+        {!loading && !error && activeTab === "inventory" && (
+          <InventoryManager
+            ingredients={ingredients}
+            onRefresh={handleRefreshIngredients}
+          />
+        )}
+
+        {/* TAB: Lịch sử nhập hàng */}
+        {!loading && !error && activeTab === "purchase" && (
+          <PurchaseHistoryManager
+            purchaseOrders={purchaseOrders}
+            onRefresh={handleRefreshPurchaseOrders}
+          />
         )}
       </main>
 

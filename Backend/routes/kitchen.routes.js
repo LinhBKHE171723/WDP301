@@ -34,6 +34,8 @@ const {
   markMenuUnavailable,
 } = require("../controllers/kitchen.menu.controller");
 
+const inv = require("../controllers/kitchen.inventory.controller");
+
 const KITCHEN_ROLES = ["chef"];
 
 // router.use(authRequired, roleRequired(...KITCHEN_ROLES));
@@ -101,5 +103,14 @@ router.patch("/menus/:menuId/available", markMenuAvailable);
 
 // 7. Đánh dấu menu là không có sẵn
 router.patch("/menus/:menuId/unavailable", markMenuUnavailable);
+
+// --- Quản lý nguyên liệu ---
+router.get("/ingredients", inv.getAllIngredients);
+router.post("/ingredients", inv.createIngredient);
+router.patch("/ingredients/:ingredientId", inv.updateStock);
+
+// --- Quản lý đơn nhập kho ---
+router.post("/purchase-orders", inv.createPurchaseOrder);
+router.get("/purchase-orders", inv.getPurchaseHistory);
 
 module.exports = router;

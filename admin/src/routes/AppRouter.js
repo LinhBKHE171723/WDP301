@@ -5,7 +5,7 @@ import KitchenDashboard from "../pages/KitchenDashboard";
 import WaiterDashboard from "../pages/WaiterDashboard";
 import TableMap from "../components/waiter/TableMap";
 import TableDetail from "../components/waiter/TableDetail";
-
+import Profile from "../components/user/Profile";
 export default function AppRouter() {
   const { user, token, isLoggedIn, loading } = useAuth();
   
@@ -43,7 +43,8 @@ export default function AppRouter() {
         <>
           <Route path="/waiter/dashboard" element={<WaiterDashboard />} />
           <Route path="/waiter/tables" element={<TableMap />} /> 
-          <Route path="/waiter/tables/:tableId" element={<TableDetail />} />  
+          <Route path="/waiter/tables/details/:tableId" element={<TableDetail />} />  
+          <Route path="/profile" element={<Profile />} />
         </>
       )}
 

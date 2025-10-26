@@ -67,6 +67,18 @@ const waiterTableController = {
       res.status(500).json({ success: false, message: "Lỗi server" });
     }
   },
+
+  // Lấy danh sách bàn trống
+  getAvailableTables: async (req, res) => {
+    try {
+      const availableTables = await Table.find({ status: 'available' });
+      res.status(200).json(availableTables);
+    }
+    catch (error) {
+      console.error("❌ Lỗi khi lấy danh sách bàn trống:", error);
+      res.status(500).json({ success: false, message: "Lỗi server" });
+    }
+  },
 };
 
 module.exports = waiterTableController;

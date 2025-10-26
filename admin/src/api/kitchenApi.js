@@ -32,6 +32,15 @@ const kitchenApi = {
     Client.patch(`/kitchen/menus/${menuId}/available`),
   markMenuUnavailable: (menuId) =>
     Client.patch(`/kitchen/menus/${menuId}/unavailable`),
+
+  // --- INVENTORY (Kho nguyên liệu) ---
+  getAllIngredients: () => Client.get("/kitchen/ingredients"),
+  updateStock: (ingredientId, data) =>
+    Client.patch(`/kitchen/ingredients/${ingredientId}`, data),
+
+  createPurchaseOrder: (data) => Client.post("/kitchen/purchase-orders", data),
+  getPurchaseOrders: () => Client.get("/kitchen/purchase-orders"),
+  createIngredient: (data) => Client.post("/kitchen/ingredients", data),
 };
 
 export default kitchenApi;

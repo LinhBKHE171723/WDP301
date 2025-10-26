@@ -8,6 +8,8 @@ const kitchenRoutes = require("./routes/kitchen.routes");
 const customerRoutes = require("./routes/customer.routes");
 const authRoutes = require("./routes/auth.route");
 const waiterRoutes = require("./routes/waiter.routes");
+const cloudinary = require("./routes/cloudinary.route");
+const userRoutes = require("./routes/user.route");
 // load env
 dotenv.config();
 
@@ -33,6 +35,13 @@ mongoose
 app.get("/", (req, res) => {
   res.send("API is running...");
 });
+
+//CLOUD
+app.use("/api/cloudinary", cloudinary);
+
+// profile 
+app.use("/api/user", userRoutes);
+
 //auth
 app.use("/api/auth", authRoutes);
 

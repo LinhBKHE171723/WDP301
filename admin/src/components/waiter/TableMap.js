@@ -154,7 +154,7 @@ export default function TableMap() {
                           ? "border-danger bg-light"
                           : "border-success bg-white"
                       }`}
-                      onClick={() => navigate(`/waiter/tables/${table._id}`)}
+                      onClick={() => navigate(`/waiter/tables/details/${table._id}`)}
                       style={{
                         cursor: "pointer",
                         transition: "transform 0.2s",
