@@ -10,23 +10,27 @@ import {
 } from "react-bootstrap";
 import { useAuth } from "../../context/AuthContext";
 import Header from "../waiter/Header";
-import userApi from "../../api/userApi"; // ✅ gọi API backend
-import axios from "axios";
-import { toast } from "react-toastify";
+import userApi from "../../api/userApi";
+import { toast, ToastContainer } from "react-toastify";
+import "react-toastify/dist/ReactToastify.css";
 
 export default function Profile() {
-    const {user, logout, setUser } = useAuth(); // setUser để cập nhật lại context
+    const { user, setUser } = useAuth();
     const [showModal, setShowModal] = useState(false);
     const [saving, setSaving] = useState(false);
+
+    // Dữ liệu form ban đầu từ user
     const [form, setForm] = useState({
         name: user?.name || "",
         phone: user?.phone || "",
-        avatar: user?.avatar || "",
     });
-    const [file, setFile] = useState(null); // file ảnh mới
-    const [preview, setPreview] = useState(user?.avatar || "https://cdn-icons-png.flaticon.com/512/149/149071.png"); // ảnh preview
 
-    // 📸 Khi chọn file mới
+    const [preview, setPreview] = useState(
+        user?.avatar || "https://cdn-icons-png.flaticon.com/512/149/149071.png"
+    );
+    const [file, setFile] = useState(null);
+
+    // 🧩 Khi người dùng chọn ảnh mới
     const handleFileChange = (e) => {
         const f = e.target.files?.[0];
         if (!f) return;
@@ -35,52 +39,27 @@ export default function Profile() {
         setPreview(url);
     };
 
-    // ☁️ Upload ảnh lên Cloudinary
-    const uploadToCloudinary = async (file) => {
-        // Lấy chữ ký upload (signature) từ backend
-        const sigRes = await axios.get("/api/cloudinary/upload/signature");
-        const { signature, timestamp } = sigRes.data;
-
-        const formData = new FormData();
-        formData.append("file", file);
-        formData.append("api_key", process.env.REACT_APP_CLOUDINARY_API_KEY);
-        formData.append("timestamp", timestamp);
-        formData.append("signature", signature);
-        formData.append("folder", "restaurant_profiles");
-
-        const cloudName = process.env.REACT_APP_CLOUDINARY_CLOUD_NAME;
-        const url = `https://api.cloudinary.com/v1_1/${cloudName}/image/upload`;
-
-        const uploadRes = await axios.post(url, formData, {
-            headers: { "Content-Type": "multipart/form-data" },
-        });
-
-        return uploadRes.data.secure_url; // trả về link ảnh
-    };
-
-    // 💾 Lưu thông tin hồ sơ
+    // 💾 Lưu thông tin hồ sơ (gửi tới backend)
     const handleSave = async () => {
         setSaving(true);
         try {
-            let avatarUrl = form.avatar;
+            // Tạo FormData để gửi file và các trường khác
+            const formData = new FormData();
+            formData.append("name", form.name);
+            formData.append("phone", form.phone);
+            if (file) formData.append("avatar", file); // chỉ thêm khi có file
 
-            // Nếu người dùng chọn ảnh mới → upload lên Cloudinary
-            if (file) {
-                avatarUrl = await uploadToCloudinary(file);
-            }
-
-            // Gọi API cập nhật hồ sơ
-            const updatedUser = await userApi.updateProfile({
-                name: form.name,
-                phone: form.phone,
-                avatar: avatarUrl,
-            });
+            // Gọi API backend cập nhật
+            const res = await userApi.updateProfile(formData, true); // thêm flag true để gửi multipart
 
             toast.success("Cập nhật hồ sơ thành công!");
-            setUser?.(updatedUser); // Cập nhật context
+            setUser?.(res.user); // Cập nhật context
+            // ✅ Cập nhật localStorage để khi reload vẫn thấy đúng
+            localStorage.setItem("user", JSON.stringify(res.user));
+            if (res.token) localStorage.setItem("token", res.token);
             setShowModal(false);
-        } catch (error) {
-            console.error("❌ Lỗi cập nhật hồ sơ:", error);
+        } catch (err) {
+            console.error("❌ Lỗi cập nhật hồ sơ:", err);
             toast.error("Không thể lưu hồ sơ, vui lòng thử lại!");
         } finally {
             setSaving(false);
@@ -89,33 +68,36 @@ export default function Profile() {
 
     return (
         <Container className="py-4">
-            {/* 🧭 Header chung cho nhân viên phục vụ */}
-            <Header user={user} onLogout={logout} />
+            {/* 🧭 Header */}
+            <Header />
 
             <h3 className="my-4">Hồ sơ cá nhân</h3>
 
-            {/* 🪪 Thông tin người dùng hiển thị tĩnh */}
+            {/* 🪪 Hiển thị thông tin hiện tại */}
             <Card className="p-3 d-flex flex-row align-items-center gap-3 shadow-sm">
                 <Image
-                    src={
-                        user?.avatar ||
-                        "https://cdn-icons-png.flaticon.com/512/149/149071.png"
-                    }
+                    src={preview}
                     roundedCircle
                     width={100}
                     height={100}
+                    alt="avatar"
                 />
                 <div>
                     <h5>{user?.name}</h5>
-                    <p className="mb-1"> <span className="fw-bold">Email:</span>  {user?.email}</p>
-                    <p className="mb-1"> <span className="fw-bold">Phone number:</span> {user?.phone || "Chưa có số điện thoại"}</p>
+                    <p className="mb-1">
+                        <span className="fw-bold">Email:</span> {user?.email}
+                    </p>
+                    <p className="mb-1">
+                        <span className="fw-bold">Phone number:</span>{" "}
+                        {user?.phone || "Chưa có số điện thoại"}
+                    </p>
                     <Button variant="outline-primary" onClick={() => setShowModal(true)}>
                         Chỉnh sửa
                     </Button>
                 </div>
             </Card>
 
-            {/* ✏️ Modal chỉnh sửa hồ sơ */}
+            {/* ✏️ Modal chỉnh sửa */}
             <Modal show={showModal} onHide={() => setShowModal(false)} centered>
                 <Modal.Header closeButton>
                     <Modal.Title>Chỉnh sửa thông tin</Modal.Title>
@@ -125,18 +107,7 @@ export default function Profile() {
                         {/* Ảnh đại diện */}
                         <div className="d-flex align-items-center mb-3 gap-3">
                             <div style={{ width: 96, height: 96 }}>
-                                {preview ? (
-                                    <Image src={preview} roundedCircle width={96} height={96} />
-                                ) : (
-                                    <div
-                                        style={{
-                                            width: 96,
-                                            height: 96,
-                                            background: "#eee",
-                                            borderRadius: "50%",
-                                        }}
-                                    />
-                                )}
+                                <Image src={preview} roundedCircle width={96} height={96} />
                             </div>
                             <Form.Group controlId="formFile" className="mb-0">
                                 <Form.Label>Ảnh đại diện</Form.Label>
@@ -145,9 +116,6 @@ export default function Profile() {
                                     accept="image/*"
                                     onChange={handleFileChange}
                                 />
-                                <Form.Text className="text-muted">
-                                    Ảnh sẽ được upload lên Cloudinary.
-                                </Form.Text>
                             </Form.Group>
                         </div>
 
@@ -156,7 +124,9 @@ export default function Profile() {
                             <Form.Label>Họ và tên</Form.Label>
                             <Form.Control
                                 value={form.name}
-                                onChange={(e) => setForm({ ...form, name: e.target.value })}
+                                onChange={(e) =>
+                                    setForm({ ...form, name: e.target.value })
+                                }
                             />
                         </Form.Group>
 
@@ -165,7 +135,9 @@ export default function Profile() {
                             <Form.Label>Số điện thoại</Form.Label>
                             <Form.Control
                                 value={form.phone}
-                                onChange={(e) => setForm({ ...form, phone: e.target.value })}
+                                onChange={(e) =>
+                                    setForm({ ...form, phone: e.target.value })
+                                }
                             />
                         </Form.Group>
                     </Form>
@@ -180,6 +152,7 @@ export default function Profile() {
                     </Button>
                 </Modal.Footer>
             </Modal>
+            <ToastContainer position="top-right" autoClose={2000} />
         </Container>
     );
 }

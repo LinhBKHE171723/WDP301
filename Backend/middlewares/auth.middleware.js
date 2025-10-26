@@ -52,6 +52,7 @@ function authRequired(req, res, next) {
       id: String(decoded.id || ""),
       role: decoded.role,
       username: decoded.username,
+      avatar: decoded.avatar,
       phone: decoded.phone,
       name: decoded.name,
       email: decoded.email,

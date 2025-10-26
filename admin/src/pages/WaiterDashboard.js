@@ -214,7 +214,7 @@ WaiterDashboard có một useEffect lắng nghe lastMessage → xử lý cập n
     return (
         <div className="min-vh-100 bg-light d-flex flex-column">
             {/* Header cố định trên cùng */}
-            <Header onLogout={logout} user={user} />
+            <Header />
 
             {/* Nội dung chính */}
             <Container className="flex-grow-1 mt-4 pb-4">
@@ -277,7 +277,7 @@ WaiterDashboard có một useEffect lắng nghe lastMessage → xử lý cập n
                                             order={order}
                                             onUpdateStatus={handleUpdateStatus}
                                             onWaiterResponse={handleWaiterResponse}
-                                            availableTables={availableTables} 
+                                            availableTables={availableTables}
                                             isPending={true}
                                         />
                                     </Col>

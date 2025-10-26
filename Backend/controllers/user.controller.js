@@ -1,5 +1,6 @@
 const User = require("../models/User");
 const cloudinary = require("../config/cloudinary");
+const jwt = require("jsonwebtoken");
 
 exports.getProfile = async (req, res) => {
     try {
@@ -16,6 +17,9 @@ exports.getProfile = async (req, res) => {
 
 exports.updateProfile = async (req, res) => {
     try {
+        console.log("User ID từ JWT:", req.user);
+        console.log("📦 req.body:", req.body);
+        console.log("📁 req.file:", req.file);
         const userId = req.user.id; // lấy từ JWT middleware
         const { name, phone } = req.body;
         let avatar = req.body.avatar;
@@ -34,6 +38,21 @@ exports.updateProfile = async (req, res) => {
             { new: true, runValidators: true }
         ).select("-password"); // Ẩn mật khẩu
 
+        // Tạo token mới với thông tin cập nhật để cậP nhật giao diện
+        const newToken = jwt.sign(
+            {
+                id: updatedUser._id,
+                role: updatedUser.role,
+                username: updatedUser.username,
+                avatar: updatedUser.avatar,
+                name: updatedUser.name,
+                email: updatedUser.email,
+                phone: updatedUser.phone,
+            },
+            process.env.JWT_SECRET,
+            { expiresIn: process.env.JWT_EXPIRES_IN }
+        );
+
         if (!updatedUser) {
             return res
                 .status(404)
@@ -45,6 +64,7 @@ exports.updateProfile = async (req, res) => {
             success: true,
             message: "Cập nhật thông tin thành công",
             user: updatedUser,
+            token: newToken, // 👈 trả token mới về
         });
     } catch (err) {
         console.error("❌ Lỗi cập nhật profile:", err);

@@ -10,7 +10,7 @@ export const AuthProvider = ({ children }) => {
   });
 
   const [isLoggedIn, setIsLoggedIn] = useState(false); // biến isLoggedIn này để duy trì trạng thái đăng nhập, tránh back lại trang login khi đã đăng nhập
-  
+
   const token = localStorage.getItem("token");
   const [loading, setLoading] = useState(true);
   // loading dùng để biểu thị app đang trong quá trình kiểm tra token xác thực, nên chưa thể biết isLoggedIn 
@@ -64,7 +64,7 @@ export const AuthProvider = ({ children }) => {
   };
 
   return (
-    <AuthContext.Provider value={{ user, token, login, logout, isLoggedIn, loading }}>
+    <AuthContext.Provider value={{ user, token, login, logout, isLoggedIn, loading, setUser }}>
       {!loading && children}
     </AuthContext.Provider>
   );
