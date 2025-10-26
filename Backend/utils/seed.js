@@ -165,7 +165,7 @@ const seedDatabase = async () => {
       },
       // Chefs
       {
-        name: "Đầu Bếp Trưởng",
+        name: "Bùi Khánh Linh",
         username: "chef01",
         password: "chef@123",
         email: "chef@example.com",
@@ -173,7 +173,7 @@ const seedDatabase = async () => {
         role: "chef",
       },
       {
-        name: "Đầu Bếp Phụ",
+        name: "Phan Tiến Mạnh",
         username: "chef02",
         password: "chef@123",
         email: "chef02@example.com",
@@ -181,7 +181,7 @@ const seedDatabase = async () => {
         role: "chef",
       },
       {
-        name: "Bếp Trưởng Bếp Nóng",
+        name: "Minh Chúc",
         username: "chef03",
         password: "chef@123",
         email: "chef03@example.com",
@@ -289,8 +289,14 @@ const seedDatabase = async () => {
         category: "Món chính",
         price: 250000,
         ingredients: [
-          { ingredient: ingredients.find((i) => i.name === "Thịt bò")._id, quantity: 0.3 }, // 300g
-          { ingredient: ingredients.find((i) => i.name === "Khoai tây")._id, quantity: 0.2 }, // 200g
+          {
+            ingredient: ingredients.find((i) => i.name === "Thịt bò")._id,
+            quantity: 0.3,
+          }, // 300g
+          {
+            ingredient: ingredients.find((i) => i.name === "Khoai tây")._id,
+            quantity: 0.2,
+          }, // 200g
         ],
       },
       {
@@ -299,8 +305,14 @@ const seedDatabase = async () => {
         category: "Món chính",
         price: 280000,
         ingredients: [
-          { ingredient: ingredients.find((i) => i.name === "Cá hồi")._id, quantity: 0.25 }, // 250g
-          { ingredient: ingredients.find((i) => i.name === "Bơ")._id, quantity: 0.05 },
+          {
+            ingredient: ingredients.find((i) => i.name === "Cá hồi")._id,
+            quantity: 0.25,
+          }, // 250g
+          {
+            ingredient: ingredients.find((i) => i.name === "Bơ")._id,
+            quantity: 0.05,
+          },
         ],
       },
       {
@@ -309,8 +321,14 @@ const seedDatabase = async () => {
         category: "Món chính",
         price: 180000,
         ingredients: [
-          { ingredient: ingredients.find((i) => i.name === "Tôm tươi")._id, quantity: 0.2 },
-          { ingredient: ingredients.find((i) => i.name === "Bột mì")._id, quantity: 0.05 },
+          {
+            ingredient: ingredients.find((i) => i.name === "Tôm tươi")._id,
+            quantity: 0.2,
+          },
+          {
+            ingredient: ingredients.find((i) => i.name === "Bột mì")._id,
+            quantity: 0.05,
+          },
         ],
       },
       {
@@ -319,9 +337,18 @@ const seedDatabase = async () => {
         category: "Khai vị",
         price: 70000,
         ingredients: [
-          { ingredient: ingredients.find((i) => i.name === "Rau xà lách")._id, quantity: 0.1 },
-          { ingredient: ingredients.find((i) => i.name === "Cà chua")._id, quantity: 0.05 },
-          { ingredient: ingredients.find((i) => i.name === "Hành tây")._id, quantity: 0.03 },
+          {
+            ingredient: ingredients.find((i) => i.name === "Rau xà lách")._id,
+            quantity: 0.1,
+          },
+          {
+            ingredient: ingredients.find((i) => i.name === "Cà chua")._id,
+            quantity: 0.05,
+          },
+          {
+            ingredient: ingredients.find((i) => i.name === "Hành tây")._id,
+            quantity: 0.03,
+          },
         ],
       },
       // Thêm món chính mới
@@ -331,9 +358,18 @@ const seedDatabase = async () => {
         category: "Món chính",
         price: 200000,
         ingredients: [
-          { ingredient: ingredients.find((i) => i.name === "Bột mì")._id, quantity: 0.2 },
-          { ingredient: ingredients.find((i) => i.name === "Phô mai")._id, quantity: 0.15 },
-          { ingredient: ingredients.find((i) => i.name === "Cà chua")._id, quantity: 0.1 },
+          {
+            ingredient: ingredients.find((i) => i.name === "Bột mì")._id,
+            quantity: 0.2,
+          },
+          {
+            ingredient: ingredients.find((i) => i.name === "Phô mai")._id,
+            quantity: 0.15,
+          },
+          {
+            ingredient: ingredients.find((i) => i.name === "Cà chua")._id,
+            quantity: 0.1,
+          },
         ],
       },
       {
@@ -342,9 +378,18 @@ const seedDatabase = async () => {
         category: "Món chính",
         price: 180000,
         ingredients: [
-          { ingredient: ingredients.find((i) => i.name === "Bột mì")._id, quantity: 0.2 },
-          { ingredient: ingredients.find((i) => i.name === "Trứng gà")._id, quantity: 0.1 },
-          { ingredient: ingredients.find((i) => i.name === "Phô mai")._id, quantity: 0.1 },
+          {
+            ingredient: ingredients.find((i) => i.name === "Bột mì")._id,
+            quantity: 0.2,
+          },
+          {
+            ingredient: ingredients.find((i) => i.name === "Trứng gà")._id,
+            quantity: 0.1,
+          },
+          {
+            ingredient: ingredients.find((i) => i.name === "Phô mai")._id,
+            quantity: 0.1,
+          },
         ],
       },
       {
@@ -353,9 +398,18 @@ const seedDatabase = async () => {
         category: "Món chính",
         price: 220000,
         ingredients: [
-          { ingredient: ingredients.find((i) => i.name === "Thịt gà")._id, quantity: 0.5 },
-          { ingredient: ingredients.find((i) => i.name === "Cà rốt")._id, quantity: 0.1 },
-          { ingredient: ingredients.find((i) => i.name === "Khoai tây")._id, quantity: 0.2 },
+          {
+            ingredient: ingredients.find((i) => i.name === "Thịt gà")._id,
+            quantity: 0.5,
+          },
+          {
+            ingredient: ingredients.find((i) => i.name === "Cà rốt")._id,
+            quantity: 0.1,
+          },
+          {
+            ingredient: ingredients.find((i) => i.name === "Khoai tây")._id,
+            quantity: 0.2,
+          },
         ],
       },
       {
@@ -364,10 +418,22 @@ const seedDatabase = async () => {
         category: "Món chính",
         price: 350000,
         ingredients: [
-          { ingredient: ingredients.find((i) => i.name === "Tôm tươi")._id, quantity: 0.3 },
-          { ingredient: ingredients.find((i) => i.name === "Cá basa")._id, quantity: 0.2 },
-          { ingredient: ingredients.find((i) => i.name === "Mực tươi")._id, quantity: 0.2 },
-          { ingredient: ingredients.find((i) => i.name === "Rau muống")._id, quantity: 0.1 },
+          {
+            ingredient: ingredients.find((i) => i.name === "Tôm tươi")._id,
+            quantity: 0.3,
+          },
+          {
+            ingredient: ingredients.find((i) => i.name === "Cá basa")._id,
+            quantity: 0.2,
+          },
+          {
+            ingredient: ingredients.find((i) => i.name === "Mực tươi")._id,
+            quantity: 0.2,
+          },
+          {
+            ingredient: ingredients.find((i) => i.name === "Rau muống")._id,
+            quantity: 0.1,
+          },
         ],
       },
       {
@@ -376,9 +442,18 @@ const seedDatabase = async () => {
         category: "Món chính",
         price: 120000,
         ingredients: [
-          { ingredient: ingredients.find((i) => i.name === "Bún tươi")._id, quantity: 0.2 },
-          { ingredient: ingredients.find((i) => i.name === "Thịt bò")._id, quantity: 0.2 },
-          { ingredient: ingredients.find((i) => i.name === "Rau muống")._id, quantity: 0.1 },
+          {
+            ingredient: ingredients.find((i) => i.name === "Bún tươi")._id,
+            quantity: 0.2,
+          },
+          {
+            ingredient: ingredients.find((i) => i.name === "Thịt bò")._id,
+            quantity: 0.2,
+          },
+          {
+            ingredient: ingredients.find((i) => i.name === "Rau muống")._id,
+            quantity: 0.1,
+          },
         ],
       },
       {
@@ -387,9 +462,18 @@ const seedDatabase = async () => {
         category: "Món chính",
         price: 100000,
         ingredients: [
-          { ingredient: ingredients.find((i) => i.name === "Phở tươi")._id, quantity: 0.2 },
-          { ingredient: ingredients.find((i) => i.name === "Thịt bò")._id, quantity: 0.15 },
-          { ingredient: ingredients.find((i) => i.name === "Hành tây")._id, quantity: 0.05 },
+          {
+            ingredient: ingredients.find((i) => i.name === "Phở tươi")._id,
+            quantity: 0.2,
+          },
+          {
+            ingredient: ingredients.find((i) => i.name === "Thịt bò")._id,
+            quantity: 0.15,
+          },
+          {
+            ingredient: ingredients.find((i) => i.name === "Hành tây")._id,
+            quantity: 0.05,
+          },
         ],
       },
       {
@@ -398,9 +482,18 @@ const seedDatabase = async () => {
         category: "Món chính",
         price: 80000,
         ingredients: [
-          { ingredient: ingredients.find((i) => i.name === "Gạo")._id, quantity: 0.2 },
-          { ingredient: ingredients.find((i) => i.name === "Thịt heo")._id, quantity: 0.2 },
-          { ingredient: ingredients.find((i) => i.name === "Dưa chuột")._id, quantity: 0.05 },
+          {
+            ingredient: ingredients.find((i) => i.name === "Gạo")._id,
+            quantity: 0.2,
+          },
+          {
+            ingredient: ingredients.find((i) => i.name === "Thịt heo")._id,
+            quantity: 0.2,
+          },
+          {
+            ingredient: ingredients.find((i) => i.name === "Dưa chuột")._id,
+            quantity: 0.05,
+          },
         ],
       },
       {
@@ -409,9 +502,18 @@ const seedDatabase = async () => {
         category: "Món chính",
         price: 150000,
         ingredients: [
-          { ingredient: ingredients.find((i) => i.name === "Cá basa")._id, quantity: 0.3 },
-          { ingredient: ingredients.find((i) => i.name === "Nước mắm")._id, quantity: 0.05 },
-          { ingredient: ingredients.find((i) => i.name === "Đường")._id, quantity: 0.02 },
+          {
+            ingredient: ingredients.find((i) => i.name === "Cá basa")._id,
+            quantity: 0.3,
+          },
+          {
+            ingredient: ingredients.find((i) => i.name === "Nước mắm")._id,
+            quantity: 0.05,
+          },
+          {
+            ingredient: ingredients.find((i) => i.name === "Đường")._id,
+            quantity: 0.02,
+          },
         ],
       },
       // Khai vị
@@ -421,9 +523,18 @@ const seedDatabase = async () => {
         category: "Khai vị",
         price: 60000,
         ingredients: [
-          { ingredient: ingredients.find((i) => i.name === "Thịt gà")._id, quantity: 0.2 },
-          { ingredient: ingredients.find((i) => i.name === "Nấm hương")._id, quantity: 0.05 },
-          { ingredient: ingredients.find((i) => i.name === "Cà rốt")._id, quantity: 0.1 },
+          {
+            ingredient: ingredients.find((i) => i.name === "Thịt gà")._id,
+            quantity: 0.2,
+          },
+          {
+            ingredient: ingredients.find((i) => i.name === "Nấm hương")._id,
+            quantity: 0.05,
+          },
+          {
+            ingredient: ingredients.find((i) => i.name === "Cà rốt")._id,
+            quantity: 0.1,
+          },
         ],
       },
       {
@@ -432,9 +543,18 @@ const seedDatabase = async () => {
         category: "Khai vị",
         price: 90000,
         ingredients: [
-          { ingredient: ingredients.find((i) => i.name === "Cá hồi")._id, quantity: 0.15 },
-          { ingredient: ingredients.find((i) => i.name === "Rau xà lách")._id, quantity: 0.1 },
-          { ingredient: ingredients.find((i) => i.name === "Cà chua")._id, quantity: 0.05 },
+          {
+            ingredient: ingredients.find((i) => i.name === "Cá hồi")._id,
+            quantity: 0.15,
+          },
+          {
+            ingredient: ingredients.find((i) => i.name === "Rau xà lách")._id,
+            quantity: 0.1,
+          },
+          {
+            ingredient: ingredients.find((i) => i.name === "Cà chua")._id,
+            quantity: 0.05,
+          },
         ],
       },
       {
@@ -443,9 +563,18 @@ const seedDatabase = async () => {
         category: "Khai vị",
         price: 80000,
         ingredients: [
-          { ingredient: ingredients.find((i) => i.name === "Tôm tươi")._id, quantity: 0.1 },
-          { ingredient: ingredients.find((i) => i.name === "Thịt heo")._id, quantity: 0.1 },
-          { ingredient: ingredients.find((i) => i.name === "Rau xà lách")._id, quantity: 0.05 },
+          {
+            ingredient: ingredients.find((i) => i.name === "Tôm tươi")._id,
+            quantity: 0.1,
+          },
+          {
+            ingredient: ingredients.find((i) => i.name === "Thịt heo")._id,
+            quantity: 0.1,
+          },
+          {
+            ingredient: ingredients.find((i) => i.name === "Rau xà lách")._id,
+            quantity: 0.05,
+          },
         ],
       },
       {
@@ -454,9 +583,18 @@ const seedDatabase = async () => {
         category: "Khai vị",
         price: 120000,
         ingredients: [
-          { ingredient: ingredients.find((i) => i.name === "Thịt heo")._id, quantity: 0.15 },
-          { ingredient: ingredients.find((i) => i.name === "Bánh mì")._id, quantity: 0.1 },
-          { ingredient: ingredients.find((i) => i.name === "Rau xà lách")._id, quantity: 0.05 },
+          {
+            ingredient: ingredients.find((i) => i.name === "Thịt heo")._id,
+            quantity: 0.15,
+          },
+          {
+            ingredient: ingredients.find((i) => i.name === "Bánh mì")._id,
+            quantity: 0.1,
+          },
+          {
+            ingredient: ingredients.find((i) => i.name === "Rau xà lách")._id,
+            quantity: 0.05,
+          },
         ],
       },
       // Đồ uống
@@ -465,35 +603,60 @@ const seedDatabase = async () => {
         description: "Nước ngọt có ga",
         category: "Đồ uống",
         price: 25000,
-        ingredients: [{ ingredient: ingredients.find((i) => i.name === "Coca Cola")._id, quantity: 1 }],
+        ingredients: [
+          {
+            ingredient: ingredients.find((i) => i.name === "Coca Cola")._id,
+            quantity: 1,
+          },
+        ],
       },
       {
         name: "Pepsi",
         description: "Nước ngọt có ga",
         category: "Đồ uống",
         price: 25000,
-        ingredients: [{ ingredient: ingredients.find((i) => i.name === "Pepsi")._id, quantity: 1 }],
+        ingredients: [
+          {
+            ingredient: ingredients.find((i) => i.name === "Pepsi")._id,
+            quantity: 1,
+          },
+        ],
       },
       {
         name: "Nước Suối",
         description: "Nước suối tinh khiết",
         category: "Đồ uống",
         price: 15000,
-        ingredients: [{ ingredient: ingredients.find((i) => i.name === "Nước suối")._id, quantity: 1 }],
+        ingredients: [
+          {
+            ingredient: ingredients.find((i) => i.name === "Nước suối")._id,
+            quantity: 1,
+          },
+        ],
       },
       {
         name: "Trà Đá",
         description: "Trà đá truyền thống",
         category: "Đồ uống",
         price: 10000,
-        ingredients: [{ ingredient: ingredients.find((i) => i.name === "Trà đá")._id, quantity: 1 }],
+        ingredients: [
+          {
+            ingredient: ingredients.find((i) => i.name === "Trà đá")._id,
+            quantity: 1,
+          },
+        ],
       },
       {
         name: "Cà Phê Đen",
         description: "Cà phê đen đậm đà",
         category: "Đồ uống",
         price: 20000,
-        ingredients: [{ ingredient: ingredients.find((i) => i.name === "Cà phê đen")._id, quantity: 1 }],
+        ingredients: [
+          {
+            ingredient: ingredients.find((i) => i.name === "Cà phê đen")._id,
+            quantity: 1,
+          },
+        ],
       },
       {
         name: "Sinh Tố Dâu",
@@ -501,8 +664,14 @@ const seedDatabase = async () => {
         category: "Đồ uống",
         price: 35000,
         ingredients: [
-          { ingredient: ingredients.find((i) => i.name === "Sữa tươi")._id, quantity: 0.2 },
-          { ingredient: ingredients.find((i) => i.name === "Đường")._id, quantity: 0.05 },
+          {
+            ingredient: ingredients.find((i) => i.name === "Sữa tươi")._id,
+            quantity: 0.2,
+          },
+          {
+            ingredient: ingredients.find((i) => i.name === "Đường")._id,
+            quantity: 0.05,
+          },
         ],
       },
       {
@@ -510,7 +679,12 @@ const seedDatabase = async () => {
         description: "Nước cam tươi ép",
         category: "Đồ uống",
         price: 30000,
-        ingredients: [{ ingredient: ingredients.find((i) => i.name === "Chanh")._id, quantity: 1 }],
+        ingredients: [
+          {
+            ingredient: ingredients.find((i) => i.name === "Chanh")._id,
+            quantity: 1,
+          },
+        ],
       },
       {
         name: "Trà Sữa Trân Châu",
@@ -518,8 +692,14 @@ const seedDatabase = async () => {
         category: "Đồ uống",
         price: 40000,
         ingredients: [
-          { ingredient: ingredients.find((i) => i.name === "Sữa tươi")._id, quantity: 0.2 },
-          { ingredient: ingredients.find((i) => i.name === "Đường")._id, quantity: 0.05 },
+          {
+            ingredient: ingredients.find((i) => i.name === "Sữa tươi")._id,
+            quantity: 0.2,
+          },
+          {
+            ingredient: ingredients.find((i) => i.name === "Đường")._id,
+            quantity: 0.05,
+          },
         ],
       },
       // Tráng miệng
@@ -528,7 +708,12 @@ const seedDatabase = async () => {
         description: "Kem vani mát lạnh",
         category: "Tráng miệng",
         price: 25000,
-        ingredients: [{ ingredient: ingredients.find((i) => i.name === "Kem vani")._id, quantity: 1 }],
+        ingredients: [
+          {
+            ingredient: ingredients.find((i) => i.name === "Kem vani")._id,
+            quantity: 1,
+          },
+        ],
       },
       {
         name: "Bánh Flan",
@@ -536,9 +721,18 @@ const seedDatabase = async () => {
         category: "Tráng miệng",
         price: 30000,
         ingredients: [
-          { ingredient: ingredients.find((i) => i.name === "Trứng gà")._id, quantity: 0.1 },
-          { ingredient: ingredients.find((i) => i.name === "Sữa tươi")._id, quantity: 0.2 },
-          { ingredient: ingredients.find((i) => i.name === "Đường")._id, quantity: 0.05 },
+          {
+            ingredient: ingredients.find((i) => i.name === "Trứng gà")._id,
+            quantity: 0.1,
+          },
+          {
+            ingredient: ingredients.find((i) => i.name === "Sữa tươi")._id,
+            quantity: 0.2,
+          },
+          {
+            ingredient: ingredients.find((i) => i.name === "Đường")._id,
+            quantity: 0.05,
+          },
         ],
       },
       {
@@ -547,8 +741,14 @@ const seedDatabase = async () => {
         category: "Tráng miệng",
         price: 20000,
         ingredients: [
-          { ingredient: ingredients.find((i) => i.name === "Đường")._id, quantity: 0.05 },
-          { ingredient: ingredients.find((i) => i.name === "Sữa tươi")._id, quantity: 0.2 },
+          {
+            ingredient: ingredients.find((i) => i.name === "Đường")._id,
+            quantity: 0.05,
+          },
+          {
+            ingredient: ingredients.find((i) => i.name === "Sữa tươi")._id,
+            quantity: 0.2,
+          },
         ],
       },
       {
@@ -557,9 +757,18 @@ const seedDatabase = async () => {
         category: "Tráng miệng",
         price: 45000,
         ingredients: [
-          { ingredient: ingredients.find((i) => i.name === "Bánh ngọt")._id, quantity: 0.1 },
-          { ingredient: ingredients.find((i) => i.name === "Sữa tươi")._id, quantity: 0.2 },
-          { ingredient: ingredients.find((i) => i.name === "Cà phê đen")._id, quantity: 0.05 },
+          {
+            ingredient: ingredients.find((i) => i.name === "Bánh ngọt")._id,
+            quantity: 0.1,
+          },
+          {
+            ingredient: ingredients.find((i) => i.name === "Sữa tươi")._id,
+            quantity: 0.2,
+          },
+          {
+            ingredient: ingredients.find((i) => i.name === "Cà phê đen")._id,
+            quantity: 0.05,
+          },
         ],
       },
       {
@@ -600,7 +809,9 @@ const seedDatabase = async () => {
       {
         name: "Combo Gia Đình",
         description: "Tất cả món chính + Salad",
-        items: items.filter(i => i.category === "Món chính").map((item) => item._id),
+        items: items
+          .filter((i) => i.category === "Món chính")
+          .map((item) => item._id),
         price: 600000,
         type: "combo",
         isAvailable: true,
@@ -673,7 +884,9 @@ const seedDatabase = async () => {
       {
         name: "Combo Dessert",
         description: "Tất cả món tráng miệng",
-        items: items.filter(i => i.category === "Tráng miệng").map((item) => item._id),
+        items: items
+          .filter((i) => i.category === "Tráng miệng")
+          .map((item) => item._id),
         price: 200000,
         type: "combo",
         isAvailable: true,
@@ -693,9 +906,9 @@ const seedDatabase = async () => {
     );
 
     // 6️⃣ Tạo orders với nhiều trạng thái khác nhau
-    const customers = users.filter(u => u.role === "customer");
-    const chefs = users.filter(u => u.role === "chef");
-    
+    const customers = users.filter((u) => u.role === "customer");
+    const chefs = users.filter((u) => u.role === "chef");
+
     // Helper function để tạo orderItem với status phù hợp
     const createOrderItems = async (items, status, assignedChef = null) => {
       const selectedItems = [];
@@ -717,20 +930,20 @@ const seedDatabase = async () => {
 
     // Helper function để tạo confirmation history
     const createConfirmationHistory = (actions) => {
-      return actions.map(action => ({
+      return actions.map((action) => ({
         action: action,
         timestamp: new Date(),
-        details: getActionDetails(action)
+        details: getActionDetails(action),
       }));
     };
 
     const getActionDetails = (action) => {
       const details = {
-        'order_created': 'Customer tạo đơn hàng mới',
-        'waiter_approved': 'Waiter đã xác nhận đơn hàng',
-        'waiter_rejected': 'Waiter từ chối đơn hàng',
-        'customer_confirmed': 'Customer xác nhận đơn hàng',
-        'order_modified': 'Customer sửa đổi đơn hàng'
+        order_created: "Customer tạo đơn hàng mới",
+        waiter_approved: "Waiter đã xác nhận đơn hàng",
+        waiter_rejected: "Waiter từ chối đơn hàng",
+        customer_confirmed: "Customer xác nhận đơn hàng",
+        order_modified: "Customer sửa đổi đơn hàng",
       };
       return details[action] || action;
     };
@@ -742,34 +955,37 @@ const seedDatabase = async () => {
       const table = tables[i];
       const customer = customers[i % customers.length];
       const waiter = waiters[i % waiters.length];
-      
+
       const orderItems = await createOrderItems(items, "pending");
-      const totalAmount = orderItems.reduce((sum, oi) => sum + oi.price * oi.quantity, 0);
+      const totalAmount = orderItems.reduce(
+        (sum, oi) => sum + oi.price * oi.quantity,
+        0
+      );
 
       const payment = await Payment.create({
         paymentMethod: "cash",
         status: "unpaid",
         amountPaid: 0,
-        totalAmount: totalAmount
+        totalAmount: totalAmount,
       });
 
       const order = await Order.create({
         userId: customer._id,
         servedBy: waiter._id,
         tableId: table._id,
-        orderItems: orderItems.map(oi => oi._id),
+        orderItems: orderItems.map((oi) => oi._id),
         paymentId: payment._id,
         status: "pending",
         totalAmount: totalAmount,
         discount: 0,
         waiterResponse: { status: "pending" },
         customerConfirmed: false,
-        confirmationHistory: createConfirmationHistory(['order_created'])
+        confirmationHistory: createConfirmationHistory(["order_created"]),
       });
 
       // Update OrderItems với orderId
       await OrderItem.updateMany(
-        { _id: { $in: orderItems.map(oi => oi._id) } },
+        { _id: { $in: orderItems.map((oi) => oi._id) } },
         { orderId: order._id }
       );
 
@@ -785,36 +1001,42 @@ const seedDatabase = async () => {
       const table = tables[i];
       const customer = customers[i % customers.length];
       const waiter = waiters[i % waiters.length];
-      
+
       const orderItems = await createOrderItems(items, "pending");
-      const totalAmount = orderItems.reduce((sum, oi) => sum + oi.price * oi.quantity, 0);
+      const totalAmount = orderItems.reduce(
+        (sum, oi) => sum + oi.price * oi.quantity,
+        0
+      );
 
       const payment = await Payment.create({
         paymentMethod: "cash",
         status: "unpaid",
         amountPaid: 0,
-        totalAmount: totalAmount
+        totalAmount: totalAmount,
       });
 
       const order = await Order.create({
         userId: customer._id,
         servedBy: waiter._id,
         tableId: table._id,
-        orderItems: orderItems.map(oi => oi._id),
+        orderItems: orderItems.map((oi) => oi._id),
         paymentId: payment._id,
         status: "pending",
         totalAmount: totalAmount,
         discount: 0,
-        waiterResponse: { 
+        waiterResponse: {
           status: "approved",
-          respondedAt: new Date()
+          respondedAt: new Date(),
         },
         customerConfirmed: false,
-        confirmationHistory: createConfirmationHistory(['order_created', 'waiter_approved'])
+        confirmationHistory: createConfirmationHistory([
+          "order_created",
+          "waiter_approved",
+        ]),
       });
 
       await OrderItem.updateMany(
-        { _id: { $in: orderItems.map(oi => oi._id) } },
+        { _id: { $in: orderItems.map((oi) => oi._id) } },
         { orderId: order._id }
       );
 
@@ -830,37 +1052,43 @@ const seedDatabase = async () => {
       const table = tables[i];
       const customer = customers[i % customers.length];
       const waiter = waiters[i % waiters.length];
-      
+
       const orderItems = await createOrderItems(items, "pending");
-      const totalAmount = orderItems.reduce((sum, oi) => sum + oi.price * oi.quantity, 0);
+      const totalAmount = orderItems.reduce(
+        (sum, oi) => sum + oi.price * oi.quantity,
+        0
+      );
 
       const payment = await Payment.create({
         paymentMethod: "cash",
         status: "unpaid",
         amountPaid: 0,
-        totalAmount: totalAmount
+        totalAmount: totalAmount,
       });
 
       const order = await Order.create({
         userId: customer._id,
         servedBy: waiter._id,
         tableId: table._id,
-        orderItems: orderItems.map(oi => oi._id),
+        orderItems: orderItems.map((oi) => oi._id),
         paymentId: payment._id,
         status: "pending",
         totalAmount: totalAmount,
         discount: 0,
-        waiterResponse: { 
+        waiterResponse: {
           status: "rejected",
           reason: "Không đủ nguyên liệu",
-          respondedAt: new Date()
+          respondedAt: new Date(),
         },
         customerConfirmed: false,
-        confirmationHistory: createConfirmationHistory(['order_created', 'waiter_rejected'])
+        confirmationHistory: createConfirmationHistory([
+          "order_created",
+          "waiter_rejected",
+        ]),
       });
 
       await OrderItem.updateMany(
-        { _id: { $in: orderItems.map(oi => oi._id) } },
+        { _id: { $in: orderItems.map((oi) => oi._id) } },
         { orderId: order._id }
       );
 
@@ -877,36 +1105,43 @@ const seedDatabase = async () => {
       const customer = customers[i % customers.length];
       const waiter = waiters[i % waiters.length];
       const chef = chefs[i % chefs.length];
-      
+
       const orderItems = await createOrderItems(items, "pending", chef._id);
-      const totalAmount = orderItems.reduce((sum, oi) => sum + oi.price * oi.quantity, 0);
+      const totalAmount = orderItems.reduce(
+        (sum, oi) => sum + oi.price * oi.quantity,
+        0
+      );
 
       const payment = await Payment.create({
         paymentMethod: "cash",
         status: "unpaid",
         amountPaid: 0,
-        totalAmount: totalAmount
+        totalAmount: totalAmount,
       });
 
       const order = await Order.create({
         userId: customer._id,
         servedBy: waiter._id,
         tableId: table._id,
-        orderItems: orderItems.map(oi => oi._id),
+        orderItems: orderItems.map((oi) => oi._id),
         paymentId: payment._id,
         status: "confirmed",
         totalAmount: totalAmount,
         discount: 0,
-        waiterResponse: { 
+        waiterResponse: {
           status: "approved",
-          respondedAt: new Date()
+          respondedAt: new Date(),
         },
         customerConfirmed: true,
-        confirmationHistory: createConfirmationHistory(['order_created', 'waiter_approved', 'customer_confirmed'])
+        confirmationHistory: createConfirmationHistory([
+          "order_created",
+          "waiter_approved",
+          "customer_confirmed",
+        ]),
       });
 
       await OrderItem.updateMany(
-        { _id: { $in: orderItems.map(oi => oi._id) } },
+        { _id: { $in: orderItems.map((oi) => oi._id) } },
         { orderId: order._id }
       );
 
@@ -923,36 +1158,43 @@ const seedDatabase = async () => {
       const customer = customers[i % customers.length];
       const waiter = waiters[i % waiters.length];
       const chef = chefs[i % chefs.length];
-      
+
       const orderItems = await createOrderItems(items, "preparing", chef._id);
-      const totalAmount = orderItems.reduce((sum, oi) => sum + oi.price * oi.quantity, 0);
+      const totalAmount = orderItems.reduce(
+        (sum, oi) => sum + oi.price * oi.quantity,
+        0
+      );
 
       const payment = await Payment.create({
         paymentMethod: "cash",
         status: "unpaid",
         amountPaid: 0,
-        totalAmount: totalAmount
+        totalAmount: totalAmount,
       });
 
       const order = await Order.create({
         userId: customer._id,
         servedBy: waiter._id,
         tableId: table._id,
-        orderItems: orderItems.map(oi => oi._id),
+        orderItems: orderItems.map((oi) => oi._id),
         paymentId: payment._id,
         status: "preparing",
         totalAmount: totalAmount,
         discount: 0,
-        waiterResponse: { 
+        waiterResponse: {
           status: "approved",
-          respondedAt: new Date()
+          respondedAt: new Date(),
         },
         customerConfirmed: true,
-        confirmationHistory: createConfirmationHistory(['order_created', 'waiter_approved', 'customer_confirmed'])
+        confirmationHistory: createConfirmationHistory([
+          "order_created",
+          "waiter_approved",
+          "customer_confirmed",
+        ]),
       });
 
       await OrderItem.updateMany(
-        { _id: { $in: orderItems.map(oi => oi._id) } },
+        { _id: { $in: orderItems.map((oi) => oi._id) } },
         { orderId: order._id }
       );
 
@@ -969,36 +1211,43 @@ const seedDatabase = async () => {
       const customer = customers[i % customers.length];
       const waiter = waiters[i % waiters.length];
       const chef = chefs[i % chefs.length];
-      
+
       const orderItems = await createOrderItems(items, "ready", chef._id);
-      const totalAmount = orderItems.reduce((sum, oi) => sum + oi.price * oi.quantity, 0);
+      const totalAmount = orderItems.reduce(
+        (sum, oi) => sum + oi.price * oi.quantity,
+        0
+      );
 
       const payment = await Payment.create({
         paymentMethod: "cash",
         status: "unpaid",
         amountPaid: 0,
-        totalAmount: totalAmount
+        totalAmount: totalAmount,
       });
 
       const order = await Order.create({
         userId: customer._id,
         servedBy: waiter._id,
         tableId: table._id,
-        orderItems: orderItems.map(oi => oi._id),
+        orderItems: orderItems.map((oi) => oi._id),
         paymentId: payment._id,
         status: "ready",
         totalAmount: totalAmount,
         discount: 0,
-        waiterResponse: { 
+        waiterResponse: {
           status: "approved",
-          respondedAt: new Date()
+          respondedAt: new Date(),
         },
         customerConfirmed: true,
-        confirmationHistory: createConfirmationHistory(['order_created', 'waiter_approved', 'customer_confirmed'])
+        confirmationHistory: createConfirmationHistory([
+          "order_created",
+          "waiter_approved",
+          "customer_confirmed",
+        ]),
       });
 
       await OrderItem.updateMany(
-        { _id: { $in: orderItems.map(oi => oi._id) } },
+        { _id: { $in: orderItems.map((oi) => oi._id) } },
         { orderId: order._id }
       );
 
@@ -1015,37 +1264,44 @@ const seedDatabase = async () => {
       const customer = customers[i % customers.length];
       const waiter = waiters[i % waiters.length];
       const chef = chefs[i % chefs.length];
-      
+
       const orderItems = await createOrderItems(items, "served", chef._id);
-      const totalAmount = orderItems.reduce((sum, oi) => sum + oi.price * oi.quantity, 0);
+      const totalAmount = orderItems.reduce(
+        (sum, oi) => sum + oi.price * oi.quantity,
+        0
+      );
 
       const payment = await Payment.create({
         paymentMethod: "cash",
         status: "unpaid",
         amountPaid: 0,
-        totalAmount: totalAmount
+        totalAmount: totalAmount,
       });
 
       const order = await Order.create({
         userId: customer._id,
         servedBy: waiter._id,
         tableId: table._id,
-        orderItems: orderItems.map(oi => oi._id),
+        orderItems: orderItems.map((oi) => oi._id),
         paymentId: payment._id,
         status: "served",
         totalAmount: totalAmount,
         discount: 0,
         servedAt: new Date(),
-        waiterResponse: { 
+        waiterResponse: {
           status: "approved",
-          respondedAt: new Date()
+          respondedAt: new Date(),
         },
         customerConfirmed: true,
-        confirmationHistory: createConfirmationHistory(['order_created', 'waiter_approved', 'customer_confirmed'])
+        confirmationHistory: createConfirmationHistory([
+          "order_created",
+          "waiter_approved",
+          "customer_confirmed",
+        ]),
       });
 
       await OrderItem.updateMany(
-        { _id: { $in: orderItems.map(oi => oi._id) } },
+        { _id: { $in: orderItems.map((oi) => oi._id) } },
         { orderId: order._id }
       );
 
@@ -1062,41 +1318,52 @@ const seedDatabase = async () => {
       const customer = customers[i % customers.length];
       const waiter = waiters[i % waiters.length];
       const chef = chefs[i % chefs.length];
-      
+
       const orderItems = await createOrderItems(items, "served", chef._id);
-      const totalAmount = orderItems.reduce((sum, oi) => sum + oi.price * oi.quantity, 0);
+      const totalAmount = orderItems.reduce(
+        (sum, oi) => sum + oi.price * oi.quantity,
+        0
+      );
 
       const payment = await Payment.create({
         paymentMethod: "card",
         status: "paid",
         amountPaid: totalAmount,
-        totalAmount: totalAmount
+        totalAmount: totalAmount,
       });
 
-      const createdAt = new Date(Date.now() - Math.random() * 14 * 24 * 60 * 60 * 1000); // 1-2 tuần trước
-      const servedAt = new Date(createdAt.getTime() + Math.random() * 2 * 60 * 60 * 1000); // 2 giờ sau khi tạo
+      const createdAt = new Date(
+        Date.now() - Math.random() * 14 * 24 * 60 * 60 * 1000
+      ); // 1-2 tuần trước
+      const servedAt = new Date(
+        createdAt.getTime() + Math.random() * 2 * 60 * 60 * 1000
+      ); // 2 giờ sau khi tạo
 
       const order = await Order.create({
         userId: customer._id,
         servedBy: waiter._id,
         tableId: table._id,
-        orderItems: orderItems.map(oi => oi._id),
+        orderItems: orderItems.map((oi) => oi._id),
         paymentId: payment._id,
         status: "paid",
         totalAmount: totalAmount,
         discount: 0,
         servedAt: servedAt,
-        waiterResponse: { 
+        waiterResponse: {
           status: "approved",
-          respondedAt: new Date(createdAt.getTime() + 5 * 60 * 1000) // 5 phút sau
+          respondedAt: new Date(createdAt.getTime() + 5 * 60 * 1000), // 5 phút sau
         },
         customerConfirmed: true,
-        confirmationHistory: createConfirmationHistory(['order_created', 'waiter_approved', 'customer_confirmed']),
-        createdAt: createdAt
+        confirmationHistory: createConfirmationHistory([
+          "order_created",
+          "waiter_approved",
+          "customer_confirmed",
+        ]),
+        createdAt: createdAt,
       });
 
       await OrderItem.updateMany(
-        { _id: { $in: orderItems.map(oi => oi._id) } },
+        { _id: { $in: orderItems.map((oi) => oi._id) } },
         { orderId: order._id }
       );
 
@@ -1112,35 +1379,38 @@ const seedDatabase = async () => {
       const table = tables[i];
       const customer = customers[i % customers.length];
       const waiter = waiters[i % waiters.length];
-      
+
       const orderItems = await createOrderItems(items, "pending");
-      const totalAmount = orderItems.reduce((sum, oi) => sum + oi.price * oi.quantity, 0);
+      const totalAmount = orderItems.reduce(
+        (sum, oi) => sum + oi.price * oi.quantity,
+        0
+      );
 
       const payment = await Payment.create({
         paymentMethod: "cash",
         status: "unpaid",
         amountPaid: 0,
-        totalAmount: totalAmount
+        totalAmount: totalAmount,
       });
 
       const order = await Order.create({
         userId: customer._id,
         servedBy: waiter._id,
         tableId: table._id,
-        orderItems: orderItems.map(oi => oi._id),
+        orderItems: orderItems.map((oi) => oi._id),
         paymentId: payment._id,
         status: "cancelled",
         totalAmount: totalAmount,
         discount: 0,
-        waiterResponse: { 
-          status: "pending"
+        waiterResponse: {
+          status: "pending",
         },
         customerConfirmed: false,
-        confirmationHistory: createConfirmationHistory(['order_created'])
+        confirmationHistory: createConfirmationHistory(["order_created"]),
       });
 
       await OrderItem.updateMany(
-        { _id: { $in: orderItems.map(oi => oi._id) } },
+        { _id: { $in: orderItems.map((oi) => oi._id) } },
         { orderId: order._id }
       );
 
@@ -1251,7 +1521,6 @@ const seedDatabase = async () => {
       },
     ]);
     console.log("📦 Đã tạo các PurchaseOrder mẫu.");
-
 
     // 8️⃣ Feedbacks
     await Feedback.insertMany([

@@ -77,6 +77,21 @@ export default function KitchenDashboard() {
     fetchChefs();
   }, [showChefModal]);
 
+  // ✅ Đồng bộ selectedOrder khi 'orders' thay đổi
+  useEffect(() => {
+    if (selectedOrder) {
+      const updatedOrder = orders.find((o) => o._id === selectedOrder._id);
+
+      if (updatedOrder) {
+        // Cập nhật lại state selectedOrder với dữ liệu mới
+        setSelectedOrder(updatedOrder);
+      } else {
+        setSelectedOrder(null);
+      }
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [orders]);
+
   // ✅ Cập nhật thời gian chờ đơn hàng
   useEffect(() => {
     const interval = setInterval(() => {
@@ -175,6 +190,7 @@ export default function KitchenDashboard() {
               selectedOrder={selectedOrder}
               setShowChefModal={setShowChefModal}
               setCurrentItem={setCurrentItem}
+              setOrders={setOrders}
             />
           </div>
         )}

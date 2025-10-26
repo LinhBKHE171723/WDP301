@@ -4,7 +4,7 @@ export default function OrderQueue({ orders, selectedOrder, onSelectOrder }) {
   return (
     <div className="col-span-5 bg-white rounded-xl shadow-lg p-6">
       <h2 className="text-xl font-bold text-gray-900 mb-4">Hàng đợi Order</h2>
-      <div className="space-y-3 max-h-96 overflow-y-auto">
+      <div className="space-y-3 h-[75vh] overflow-y-auto">
         {orders.map((order) => {
           const borderColor =
             order.waitTime > 300

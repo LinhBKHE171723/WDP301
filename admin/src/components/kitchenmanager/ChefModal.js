@@ -1,6 +1,6 @@
 import React, { useState } from "react";
 import kitchenApi from "../../api/kitchenApi";
-
+import { toast } from "react-toastify";
 export default function ChefModal({
   chefs,
   itemId,
@@ -14,8 +14,8 @@ export default function ChefModal({
     try {
       setLoading(true);
       // 🧩 Gọi API thật
-      const res = await kitchenApi.assignChefToItem(itemId, chef.name);
-      alert(res.data?.message || "Giao món thành công!");
+      const res = await kitchenApi.assignChefToItem(itemId, chef._id);
+      toast.success(res.data?.message || "Giao món thành công!");
 
       // Cập nhật lại UI local
       setOrders((prevOrders) =>

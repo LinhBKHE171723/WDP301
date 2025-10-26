@@ -6,10 +6,11 @@ const kitchenApi = {
   getOrderDetails: (orderId) => Client.get(`/kitchen/orders/${orderId}`),
   startPreparingOrder: (orderId) =>
     Client.patch(`/kitchen/orders/${orderId}/start-preparing`),
-  assignChefToItem: (orderItemId, chefName) =>
+  assignChefToItem: (orderItemId, chefId) =>
     Client.patch(`/kitchen/order-items/${orderItemId}/assign-chef`, {
-      chefName,
+      chefId,
     }),
+
   markItemReady: (orderItemId) =>
     Client.patch(`/kitchen/order-items/${orderItemId}/ready`),
 
