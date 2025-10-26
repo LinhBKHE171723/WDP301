@@ -22,10 +22,7 @@ mongoose
   // .connect(process.env.MONGO_URI)
   .connect(process.env.MONGO_URI)
   .then(() => {
-    // Chạy 1 lần khi server khởi động
-checkExpiryAndUpdateStock();
-// Lên lịch chạy 1 lần/ngày
-setInterval(checkExpiryAndUpdateStock, 24 * 60 * 60 * 1000); // 24h
+   
     console.log("✅ MongoDB connected");
   })
   .catch((err) => console.error(" MongoDB connection error:", err));

@@ -6,128 +6,115 @@ const mongoose = require("mongoose");
 
 const VN_TZ = "Asia/Ho_Chi_Minh";
 
+function truncateDate(date, unit) {
+  // Tạo một bản sao để không thay đổi ngày gốc
+  const d = new Date(date);
+
+  switch (unit) {
+    case "year":
+      d.setMonth(0, 1); // Tháng 1, ngày 1
+      d.setHours(0, 0, 0, 0);
+      break;
+    case "month":
+      d.setDate(1); // Ngày đầu tiên của tháng
+      d.setHours(0, 0, 0, 0);
+      break;
+    case "week":
+      const dayOfWeek = d.getDay(); // 0=Chủ Nhật, 1=Thứ Hai, ..., 6=Thứ Bảy
+      // Lùi về ngày thứ Hai gần nhất
+      const distanceToMonday = dayOfWeek === 0 ? -6 : 1 - dayOfWeek;
+      d.setDate(d.getDate() + distanceToMonday);
+      d.setHours(0, 0, 0, 0);
+      break;
+    case "day":
+    default:
+      d.setHours(0, 0, 0, 0); // Đầu ngày
+      break;
+  }
+  return d;
+}
 const TYPE_TO_TRUNC = {
-  daily: { unit: "day", label: (d) => fmtDateYMD(d) }, // 2025-01-31
-  weekly: { unit: "week", label: (d) => isoWeekLabel(d) }, // 2025-W05
-  monthly: { unit: "month", label: (d) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}` },
-  yearly: { unit: "year", label: (d) => `${d.getFullYear()}` },
+  daily: {
+    unit: "day",
+    label: (d) => d.toLocaleDateString("vi-VN"),
+  },
+  weekly: {
+    unit: "week",
+    label: (d) => {
+      const week = Math.ceil(d.getDate() / 7);
+      return `Tuần ${week} - ${d.getMonth() + 1}/${d.getFullYear()}`;
+    },
+  },
+  monthly: {
+    unit: "month",
+    label: (d) => `${d.getMonth() + 1}/${d.getFullYear()}`,
+  },
+  yearly: {
+    unit: "year",
+    label: (d) => `${d.getFullYear()}`,
+  },
 };
 
 exports.getRevenueStats = async ({ type = "daily", from, to }) => {
   const { fromDate, toDate, conf } = normalizeTimeInputs(type, from, to);
 
-  // === Doanh thu (Order đã thanh toán) ===
-  const revenuePipeline = [
-    { $match: { status: "paid", createdAt: { $gte: fromDate, $lte: toDate } } },
-    {
-      $addFields: {
-        timeBucket: {
-          $dateTrunc: { date: "$createdAt", unit: conf.unit, timezone: VN_TZ },
-        },
-      },
-    },
-    {
-      $group: {
-        _id: "$timeBucket",
-        revenue: { $sum: { $ifNull: ["$totalAmount", 0] } },
-      },
-    },
-    { $project: { _id: 0, time: "$_id", revenue: 1 } },
-  ];
+  const paidOrdersPromise = Order.find({
+    status: "paid",
+    createdAt: { $gte: fromDate, $lte: toDate },
+  });
 
-  // === Chi phí (chỉ tính PurchaseOrder còn hạn) ===
-  const costPipeline = [
-    {
-      $match: {
-        time: { $gte: fromDate, $lte: toDate },
-        status: "valid", // ❗ chỉ tính hàng chưa hết hạn
-      },
-    },
-    {
-      $addFields: {
-        timeBucket: {
-          $dateTrunc: { date: "$time", unit: conf.unit, timezone: VN_TZ },
-        },
-      },
-    },
-    {
-      $group: {
-        _id: "$timeBucket",
-        cost: { $sum: { $ifNull: ["$price", 0] } },
-      },
-    },
-    { $project: { _id: 0, time: "$_id", cost: 1 } },
-  ];
+  const purchaseOrdersPromise = PurchaseOrder.find({
+    time: { $gte: fromDate, $lte: toDate },
+  });
 
-  // === Thất thoát (PurchaseOrder đã hết hạn) ===
-  const wastePipeline = [
-    {
-      $match: {
-        time: { $gte: fromDate, $lte: toDate },
-        status: "expired", // ❗ chỉ hàng hết hạn
-      },
-    },
-    {
-      $addFields: {
-        timeBucket: {
-          $dateTrunc: { date: "$time", unit: conf.unit, timezone: VN_TZ },
-        },
-      },
-    },
-    {
-      $group: {
-        _id: "$timeBucket",
-        waste: { $sum: { $ifNull: ["$price", 0] } },
-      },
-    },
-    { $project: { _id: 0, time: "$_id", waste: 1 } },
-  ];
-
-  // Chạy song song 3 pipeline
-  const [revRows, costRows, wasteRows] = await Promise.all([
-    Order.aggregate(revenuePipeline),
-    PurchaseOrder.aggregate(costPipeline),
-    PurchaseOrder.aggregate(wastePipeline),
+  // Chạy song song 2 câu lệnh truy vấn để tiết kiệm thời gian
+  const [paidOrders, allPurchaseOrders] = await Promise.all([
+    paidOrdersPromise,
+    purchaseOrdersPromise,
   ]);
 
-  // Gom nhóm theo thời gian
-  const byTime = new Map();
+  // B3: Gom nhóm và tính toán thủ công bằng JavaScript
+  const statsByTime = new Map();
 
-  for (const r of revRows) {
-    const k = new Date(r.time).toISOString();
-    byTime.set(k, { time: new Date(r.time), revenue: r.revenue || 0, cost: 0, waste: 0 });
+  // Xử lý doanh thu từ các đơn hàng đã thanh toán
+  for (const order of paidOrders) {
+    const timeBucket = truncateDate(order.createdAt, conf.unit);
+    const key = timeBucket.toISOString();
+
+    const currentStats = statsByTime.get(key) || { time: timeBucket, revenue: 0, cost: 0, waste: 0 };
+    currentStats.revenue += order.totalAmount || 0;
+    statsByTime.set(key, currentStats);
   }
 
-  for (const c of costRows) {
-    const k = new Date(c.time).toISOString();
-    const obj = byTime.get(k) || { time: new Date(c.time), revenue: 0, cost: 0, waste: 0 };
-    obj.cost = c.cost || 0;
-    byTime.set(k, obj);
-  }
+  // Xử lý chi phí và thất thoát từ các đơn nhập hàng
+  // Xử lý chi phí từ các đơn nhập hàng
+for (const po of allPurchaseOrders) {
+  const timeBucket = truncateDate(po.time, conf.unit);
+  const key = timeBucket.toISOString();
 
-  for (const w of wasteRows) {
-    const k = new Date(w.time).toISOString();
-    const obj = byTime.get(k) || { time: new Date(w.time), revenue: 0, cost: 0, waste: 0 };
-    obj.waste = w.waste || 0;
-    byTime.set(k, obj);
-  }
+  const currentStats = statsByTime.get(key) || { time: timeBucket, revenue: 0, cost: 0 };
+  
+  currentStats.cost += po.price || 0;
+  
+  statsByTime.set(key, currentStats);
+}
 
-  // Format lại dữ liệu trả ra
-  const rows = Array.from(byTime.values())
-    .sort((a, b) => a.time - b.time)
+
+  // B4: Định dạng dữ liệu cuối cùng để trả về
+  const rows = Array.from(statsByTime.values())
+    .sort((a, b) => a.time - b.time) // Sắp xếp theo thứ tự thời gian
     .map((row) => {
-      const profit = (row.revenue || 0) - (row.cost || 0) - (row.waste || 0);
+      const profit = row.revenue - row.cost - row.waste;
       const label = conf.label(new Date(row.time));
       return {
         time: row.time.toISOString(),
         timeLabel: label,
-        revenue: row.revenue || 0,
-        cost: row.cost || 0,
-        waste: row.waste || 0,
-        profit,
+        revenue: row.revenue,
+        cost: row.cost,
+        waste: row.waste,
+        profit: profit,
         revenueVND: fmtVND(row.revenue),
         costVND: fmtVND(row.cost),
-        wasteVND: fmtVND(row.waste),
         profitVND: fmtVND(profit),
       };
     });
@@ -136,25 +123,18 @@ exports.getRevenueStats = async ({ type = "daily", from, to }) => {
 };
 
 
-// =================================================================
-// HÀM ĐƯỢC VIẾT LẠI BẰNG JAVASCRIPT THUẦN THEO YÊU CẦU
-// =================================================================
 exports.getTopItems = async ({ from, to, limit }) => {
-  // B1: Chuẩn hóa thời gian và giới hạn
   const { fromDate, toDate } = normalizeTimeInputs("daily", from, to);
   const resultLimit = clampInt(limit, 10, 5, 100);
-
-  // B2: Tìm tất cả các Order đã thanh toán trong khoảng thời gian
   const paidOrders = await Order.find({
     status: "paid",
     createdAt: { $gte: fromDate, $lte: toDate },
   });
 
   if (paidOrders.length === 0) {
-    return []; // Trả về mảng rỗng nếu không có đơn hàng
+    return []; 
   }
 
-  // B3: Lấy tất cả các ID OrderItem từ các đơn hàng trên
   const allOrderItemIds = paidOrders.flatMap(order => order.orderItems);
   const allOrderItems = await OrderItem.find({ _id: { $in: allOrderItemIds } });
 
@@ -208,10 +188,6 @@ exports.getTopItems = async ({ from, to, limit }) => {
 };
 
 
-// ... các hàm helper ở dưới (normalizeTimeInputs, parseDate, etc.) ...
-
-// ===== Helpers =====
-
 function normalizeTimeInputs(type, from, to) {
     const conf = TYPE_TO_TRUNC[(type || "daily").toLowerCase()] || TYPE_TO_TRUNC.daily;
     const now = new Date();
@@ -254,12 +230,3 @@ function fmtDateYMD(date) {
   return `${y}-${m}-${d}`;
 }
 
-function isoWeekLabel(date) {
-  const d = new Date(Date.UTC(date.getFullYear(), date.getMonth(), date.getDate()));
-  const dayNr = (d.getUTCDay() + 6) % 7; // 0=Mon..6=Sun
-  d.setUTCDate(d.getUTCDate() - dayNr + 3);
-  const firstThursday = new Date(Date.UTC(d.getUTCFullYear(), 0, 4));
-  const week = 1 + Math.round(((d - firstThursday) / 86400000 - 3) / 7);
-  const isoYear = d.getUTCFullYear();
-  return `${isoYear}-W${String(week).padStart(2, "0")}`;
-}

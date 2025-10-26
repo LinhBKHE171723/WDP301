@@ -132,11 +132,15 @@ static async update(id, data) {
   const { email, password, _id, createdAt, updatedAt, ...updateData } = data;
   const existingUser = await User.findById(id);
   if (!existingUser) throw { status: 404, message: "User not found" };
-   if (updateData.accountStatus === "banned") {
-  updateData.status = "inactive";
-} else if (updateData.accountStatus === "active") {
-  updateData.status = "active";  // (optional)
-}
+  if (updateData.accountStatus === "banned") {
+    existingUser.accountStatus = "banned";
+    existingUser.status = "inactive"; 
+  }
+
+  // ✅ Nếu admin unban tài khoản
+  else if (updateData.accountStatus === "active") {
+    existingUser.accountStatus = "active";
+  }
 
   Object.keys(updateData).forEach((key) => {
     if (updateData[key] === undefined || updateData[key] === null) {
