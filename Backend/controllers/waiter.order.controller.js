@@ -72,6 +72,7 @@ exports.respondToOrder = async (req, res) => {
 
       // Table chuyển sang occupied
       table.status = 'occupied';
+      table.orderNow = order._id;
       await table.save();
     } else {
       // ❌ Từ chối

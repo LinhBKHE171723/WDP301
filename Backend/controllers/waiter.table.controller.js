@@ -11,7 +11,7 @@ const waiterTableController = {
    */
   getAllTables: async (req, res) => {
     try {
-      const tables = await Table.find()
+      const tables = await Table.find().sort({ tableNumber: 1 })
         .populate({
           path: "orderNow",
           populate: [
@@ -71,7 +71,7 @@ const waiterTableController = {
   // Lấy danh sách bàn trống
   getAvailableTables: async (req, res) => {
     try {
-      const availableTables = await Table.find({ status: 'available' });
+      const availableTables = await Table.find({ status: 'available' }).sort({ tableNumber: 1 });
       res.status(200).json(availableTables);
     }
     catch (error) {
