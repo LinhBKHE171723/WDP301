@@ -15,6 +15,7 @@ exports.getPendingOrders = async (req, res) => {
       .populate('tableId', 'tableNumber')
       .populate('orderItems')
       .populate('userId', 'name')
+      .populate('servedBy', 'name email')
       .sort({ createdAt: -1 });
 
     // Populate thông tin item trong orderItems
@@ -134,6 +135,7 @@ exports.getActiveOrders = async (req, res) => {
       .populate('tableId', 'tableNumber')
       .populate('orderItems')
       .populate('userId', 'name')
+      .populate('servedBy', 'name email')
       .sort({ createdAt: -1 });
 
     // Populate thông tin item trong orderItems

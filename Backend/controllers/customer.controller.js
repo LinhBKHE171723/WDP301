@@ -243,7 +243,8 @@ exports.getOrderById = async (req, res) => {
     const order = await Order.findById(orderId)
       .populate('tableId', 'tableNumber')
       .populate('orderItems')
-      .populate('paymentId');
+      .populate('paymentId')
+      .populate('servedBy', 'name email');
 
     if (!order) {
       return res.status(404).json({
