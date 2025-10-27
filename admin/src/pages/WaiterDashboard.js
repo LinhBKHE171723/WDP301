@@ -185,7 +185,7 @@ WaiterDashboard có một useEffect lắng nghe lastMessage → xử lý cập n
                     break;
 
                 case 'order:confirmed':
-                    // Đơn hàng đã được customer xác nhận, chuyển sang active
+                    // Đơn hàng đã được customer xác nhận
                     console.log('✅ Order confirmed by customer:', lastMessage.data);
                     toast.success(`✅ Đơn hàng từ bàn ${lastMessage.data.tableId?.tableNumber} đã được khách xác nhận!`);
 
@@ -193,10 +193,10 @@ WaiterDashboard có một useEffect lắng nghe lastMessage → xử lý cập n
                     fetchOrders();
                     fetchPendingOrders();
 
-                    // Auto switch to active tab
-                    if (activeTab !== 'active') {
-                        setActiveTab('active');
-                    }
+                    // Không tự động chuyển tab, để waiter ở lại tab "Chờ xác nhận"
+                    // if (activeTab !== 'active') {
+                    //     setActiveTab('active');
+                    // }
                     break;
 
                 case 'order:cancelled':
