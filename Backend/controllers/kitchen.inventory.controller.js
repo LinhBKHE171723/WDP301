@@ -10,28 +10,51 @@ exports.getAllIngredients = async (req, res) => {
     res.status(500).json({ message: "Lỗi khi tải danh sách nguyên liệu." });
   }
 };
-
-// ✅ Tạo mới đơn nhập kho
+// ✅ Tạo đơn nhập kho
 exports.createPurchaseOrder = async (req, res) => {
   try {
-    const { ingredientId, quantity, unit, price } = req.body;
+    let { ingredientId, quantity, unit, price, supplier, note } = req.body;
 
+    if (!ingredientId || !quantity || quantity <= 0) {
+      return res.status(400).json({
+        message: "Thiếu thông tin ingredientId hoặc quantity không hợp lệ.",
+      });
+    }
+
+    quantity = Number(quantity);
+    price = Number(price) || 0;
+
+    // Lấy nguyên liệu hiện tại
+    const ingredient = await Ingredient.findById(ingredientId);
+    if (!ingredient) {
+      return res.status(404).json({ message: "Không tìm thấy nguyên liệu." });
+    }
+
+    // ✅ Tạo đơn nhập hàng
     const order = await PurchaseOrder.create({
       ingredientId,
       quantity,
       unit,
       price,
+      supplier: supplier || "Nhập trực tiếp",
+      note: note || "",
     });
 
-    // Cập nhật tồn kho sau khi nhập hàng
-    await Ingredient.findByIdAndUpdate(ingredientId, {
-      $inc: { stockQuantity: quantity },
-    });
+    // ✅ Tính giá trung bình mới (Weighted Average)
+    const totalOld = ingredient.stockQuantity * (ingredient.priceNow || 0);
+    const totalNew = quantity * price;
+    const newStock = ingredient.stockQuantity + quantity;
+    const newAvgPrice = newStock > 0 ? (totalOld + totalNew) / newStock : price;
 
-    res.status(201).json(order);
+    res.status(201).json({
+      message: "✅ Nhập hàng thành công!",
+      order,
+    });
   } catch (err) {
-    console.error(err);
-    res.status(500).json({ message: "Không thể tạo đơn nhập kho." });
+    console.error("❌ Lỗi tạo đơn nhập kho:", err);
+    res
+      .status(500)
+      .json({ message: err.message || "Không thể tạo đơn nhập kho." });
   }
 };
 
@@ -63,24 +86,57 @@ exports.getPurchaseHistory = async (req, res) => {
 // ✅ Tạo mới nguyên liệu
 exports.createIngredient = async (req, res) => {
   try {
-    const { name, unit, stockQuantity, minStock } = req.body;
-
-    if (!name || !unit) {
-      return res
-        .status(400)
-        .json({ message: "Thiếu tên hoặc đơn vị nguyên liệu." });
-    }
-
+    const { name, unit, stockQuantity, minStock, priceNow } = req.body;
     const ingredient = await Ingredient.create({
       name,
       unit,
-      stockQuantity: stockQuantity || 0,
-      minStock: minStock || 0,
+      stockQuantity,
+      minStock,
+      priceNow,
     });
-
     res.status(201).json(ingredient);
   } catch (err) {
     console.error(err);
-    res.status(500).json({ message: "Không thể tạo nguyên liệu mới." });
+    res.status(500).json({ message: "Không thể tạo nguyên liệu." });
+  }
+};
+
+// ✅ Sửa thông tin nguyên liệu
+exports.updateIngredient = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { name, unit, stockQuantity, minStock, priceNow } = req.body;
+
+    const updated = await Ingredient.findByIdAndUpdate(
+      id,
+      { name, unit, stockQuantity, minStock, priceNow },
+      { new: true }
+    );
+
+    if (!updated) {
+      return res.status(404).json({ message: "Không tìm thấy nguyên liệu." });
+    }
+
+    res.json(updated);
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ message: "Lỗi khi cập nhật nguyên liệu." });
+  }
+};
+
+// ✅ Xóa nguyên liệu
+exports.deleteIngredient = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const deleted = await Ingredient.findByIdAndDelete(id);
+
+    if (!deleted) {
+      return res.status(404).json({ message: "Không tìm thấy nguyên liệu." });
+    }
+
+    res.json({ message: "Đã xóa nguyên liệu thành công." });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ message: "Lỗi khi xóa nguyên liệu." });
   }
 };

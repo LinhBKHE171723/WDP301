@@ -36,23 +36,23 @@ export default function KitchenDashboard() {
       try {
         if (activeTab === "kds") {
           const res = await kitchenApi.getConfirmedOrders();
-          console.log("🍽️ Dữ liệu đơn hàng:", res.data || res);
+
           setOrders(res.data || []);
         } else if (activeTab === "items") {
           const res = await kitchenApi.getAllItems();
-          console.log("🍽️ Dữ liệu món ăn:", res.data || res);
+
           setItems(res.data || []);
         } else if (activeTab === "menus") {
           const res = await kitchenApi.getAllMenus();
-          console.log("🍽️ Dữ liệu thực đơn:", res.data || res);
+
           setMenus(res.data || []);
         } else if (activeTab === "inventory") {
           const res = await kitchenApi.getAllIngredients();
-          console.log("📦 Dữ liệu nguyên liệu:", res.data || res);
+
           setIngredients(res.data || res || []);
         } else if (activeTab === "purchase") {
           const res = await kitchenApi.getPurchaseOrders();
-          console.log("📜 Dữ liệu đơn nhập hàng:", res.data || res);
+
           setPurchaseOrders(res.data || res || []);
         }
       } catch (err) {

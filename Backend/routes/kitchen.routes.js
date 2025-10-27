@@ -113,6 +113,8 @@ router.patch("/ingredients/:ingredientId", inv.updateStock);
 // --- Quản lý đơn nhập kho ---
 router.post("/purchase-orders", inv.createPurchaseOrder);
 router.get("/purchase-orders", inv.getPurchaseHistory);
+router.put("/ingredients/:id", inv.updateIngredient);
+router.delete("/ingredients/:id", inv.deleteIngredient);
 
 // --- Quản lý nhân viên bếp ---
 router.get("/chefs", getAllChef);
