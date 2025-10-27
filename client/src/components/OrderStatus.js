@@ -225,7 +225,8 @@ const OrderStatus = React.memo(({ orderId, onBack }) => {
           const wasNotApprovedBefore = !prevOrder || !prevOrder.waiterResponse || prevOrder.waiterResponse.status !== 'approved';
           if (wasNotApprovedBefore) {
             setWaiterResponseData({
-              type: 'approved'
+              type: 'approved',
+              tableNumber: data.data.tableId?.tableNumber || null
             });
             setShowWaiterResponseModal(true);
           }
@@ -329,7 +330,8 @@ const OrderStatus = React.memo(({ orderId, onBack }) => {
       
       // Trigger popup cho waiter approval
       setWaiterResponseData({
-        type: 'approved'
+        type: 'approved',
+        tableNumber: lastMessage.data.order.tableId?.tableNumber || null
       });
       setShowWaiterResponseModal(true);
     } else if (lastMessage && lastMessage.type === 'order:item_updated' && lastMessage.orderId === orderId) {
@@ -1202,6 +1204,9 @@ const OrderStatus = React.memo(({ orderId, onBack }) => {
               ) : (
                 <div>
                   <p>Nhân viên đã xác nhận đơn hàng của bạn.</p>
+                  {waiterResponseData.tableNumber && (
+                    <p><strong>Bàn của bạn: {waiterResponseData.tableNumber}</strong></p>
+                  )}
                   <p>Vui lòng kiểm tra lại và xác nhận để gửi xuống bếp.</p>
                   
                   {/* Hiển thị chi tiết đơn hàng */}
