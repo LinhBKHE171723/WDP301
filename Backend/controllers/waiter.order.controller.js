@@ -40,7 +40,6 @@ exports.respondToOrder = async (req, res) => {
     const { orderId } = req.params;
     const { approved, reason, selectedTable } = req.body;
     const waiterId = req.user.id; // lấy từ middleware auth
-    console.log("waiterId:", waiterId);
 
     // Validate input
     if (typeof approved !== 'boolean') {
