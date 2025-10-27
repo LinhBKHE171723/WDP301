@@ -213,7 +213,7 @@ WaiterDashboard có một useEffect lắng nghe lastMessage → xử lý cập n
                     console.log('📨 Unknown message type:', lastMessage.type);
             }
         }
-    }, [lastMessage, activeTab]);
+    }, [lastMessage]);
 
     return (
         <div className="min-vh-100 bg-light d-flex flex-column">
