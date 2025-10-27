@@ -17,6 +17,7 @@ export default function TableDetail() {
     try {
       const res = await waiterApi.getTableDetails(tableId);
       setTable(res.table);
+      console.log("🚀 Table details:", res.table);
     } catch (err) {
       console.error(err);
       toast.error("Không thể tải chi tiết bàn!");
@@ -35,7 +36,7 @@ export default function TableDetail() {
 
       <Container className="flex-grow-1 mt-4 pb-5">
         <div className="d-flex flex-wrap justify-content-between align-items-center mb-3">
-          <h4 className="fw-bold text-dark mb-3 mb-md-0">🪑 Chi tiết bàn</h4>
+          <h4 className="fw-bold text-dark mb-3 mb-md-0">Chi tiết bàn</h4>
           <NotificationBell />
         </div>
 
@@ -67,9 +68,9 @@ export default function TableDetail() {
                 {/* Hiển thị người phục vụ nếu có orderNow */}
                 {table.orderNow && (
                   <p className="fw-semibold text-dark mb-1">
-                    👤 Nhân viên phục vụ:{" "}
+                    Nhân viên phục vụ:{" "}
                     <span className="text-primary">
-                      {table.orderNow.servedBy?.name || "Không rõ"}
+                      {table?.orderNow?.servedBy?.name ?? "Không rõ"}
                     </span>
                   </p>
                 )}
