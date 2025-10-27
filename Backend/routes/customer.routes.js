@@ -19,7 +19,8 @@ const {
   confirmOrder,
   updateOrderItemStatus,
   getLatestOrder,
-  testUpdateOrderItemStatus
+  testUpdateOrderItemStatus,
+  startEditOrder
 } = require("../controllers/customer.controller");
 
 // Routes cho khách hàng (không cần authentication)
@@ -61,6 +62,9 @@ router.put("/orders/:orderId", updateOrderStatus);
 
 // 10.1. Customer xác nhận đơn hàng sau khi waiter approve
 router.post("/orders/:orderId/confirm", confirmOrder);
+
+// 10.2. Customer bắt đầu sửa đơn hàng - xóa bàn và người phục vụ
+router.post("/orders/:orderId/start-edit", startEditOrder);
 
 // 11. Kiểm tra order có thể feedback không
 router.get("/orders/:orderId/can-feedback", canFeedback);
