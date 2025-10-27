@@ -25,13 +25,7 @@ export default function KitchenDashboard() {
   const [currentItem, setCurrentItem] = useState(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
-
-  const [chefs] = useState([
-    { id: 1, name: "Anh Tuấn", specialty: "Món chính" },
-    { id: 2, name: "Chị Lan", specialty: "Đồ uống" },
-    { id: 3, name: "Anh Minh", specialty: "Cơm" },
-    { id: 4, name: "Chị Hoa", specialty: "Tráng miệng" },
-  ]);
+  const [chefs, setChefs] = useState([]);
 
   // ✅ Fetch dữ liệu theo tab
   useEffect(() => {
@@ -42,20 +36,23 @@ export default function KitchenDashboard() {
       try {
         if (activeTab === "kds") {
           const res = await kitchenApi.getConfirmedOrders();
+
           setOrders(res.data || []);
         } else if (activeTab === "items") {
           const res = await kitchenApi.getAllItems();
+
           setItems(res.data || []);
         } else if (activeTab === "menus") {
           const res = await kitchenApi.getAllMenus();
+
           setMenus(res.data || []);
         } else if (activeTab === "inventory") {
           const res = await kitchenApi.getAllIngredients();
-          console.log("📦 Dữ liệu nguyên liệu:", res.data || res);
+
           setIngredients(res.data || res || []);
         } else if (activeTab === "purchase") {
           const res = await kitchenApi.getPurchaseOrders();
-          console.log("📜 Dữ liệu đơn nhập hàng:", res.data || res);
+
           setPurchaseOrders(res.data || res || []);
         }
       } catch (err) {
@@ -68,6 +65,34 @@ export default function KitchenDashboard() {
 
     fetchData();
   }, [activeTab]);
+
+  useEffect(() => {
+    const fetchChefs = async () => {
+      try {
+        const res = await kitchenApi.getAllChefs();
+
+        setChefs(res?.chefs || []);
+      } catch (err) {
+        console.error("❌ Lỗi khi tải danh sách đầu bếp:", err);
+      }
+    };
+    fetchChefs();
+  }, [showChefModal]);
+
+  // ✅ Đồng bộ selectedOrder khi 'orders' thay đổi
+  useEffect(() => {
+    if (selectedOrder) {
+      const updatedOrder = orders.find((o) => o._id === selectedOrder._id);
+
+      if (updatedOrder) {
+        // Cập nhật lại state selectedOrder với dữ liệu mới
+        setSelectedOrder(updatedOrder);
+      } else {
+        setSelectedOrder(null);
+      }
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [orders]);
 
   // ✅ Cập nhật thời gian chờ đơn hàng
   useEffect(() => {
@@ -134,7 +159,7 @@ export default function KitchenDashboard() {
                   : tab === "items"
                   ? "Quản lý Món ăn"
                   : tab === "menus"
-                  ? "Quản lý Thực đơn"
+                  ? "Quản lý Combo"
                   : tab === "inventory"
                   ? "Quản lý Kho"
                   : "Lịch sử Nhập hàng"}
@@ -167,6 +192,7 @@ export default function KitchenDashboard() {
               selectedOrder={selectedOrder}
               setShowChefModal={setShowChefModal}
               setCurrentItem={setCurrentItem}
+              setOrders={setOrders}
             />
           </div>
         )}

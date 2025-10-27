@@ -14,7 +14,6 @@ const orderSchema = new Schema(
         "pending",
         "confirmed",
         "preparing",
-        "ready",
         "served",
         "paid",
         "cancelled",

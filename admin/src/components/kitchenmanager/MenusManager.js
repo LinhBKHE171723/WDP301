@@ -54,8 +54,8 @@ export default function MenusManager({ menus, items = [], setMenus }) {
       .join(", ");
   };
 
-  const filteredMenus = menus.filter((m) =>
-    m.name.toLowerCase().includes(search.toLowerCase())
+  const filteredMenus = (menus || []).filter(
+    (m) => m && m.name && m.name.toLowerCase().includes(search.toLowerCase())
   );
 
   // ✅ Mở modal thêm
