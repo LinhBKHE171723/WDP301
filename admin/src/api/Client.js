@@ -26,6 +26,17 @@ Client.interceptors.response.use(
   // Nếu thất bại → xử lý lỗi tập trung
   (err) => {
     console.error("API error:", err.response || err.message); // In chi tiết lỗi ra console (để debug)
+    
+    // Nếu lỗi 401 (Unauthorized) - token invalid hoặc user không tồn tại
+    if (err.response?.status === 401) {
+      // Clear token và user khỏi localStorage
+      localStorage.removeItem("token");
+      localStorage.removeItem("user");
+      
+      // Redirect về trang login
+      window.location.href = "/login";
+    }
+    
     return Promise.reject(err.response?.data || { message: "Lỗi kết nối" });
   }
 );
