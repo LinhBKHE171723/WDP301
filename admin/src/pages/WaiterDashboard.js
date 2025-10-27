@@ -108,6 +108,10 @@ export default function WaiterDashboard() {
 
             if (response === 'approved') {
                 toast.success(`✅ Đã xác nhận đơn hàng #${orderId.slice(-4)}`);
+                // 🔄 Refresh cả 3 danh sách
+                fetchOrders();
+                fetchPendingOrders();
+                fetchAvailableTables(); // 🆕 Cập nhật lại danh sách bàn trống ngay
             } else if (response === 'rejected') {
                 toast.warning(`❌ Đã từ chối đơn hàng #${orderId.slice(-4)}`);
             }
@@ -313,7 +317,7 @@ WaiterDashboard có một useEffect lắng nghe lastMessage → xử lý cập n
                     </>
                 )}
             </Container>
-        
+
         </div>
     );
 }
