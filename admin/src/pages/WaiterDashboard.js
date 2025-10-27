@@ -209,6 +209,19 @@ WaiterDashboard có một useEffect lắng nghe lastMessage → xử lý cập n
                     fetchPendingOrders();
                     break;
 
+                case 'table:updated':
+                    // Bàn được giải phóng hoặc thay đổi trạng thái
+                    console.log('🪑 Table status updated:', lastMessage.data);
+                    
+                    // Fetch lại danh sách bàn trống
+                    fetchAvailableTables();
+                    
+                    // Optionally show a toast
+                    if (lastMessage.data.status === 'available') {
+                        toast.info(`🪑 Bàn ${lastMessage.data.tableNumber} đã trống`);
+                    }
+                    break;
+
                 default:
                     console.log('📨 Unknown message type:', lastMessage.type);
             }
@@ -247,7 +260,7 @@ WaiterDashboard có một useEffect lắng nghe lastMessage → xử lý cập n
                                 onClick={() => setActiveTab('pending')}
                                 data-count={pendingOrders.length}
                             >
-                                ⏳ Chờ xác nhận
+                                Chờ xác nhận
                             </button>
                         </li>
                         <li className="nav-item">
@@ -256,7 +269,7 @@ WaiterDashboard có một useEffect lắng nghe lastMessage → xử lý cập n
                                 onClick={() => setActiveTab('active')}
                                 data-count={orders.length}
                             >
-                                🔥 Đang phục vụ
+                                Đang phục vụ
                             </button>
                         </li>
                     </ul>

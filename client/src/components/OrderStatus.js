@@ -543,6 +543,37 @@ const OrderStatus = React.memo(({ orderId, onBack }) => {
     }
   };
 
+  const handleStartEditOrder = async () => {
+    try {
+      console.log('Starting edit order - removing table and waiter');
+      
+      const response = await fetch(API_ENDPOINTS.CUSTOMER.START_EDIT_ORDER(orderId), {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        }
+      });
+
+      const data = await response.json();
+
+      if (data.success) {
+
+        // Đóng popup modal
+        setShowWaiterResponseModal(false);
+        setWaiterResponseData(null);
+        // Bật edit mode
+        setCanEditOrder(true);
+        // Refresh order status
+        fetchOrderStatus();
+      } else {
+        alert(`Lỗi: ${data.message || 'Không thể bắt đầu sửa đơn hàng'}`);
+      }
+    } catch (error) {
+      console.error('Error starting edit order:', error);
+      alert('Có lỗi xảy ra khi bắt đầu sửa đơn hàng');
+    }
+  };
+
   const handleConfirmOrder = async () => {
     try {
       const response = await fetch(API_ENDPOINTS.CUSTOMER.CONFIRM_ORDER(orderId), {
@@ -975,7 +1006,7 @@ const OrderStatus = React.memo(({ orderId, onBack }) => {
                 disabled={isRefreshing}
               >
                 {isRefreshing ? (
-                  '🔄 Đang cập nhật...'
+                  'Đang cập nhật...'
                 ) : (pendingChanges.itemsToAdd.length > 0 || pendingChanges.itemsToRemove.length > 0) ? (
                   'Gửi lại đơn hàng cho waiter'
                 ) : (
@@ -985,7 +1016,7 @@ const OrderStatus = React.memo(({ orderId, onBack }) => {
             )}
             {order && order.status === 'paid' && (
               <button onClick={handleShowFeedback} className="feedback-btn">
-                💬 Đánh giá dịch vụ
+                Đánh giá dịch vụ
               </button>
             )}
           </div>
@@ -1244,10 +1275,7 @@ const OrderStatus = React.memo(({ orderId, onBack }) => {
             <div className="modal-footer">
               {waiterResponseData.type === 'rejected' ? (
                 <button 
-                  onClick={() => {
-                    setShowWaiterResponseModal(false);
-                    setCanEditOrder(true);
-                  }} 
+                  onClick={handleStartEditOrder}
                   className="edit-order-btn"
                 >
                   ✏️ Sửa đổi đơn hàng
@@ -1261,10 +1289,7 @@ const OrderStatus = React.memo(({ orderId, onBack }) => {
                     ✓ Xác nhận đơn hàng
                   </button>
                   <button 
-                    onClick={() => {
-                      setShowWaiterResponseModal(false);
-                      setCanEditOrder(true);
-                    }} 
+                    onClick={handleStartEditOrder}
                     className="edit-order-btn"
                   >
                     ✏️ Sửa đổi đơn hàng

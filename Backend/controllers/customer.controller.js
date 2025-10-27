@@ -976,3 +976,108 @@ exports.getLatestOrder = async (req, res) => {
     });
   }
 };
+
+// Customer bắt đầu sửa đơn hàng - xóa bàn và người phục vụ
+exports.startEditOrder = async (req, res) => {
+  try {
+    const { orderId } = req.params;
+
+    // Kiểm tra order tồn tại
+    const order = await Order.findById(orderId);
+    if (!order) {
+      return res.status(404).json({
+        success: false,
+        message: "Không tìm thấy đơn hàng"
+      });
+    }
+
+    // Kiểm tra order chưa bị hủy
+    if (order.status === 'cancelled') {
+      return res.status(400).json({
+        success: false,
+        message: "Không thể sửa đơn hàng đã bị hủy"
+      });
+    }
+
+    let oldTable = null;
+
+    // Nếu order có tableId, giải phóng bàn cũ
+    if (order.tableId) {
+      oldTable = await Table.findById(order.tableId);
+      
+      if (oldTable) {
+        // Kiểm tra bàn này có đang giữ order này không
+        if (oldTable.orderNow && oldTable.orderNow.toString() === orderId) {
+          // Giải phóng bàn
+          oldTable.status = "available";
+          oldTable.orderNow = null;
+          await oldTable.save();
+        }
+      }
+    }
+
+    // Xóa tableId và servedBy khỏi order
+    order.tableId = null;
+    order.servedBy = null;
+    
+    // Reset waiterResponse về pending - nhưng chỉ khi order chưa được confirmed
+    // Nếu order đã được confirmed, giữ nguyên status để không xuất hiện lại trong pending list
+    if (order.status === 'pending') {
+      order.waiterResponse.status = 'pending';
+      order.waiterResponse.reason = null;
+      order.waiterResponse.respondedAt = null;
+    }
+    order.customerConfirmed = false;
+    
+    // Broadcast cập nhật trạng thái bàn cho waiter (nếu có bàn được giải phóng)
+    if (oldTable && oldTable._id) {
+      // Lưu lại thông tin bàn đã giải phóng để broadcast
+      const tableInfo = {
+        _id: oldTable._id,
+        tableNumber: oldTable.tableNumber,
+        status: oldTable.status, // đã là "available" sau khi save
+        orderNow: null
+      };
+      
+      const webSocketService = req.app.get("webSocketService");
+      if (webSocketService) {
+        webSocketService.broadcastTableUpdate(oldTable._id, tableInfo);
+      }
+    }
+    
+    // Thêm vào confirmationHistory
+    order.confirmationHistory.push({
+      action: 'customer_started_edit',
+      timestamp: new Date(),
+      details: 'Customer bắt đầu sửa đổi đơn hàng - bàn và người phục vụ đã được xóa'
+    });
+    
+    await order.save();
+
+    // Populate để trả về thông tin đầy đủ
+    const populatedOrder = await Order.findById(order._id)
+      .populate("orderItems")
+      .populate("tableId")
+      .populate("paymentId");
+
+    // Emit WebSocket event - chỉ thông báo customer, KHÔNG thông báo waiter
+    // vì order chưa sẵn sàng để waiter approve lại (còn đang edit)
+    const webSocketService = req.app.get("webSocketService");
+    if (webSocketService) {
+      webSocketService.broadcastToOrder(order._id, "order:started_edit", populatedOrder);
+      // KHÔNG broadcast cho waiter vì order chỉ bắt đầu edit, chưa gửi lại cho waiter
+      // webSocketService.broadcastToAllWaiters("order:needs_waiter_confirm", populatedOrder);
+    }
+
+    res.status(200).json({
+      success: true,
+      message: "Đã bắt đầu sửa đơn hàng. Bàn đã được giải phóng, waiter sẽ chọn bàn mới khi xác nhận.",
+      data: populatedOrder
+    });
+  } catch (error) {
+    res.status(500).json({ 
+      success: false, 
+      message: error.message 
+    });
+  }
+};
