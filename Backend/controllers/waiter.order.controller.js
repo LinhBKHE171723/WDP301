@@ -1,6 +1,7 @@
 const Order = require("../models/Order");
 const OrderItem = require("../models/OrderItem");
 const Table = require("../models/Table");
+const User = require("../models/User");
 const mongoose = require("mongoose");
 const { populateOrderItemDetails } = require("../utils/customerHelpers");
 
@@ -64,7 +65,11 @@ exports.respondToOrder = async (req, res) => {
       if (!table) return res.status(404).json({ success: false, message: "Bàn không tồn tại" });
       if (table.status === 'occupied') return res.status(409).json({ success: false, message: "Bàn đã có người chọn" });
 
-      order.servedBy = new mongoose.Types.ObjectId(waiterId);
+      // tìm người phục vụ
+      const waiter = await User.findById(waiterId);
+      if (!waiter) return res.status(404).json({ success: false, message: "Nhân viên phục vụ không tồn tại" });
+
+      order.servedBy = new mongoose.Types.ObjectId(waiter._id);
       order.tableId = new mongoose.Types.ObjectId(table._id);
       order.waiterResponse.status = 'approved';
       order.waiterResponse.reason = null;
@@ -72,6 +77,7 @@ exports.respondToOrder = async (req, res) => {
 
       // Table chuyển sang occupied
       table.status = 'occupied';
+      table.orderNow = order._id;
       await table.save();
     } else {
       // ❌ Từ chối
@@ -89,14 +95,15 @@ exports.respondToOrder = async (req, res) => {
 
     await order.save();
 
-    // Populate để trả về cho UI
+    // Populate để trả về cho UI bên phía khách hàng
     const populatedOrder = await Order.findById(order._id)
       .populate("orderItems")
       .populate("tableId")
       .populate("paymentId")
-      .populate("userId", "name");
+      .populate("userId", "name")
+      .populate("servedBy", "name email");
 
-    // Emit WebSocket
+    // Emit WebSocket event để cập nhật real-time cho khách hàng 
     const webSocketService = req.app.get("webSocketService");
     if (webSocketService) {
       const eventType = approved ? "order:waiter_approved" : "order:waiter_rejected";
