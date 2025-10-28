@@ -1,6 +1,7 @@
 const User = require("../models/User");
 const jwt = require("jsonwebtoken");
 const bcrypt = require("bcryptjs");
+<<<<<<< Updated upstream
 
 exports.register = async (req, res) => {
   try {
@@ -108,6 +109,8 @@ exports.register = async (req, res) => {
     });
   }
 };
+=======
+>>>>>>> Stashed changes
 
 exports.login = async (req, res) => {
   try {
