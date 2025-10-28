@@ -46,15 +46,17 @@ exports.respondToOrder = async (req, res) => {
     if (typeof approved !== 'boolean') {
       return res.status(400).json({ success: false, message: "'approved' phải là boolean" });
     }
-    if (approved && !selectedTable) {
-      return res.status(400).json({ success: false, message: "Cần chọn bàn khi xác nhận" });
-    }
     if (!approved && (!reason || reason.trim() === '')) {
       return res.status(400).json({ success: false, message: "Lý do từ chối là bắt buộc" });
     }
 
     const order = await Order.findById(orderId);
     if (!order) return res.status(404).json({ success: false, message: "Không tìm thấy đơn hàng" });
+
+    // Validate table selection for approval
+    if (approved && !selectedTable && !order.tableId) {
+      return res.status(400).json({ success: false, message: "Cần chọn bàn khi xác nhận" });
+    }
 
     if (order.waiterResponse.status !== 'pending') {
       return res.status(400).json({ success: false, message: "Đơn hàng đã được waiter phản hồi trước đó" });
@@ -75,14 +77,8 @@ exports.respondToOrder = async (req, res) => {
           });
         }
         
-        // Check occupied cho bàn waiter chọn
-        if (table.status === 'occupied') {
-          return res.status(409).json({ 
-            success: false, 
-            message: "Bàn đã có người chọn" 
-          });
-        }
-        
+        // ✅ Cho phép nhiều order trên cùng một bàn
+        // Chỉ kiểm tra nếu bàn không tồn tại, không kiểm tra status occupied
         finalTableId = selectedTable;
         console.log(`✅ Waiter chọn bàn: ${table.tableNumber}`);
         

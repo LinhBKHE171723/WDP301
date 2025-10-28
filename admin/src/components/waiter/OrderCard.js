@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { Card, Button, Modal, Form, Spinner } from "react-bootstrap";
 import waiterApi from "../../api/waiterApi";
 import { toast } from "react-toastify";
@@ -16,20 +16,32 @@ export default function OrderCard({
   const [selectedTable, setSelectedTable] = useState("");
   const [loading, setLoading] = useState(false);
 
+  // Tự động chọn bàn hiện tại nếu order đã có tableId
+  useEffect(() => {
+    if (tableId && !selectedTable) {
+      setSelectedTable(tableId._id);
+    }
+  }, [tableId, selectedTable]);
+
   // ✅ Xác nhận đơn hàng
   const handleApprove = async () => {
-    if (!selectedTable) {
+    // Chỉ validate nếu order chưa có tableId và waiter không chọn bàn
+    if (!selectedTable && !tableId) {
       toast.warning("⚠️ Vui lòng chọn bàn trước khi xác nhận!");
       return;
     }
 
     try {
       setLoading(true);
-      await waiterApi.respondToOrder(order._id, true, null, selectedTable);
+      // Nếu không có selectedTable nhưng có tableId, sử dụng tableId
+      const finalSelectedTable = selectedTable || (tableId ? tableId._id : null);
+      
+      const response = await waiterApi.respondToOrder(order._id, true, null, finalSelectedTable);
       onWaiterResponse(order._id, "approved");
       toast.success("✅ Đã xác nhận đơn hàng và gán bàn thành công!");
     } catch (error) {
-      console.error(error);
+      console.error('❌ Error details:', error);
+      
       if (error.response?.status === 409) {
         toast.error("❌ Bàn này đã được chọn bởi waiter khác!");
       } else {
@@ -94,12 +106,24 @@ export default function OrderCard({
                 disabled={loading}
               >
                 <option value="">-- Chọn bàn trống --</option>
+                {/* Hiển thị bàn hiện tại nếu có */}
+                {tableId && (
+                  <option value={tableId._id} style={{backgroundColor: '#e8f5e8'}}>
+                    Bàn {tableId.tableNumber} (Đã gán tự động)
+                  </option>
+                )}
                 {availableTables.map((t) => (
                   <option key={t?._id} value={t?._id}>
                     Bàn {t?.tableNumber}
                   </option>
                 ))}
               </Form.Select>
+              {/* Thông báo nếu order đã có bàn */}
+              {tableId && (
+                <Form.Text className="text-success small">
+                  ✅ Đơn hàng đã được gán tự động cho bàn {tableId.tableNumber}. Bạn có thể chọn bàn khác nếu cần.
+                </Form.Text>
+              )}
             </Form.Group>
           )}
 
