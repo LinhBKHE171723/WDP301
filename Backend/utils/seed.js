@@ -223,9 +223,9 @@ const seedDatabase = async () => {
       console.log(`✅ Tạo user: ${user.username}`);
     }
 
-    const customer = users.find((u) => u.role === "customer");
+    const customers = users.filter((u) => u.role === "customer");
     const waiters = users.filter((u) => u.role === "waiter");
-    const chef = users.find((u) => u.role === "chef");
+    const chefs = users.filter((u) => u.role === "chef");
 
     // 3️⃣ Nguyên liệu
     const ingredients = await Ingredient.insertMany([
@@ -907,8 +907,6 @@ const seedDatabase = async () => {
     );
 
     // 6️⃣ Tạo orders với nhiều trạng thái khác nhau
-    const customers = users.filter((u) => u.role === "customer");
-    const chefs = users.filter((u) => u.role === "chef");
 
     // Helper function để tạo orderItem với status phù hợp
     const createOrderItems = async (items, status, assignedChef = null) => {
