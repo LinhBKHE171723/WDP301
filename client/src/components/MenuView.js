@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { getCookie, setCookie, eraseCookie, addOrderIdToCookie, getGuestOrderIds, validateAndCleanGuestOrderIds } from '../utils/cookie';
 import LoginModal from './LoginModal';
+import RegisterModal from './RegisterModal';
 import ItemDetail from './ItemDetail';
 import OrderStatus from './OrderStatus';
 import { filterMenusByPrice, filterItemsByPriceAndCategory, getUniqueCategories } from '../utils/priceFilters';
@@ -21,6 +22,7 @@ const MenuView = ({ table, onBack }) => {
   const [showCart, setShowCart] = useState(false);
   const [selectedItem, setSelectedItem] = useState(null);
   const [showLoginModal, setShowLoginModal] = useState(false);
+  const [showRegisterModal, setShowRegisterModal] = useState(false);
   const [showItemDetail, setShowItemDetail] = useState(false);
   const [priceFilter, setPriceFilter] = useState('all');
   const [itemPriceFilter, setItemPriceFilter] = useState('all');
@@ -193,12 +195,27 @@ const MenuView = ({ table, onBack }) => {
 
   const handleLogin = (userData, token) => {
     login(userData, token);
-    alert(`Chào mừng ${userData.username}!`);
+    alert(`Chào mừng ${userData.name}!`);
+  };
+
+  const handleRegister = (userData, token) => {
+    login(userData, token);
+    alert(`Chào mừng ${userData.name}! Đăng ký thành công!`);
   };
 
   const handleLogout = () => {
     logout();
     alert('Đã đăng xuất thành công!');
+  };
+
+  const handleSwitchToRegister = () => {
+    setShowLoginModal(false);
+    setShowRegisterModal(true);
+  };
+
+  const handleSwitchToLogin = () => {
+    setShowRegisterModal(false);
+    setShowLoginModal(true);
   };
 
   const handleBackFromOrder = () => {
@@ -553,6 +570,15 @@ const MenuView = ({ table, onBack }) => {
          isOpen={showLoginModal}
          onClose={() => setShowLoginModal(false)}
          onLogin={handleLogin}
+         onSwitchToRegister={handleSwitchToRegister}
+       />
+
+       {/* Register Modal */}
+       <RegisterModal 
+         isOpen={showRegisterModal}
+         onClose={() => setShowRegisterModal(false)}
+         onRegister={handleRegister}
+         onSwitchToLogin={handleSwitchToLogin}
        />
      </div>
   );

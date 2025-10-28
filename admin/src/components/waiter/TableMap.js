@@ -46,15 +46,15 @@ export default function TableMap() {
 
     // Lọc theo trạng thái order
     if (filterOrderStatus !== "all") {
-      filtered = filtered.filter(
-        (t) => t.orderNow?.status === filterOrderStatus
+      filtered = filtered.filter((t) => 
+        t.orderNow && t.orderNow.some(order => order.status === filterOrderStatus)
       );
     }
 
     // Lọc theo tên nhân viên phục vụ
     if (filterWaiter !== "all") {
-      filtered = filtered.filter(
-        (t) => t.orderNow?.servedBy?.name === filterWaiter
+      filtered = filtered.filter((t) => 
+        t.orderNow && t.orderNow.some(order => order.servedBy?.name === filterWaiter)
       );
     }
 
@@ -65,8 +65,8 @@ export default function TableMap() {
   const waiterNames = [
     ...new Set(
       tables
-        .filter((t) => t.orderNow?.servedBy?.name)
-        .map((t) => t.orderNow.servedBy.name)
+        .filter((t) => t.orderNow && t.orderNow.length > 0)
+        .flatMap((t) => t.orderNow.map(order => order.servedBy?.name).filter(Boolean))
     ),
   ];
 
@@ -176,17 +176,26 @@ export default function TableMap() {
                           {isOccupied ? "Đang có khách" : "Trống"}
                         </p>
 
-                        {table.orderNow && (
+                        {table.orderNow && table.orderNow.length > 0 && (
                           <>
                             <p className="small text-muted mb-1">
-                              🧾 Order: #{table.orderNow._id.slice(-5)}
+                              🧾 Orders: {table.orderNow.length} đơn hàng
                             </p>
-                            <p className="small text-muted mb-1">
-                              👤 {table.orderNow.servedBy?.name}
-                            </p>
-                            <p className="small text-secondary">
-                              Trạng thái: {table.orderNow.status}
-                            </p>
+                            {table.orderNow.slice(0, 2).map((order, index) => (
+                              <div key={order._id} className="small text-muted mb-1">
+                                <p className="mb-0">
+                                  #{order._id.slice(-5)} - {order.status}
+                                </p>
+                                {order.servedBy && (
+                                  <p className="mb-0">👤 {order.servedBy.name}</p>
+                                )}
+                              </div>
+                            ))}
+                            {table.orderNow.length > 2 && (
+                              <p className="small text-muted">
+                                ... và {table.orderNow.length - 2} đơn hàng khác
+                              </p>
+                            )}
                           </>
                         )}
                       </Card.Body>

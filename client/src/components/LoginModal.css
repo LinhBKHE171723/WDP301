@@ -105,6 +105,14 @@
   color: #999;
 }
 
+.form-text {
+  display: block;
+  margin-top: 4px;
+  color: #666;
+  font-size: 12px;
+  font-style: italic;
+}
+
 .error-message {
   background: #fee;
   color: #c33;
