@@ -64,16 +64,6 @@ export default function TableDetail() {
                   Trạng thái:{" "}
                   {table.status === "occupied" ? "Đang có khách" : "Trống"}
                 </p>
-
-                {/* Hiển thị người phục vụ nếu có orderNow */}
-                {table.orderNow && (
-                  <p className="fw-semibold text-dark mb-1">
-                    Nhân viên phục vụ:{" "}
-                    <span className="text-primary">
-                      {table?.orderNow?.servedBy?.name ?? "Không rõ"}
-                    </span>
-                  </p>
-                )}
               </div>
             </Card>
 
