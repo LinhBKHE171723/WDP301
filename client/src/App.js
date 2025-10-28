@@ -52,62 +52,62 @@ function DashboardRoute({ shiftInfo, shiftData, setShiftData }) {
     window.print()
   }
 
-  return (
-    <CashierDashboard
-      shiftInfo={shiftInfo}
-      shiftData={shiftData}
-      onCloseShift={handleCloseShift}
-      onAddPettyCash={handleAddPettyCash}
-      onPrintXReport={handlePrintXReport}
-    />
-  )
+  // return (
+  //   <CashierDashboard
+  //     shiftInfo={shiftInfo}
+  //     shiftData={shiftData}
+  //     onCloseShift={handleCloseShift}
+  //     onAddPettyCash={handleAddPettyCash}
+  //     onPrintXReport={handlePrintXReport}
+  //   />
+  // )
 }
 
-function UnpaidOrdersRoute() {
-  const navigate = useNavigate()
-  const handleBack = () => navigate("/cashier/dashboard")
+// function UnpaidOrdersRoute() {
+//   const navigate = useNavigate()
+//   const handleBack = () => navigate("/cashier/dashboard")
 
-  const handlePaymentComplete = (payment) => {
-    // Ở demo route standalone này, chỉ điều hướng về dashboard
-    // Nếu muốn đẩy payment vào lịch sử của dashboard qua context/store, bạn có thể thêm sau.
-    navigate("/cashier/dashboard")
-  }
+//   const handlePaymentComplete = (payment) => {
+//     // Ở demo route standalone này, chỉ điều hướng về dashboard
+//     // Nếu muốn đẩy payment vào lịch sử của dashboard qua context/store, bạn có thể thêm sau.
+//     navigate("/cashier/dashboard")
+//   }
 
-  return <UnpaidOrdersList onBack={handleBack} onPaymentComplete={handlePaymentComplete} />
-}
+  // return <UnpaidOrdersList onBack={handleBack} onPaymentComplete={handlePaymentComplete} />
+// }
 
-function TableManagementRoute() {
-  const navigate = useNavigate()
-  return <TableManagement onBack={() => navigate("/cashier/dashboard")} />
-}
+// function TableManagementRoute() {
+//   const navigate = useNavigate()
+//   return <TableManagement onBack={() => navigate("/cashier/dashboard")} />
+// }
 
-function OrderPaymentRoute() {
-  const navigate = useNavigate()
+// function OrderPaymentRoute() {
+//   const navigate = useNavigate()
 
   // Tạo demo order nếu người dùng vào trực tiếp /cashier/orderpayment
-  const demoOrder = useMemo(
-    () => ({
-      id: 999,
-      orderNumber: "ĐH-DEM0",
-      tableNumber: "Bàn DEMO",
-      orderTime: new Date().toISOString(),
-      items: [
-        { id: 1, name: "Phở Bò", quantity: 1, price: 75000 },
-        { id: 2, name: "Trà Đá", quantity: 2, price: 10000 },
-      ],
-      totalAmount: 95000,
-    }),
-    []
-  )
+//   const demoOrder = useMemo(
+//     () => ({
+//       id: 999,
+//       orderNumber: "ĐH-DEM0",
+//       tableNumber: "Bàn DEMO",
+//       orderTime: new Date().toISOString(),
+//       items: [
+//         { id: 1, name: "Phở Bò", quantity: 1, price: 75000 },
+//         { id: 2, name: "Trà Đá", quantity: 2, price: 10000 },
+//       ],
+//       totalAmount: 95000,
+//     }),
+//     []
+//   )
 
-  return (
-    <OrderPayment
-      order={demoOrder}
-      onBack={() => navigate("/cashier/dashboard")}
-      onPaymentComplete={() => navigate("/cashier/dashboard")}
-    />
-  )
-}
+//   return (
+//     <OrderPayment
+//       order={demoOrder}
+//       onBack={() => navigate("/cashier/dashboard")}
+//       onPaymentComplete={() => navigate("/cashier/dashboard")}
+//     />
+//   )
+// }
 
 /* -------------------------- App chính -------------------------- */
 

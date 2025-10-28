@@ -38,6 +38,8 @@ export default function CashierDashboard({
   const [pettyCashType, setPettyCashType] = useState("out") // "in" | "out"
   const [pettyCashAmount, setPettyCashAmount] = useState("")
   const [pettyCashReason, setPettyCashReason] = useState("")
+  const [now, setNow] = useState(Date.now())
+
 
   // ====== Dữ liệu mặc định để tương thích nếu app cũ chưa truyền vào ======
   const noop = () => {}
@@ -92,6 +94,12 @@ export default function CashierDashboard({
     window.addEventListener("storage", handleStorage)
     return () => window.removeEventListener("storage", handleStorage)
   }, [])
+
+  useEffect(() => {
+  const id = setInterval(() => setNow(Date.now()), 60_000) // mỗi phút
+  return () => clearInterval(id)
+}, [])
+
   // === TEST ONLY: luôn có 3 đơn chờ trên Dashboard ===
 useEffect(() => {
   const FORCE_TEST_SEED = true; // hết test đặt false
@@ -188,9 +196,10 @@ useEffect(() => {
   const totalRevenue = cashRevenue + cardRevenue
   const completedOrdersCount = paymentHistory.length
 
-  const currentShiftDuration = Math.floor(
-    (Date.now() - new Date(shiftInfo.startTime).getTime()) / (1000 * 60)
-  )
+  const startMs = new Date(shiftInfo.startTime).getTime()
+const currentShiftDuration = Number.isFinite(startMs)
+  ? Math.max(0, Math.floor((now - startMs) / 60_000))
+  : 0
 
   // ====== Phiếu thu/chi: tổng hợp ======
   const pettyCashIn = (shiftData.pettyCashTransactions || [])

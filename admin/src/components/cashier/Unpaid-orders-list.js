@@ -48,26 +48,26 @@ const SEED_ORDERS = [
 
 // Load danh sách đơn chờ từ localStorage, nếu chưa có thì seed
 const loadUnpaid = () => {
-  const FORCE_TEST_SEED = true; // <-- khi hết test, đổi thành false
+  const FORCE_TEST_SEED = false; // <- tắt khi hết test
 
   try {
-    if (FORCE_TEST_SEED) {
-      localStorage.setItem("unpaidOrders", JSON.stringify(SEED_ORDERS))
-      return SEED_ORDERS
-    }
+    const raw = localStorage.getItem("unpaidOrders");
+    const arr = raw ? JSON.parse(raw) : null;
 
-    const raw = localStorage.getItem("unpaidOrders")
-    if (raw) {
-      const arr = JSON.parse(raw)
-      if (Array.isArray(arr) && arr.length > 0) return arr
+    if (Array.isArray(arr) && arr.length > 0) return arr;
+
+    // Chỉ seed khi rỗng
+    const data = SEED_ORDERS;
+    if (FORCE_TEST_SEED || !arr) {
+      localStorage.setItem("unpaidOrders", JSON.stringify(data));
     }
-    // chưa có thì seed mặc định
-    localStorage.setItem("unpaidOrders", JSON.stringify(SEED_ORDERS))
-    return SEED_ORDERS
+    return data;
   } catch {
-    return SEED_ORDERS
+    localStorage.setItem("unpaidOrders", JSON.stringify(SEED_ORDERS));
+    return SEED_ORDERS;
   }
-}
+};
+
 
 function UnpaidOrdersList({ onBack, onPaymentComplete }) {
   const [selectedOrder, setSelectedOrder] = useState(null)
