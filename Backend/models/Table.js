@@ -9,7 +9,7 @@ const tableSchema = new Schema({
     enum: ["available", "occupied"],
     default: "available",
   },
-  orderNow: { type: Schema.Types.ObjectId, ref: "Order", default: null },
+  orderNow: [{ type: Schema.Types.ObjectId, ref: "Order" }],
 });
 
 module.exports = mongoose.model("Table", tableSchema);

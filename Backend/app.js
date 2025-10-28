@@ -2,6 +2,7 @@ const express = require("express");
 const mongoose = require("mongoose");
 const cors = require("cors");
 const morgan = require("morgan");
+const cookieParser = require("cookie-parser");
 const dotenv = require("dotenv");
 const seedDatabase = require("./utils/seed");
 const kitchenRoutes = require("./routes/kitchen.routes");
@@ -18,6 +19,7 @@ const app = express();
 // middlewares
 app.use(cors());
 app.use(express.json());
+app.use(cookieParser());
 app.use(morgan("dev"));
 app.disable("etag");
 
