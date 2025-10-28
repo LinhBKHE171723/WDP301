@@ -2,81 +2,120 @@ import React, { useState } from 'react';
 import './LoginModal.css';
 
 const RegisterModal = ({ isOpen, onClose, onRegister, onSwitchToLogin }) => {
-  const [form, setForm] = useState({ 
-    name: "", 
-    username: "", 
-    email: "", 
-    password: "", 
-    confirmPassword: "",
-    phone: ""
+  const [formData, setFormData] = useState({
+    name: '',
+    username: '',
+    email: '',
+    password: '',
+    confirmPassword: '',
+    phone: ''
   });
-  const [error, setError] = useState("");
-  const [loading, setLoading] = useState(false);
+  const [errors, setErrors] = useState({});
+  const [isLoading, setIsLoading] = useState(false);
 
   const handleChange = (e) => {
-    setForm({ ...form, [e.target.name]: e.target.value });
-    setError(""); // Clear error when user types
+    const { name, value } = e.target;
+    setFormData(prev => ({
+      ...prev,
+      [name]: value
+    }));
+    // Clear error when user starts typing
+    if (errors[name]) {
+      setErrors(prev => ({
+        ...prev,
+        [name]: ''
+      }));
+    }
+  };
+
+  const validateForm = () => {
+    const newErrors = {};
+
+    if (!formData.name.trim()) {
+      newErrors.name = 'Tên là bắt buộc';
+    }
+
+    if (!formData.email.trim()) {
+      newErrors.email = 'Email là bắt buộc';
+    } else if (!/\S+@\S+\.\S+/.test(formData.email)) {
+      newErrors.email = 'Email không hợp lệ';
+    }
+
+    if (!formData.password) {
+      newErrors.password = 'Mật khẩu là bắt buộc';
+    } else if (formData.password.length < 6) {
+      newErrors.password = 'Mật khẩu phải có ít nhất 6 ký tự';
+    }
+
+    if (formData.password !== formData.confirmPassword) {
+      newErrors.confirmPassword = 'Mật khẩu xác nhận không khớp';
+    }
+
+    setErrors(newErrors);
+    return Object.keys(newErrors).length === 0;
   };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    setError("");
-    setLoading(true);
-
-    // Validation
-    if (form.password !== form.confirmPassword) {
-      setError("Mật khẩu xác nhận không khớp");
-      setLoading(false);
+    
+    if (!validateForm()) {
       return;
     }
 
-    if (form.password.length < 6) {
-      setError("Mật khẩu phải có ít nhất 6 ký tự");
-      setLoading(false);
-      return;
-    }
-
+    setIsLoading(true);
     try {
-      const res = await fetch("http://localhost:5000/api/auth/register", {
-        method: "POST",
+      const response = await fetch('http://localhost:5000/api/auth/register', {
+        method: 'POST',
         headers: {
-          "Content-Type": "application/json",
+          'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          name: form.name,
-          username: form.username || undefined,
-          email: form.email,
-          password: form.password,
-          phone: form.phone || undefined
-        }),
+          name: formData.name,
+          username: formData.username,
+          email: formData.email,
+          password: formData.password,
+          phone: formData.phone
+        })
       });
 
-      const data = await res.json();
+      const result = await response.json();
 
-      if (res.ok && data.success) {
-        onRegister(data.user, data.token);
+      if (response.ok && result.success) {
+        // Registration successful
+        alert(`Chào mừng ${result.user.name}! Đăng ký thành công!`);
+        onRegister(result.user, result.token);
         onClose();
+        // Reset form
+        setFormData({
+          name: '',
+          username: '',
+          email: '',
+          password: '',
+          confirmPassword: '',
+          phone: ''
+        });
       } else {
-        setError(data.message || "Đăng ký thất bại");
+        // Registration failed
+        setErrors({ general: result.message || 'Đăng ký thất bại' });
       }
-    } catch (err) {
-      console.error(err);
-      setError("Lỗi kết nối server. Vui lòng thử lại.");
+    } catch (error) {
+      console.error('Registration error:', error);
+      setErrors({ general: 'Lỗi kết nối. Vui lòng thử lại.' });
     } finally {
-      setLoading(false);
+      setIsLoading(false);
     }
   };
 
   const handleClose = () => {
-    setForm({ 
-      name: "", 
-      username: "", 
-      email: "", 
-      password: "", 
-      confirmPassword: "",
-      phone: ""
+    setFormData({
+      name: '',
+      username: '',
+      email: '',
+      password: '',
+      confirmPassword: '',
+      phone: ''
     });
-    setError("");
+    setErrors({});
     onClose();
   };
 
@@ -86,13 +125,17 @@ const RegisterModal = ({ isOpen, onClose, onRegister, onSwitchToLogin }) => {
     <div className="login-modal-overlay">
       <div className="login-modal">
         <div className="login-modal-header">
-          <h2>Đăng ký tài khoản</h2>
+          <h2>🎉 Đăng ký tài khoản</h2>
           <button onClick={handleClose} className="close-btn">
             ×
           </button>
         </div>
 
         <div className="login-modal-body">
+          {errors.general && (
+            <div className="error-message">{errors.general}</div>
+          )}
+
           <form onSubmit={handleSubmit}>
             <div className="form-group">
               <label htmlFor="name">Họ và tên *</label>
@@ -100,11 +143,12 @@ const RegisterModal = ({ isOpen, onClose, onRegister, onSwitchToLogin }) => {
                 type="text"
                 id="name"
                 name="name"
-                value={form.name}
+                value={formData.name}
                 onChange={handleChange}
-                required
                 placeholder="Nhập họ và tên"
+                required
               />
+              {errors.name && <div className="error-message">{errors.name}</div>}
             </div>
 
             <div className="form-group">
@@ -113,11 +157,12 @@ const RegisterModal = ({ isOpen, onClose, onRegister, onSwitchToLogin }) => {
                 type="email"
                 id="email"
                 name="email"
-                value={form.email}
+                value={formData.email}
                 onChange={handleChange}
-                required
                 placeholder="Nhập email"
+                required
               />
+              {errors.email && <div className="error-message">{errors.email}</div>}
             </div>
 
             <div className="form-group">
@@ -126,23 +171,11 @@ const RegisterModal = ({ isOpen, onClose, onRegister, onSwitchToLogin }) => {
                 type="text"
                 id="username"
                 name="username"
-                value={form.username}
+                value={formData.username}
                 onChange={handleChange}
-                placeholder="Để trống sẽ tự động tạo"
+                placeholder="Tên đăng nhập (tùy chọn)"
               />
-              <small className="form-text">Nếu để trống, hệ thống sẽ tự động tạo từ email</small>
-            </div>
-
-            <div className="form-group">
-              <label htmlFor="phone">Số điện thoại</label>
-              <input
-                type="tel"
-                id="phone"
-                name="phone"
-                value={form.phone}
-                onChange={handleChange}
-                placeholder="Nhập số điện thoại"
-              />
+              <div className="form-text">Để trống để tự động tạo từ email</div>
             </div>
 
             <div className="form-group">
@@ -151,11 +184,12 @@ const RegisterModal = ({ isOpen, onClose, onRegister, onSwitchToLogin }) => {
                 type="password"
                 id="password"
                 name="password"
-                value={form.password}
+                value={formData.password}
                 onChange={handleChange}
+                placeholder="Nhập mật khẩu"
                 required
-                placeholder="Nhập mật khẩu (ít nhất 6 ký tự)"
               />
+              {errors.password && <div className="error-message">{errors.password}</div>}
             </div>
 
             <div className="form-group">
@@ -164,21 +198,32 @@ const RegisterModal = ({ isOpen, onClose, onRegister, onSwitchToLogin }) => {
                 type="password"
                 id="confirmPassword"
                 name="confirmPassword"
-                value={form.confirmPassword}
+                value={formData.confirmPassword}
                 onChange={handleChange}
-                required
                 placeholder="Nhập lại mật khẩu"
+                required
               />
+              {errors.confirmPassword && <div className="error-message">{errors.confirmPassword}</div>}
             </div>
 
-            {error && <div className="error-message">{error}</div>}
+            <div className="form-group">
+              <label htmlFor="phone">Số điện thoại</label>
+              <input
+                type="tel"
+                id="phone"
+                name="phone"
+                value={formData.phone}
+                onChange={handleChange}
+                placeholder="Nhập số điện thoại"
+              />
+            </div>
 
             <button 
               type="submit" 
               className="login-btn"
-              disabled={loading}
+              disabled={isLoading}
             >
-              {loading ? "Đang đăng ký..." : "Đăng ký"}
+              {isLoading ? 'Đang đăng ký...' : 'Đăng ký'}
             </button>
           </form>
 

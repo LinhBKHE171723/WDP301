@@ -208,6 +208,11 @@ const MenuView = ({ table, onBack }) => {
     alert('Đã đăng xuất thành công!');
   };
 
+  const handleRegister = (userData, token) => {
+    login(userData, token);
+    alert(`Chào mừng ${userData.name}! Đăng ký thành công!`);
+  };
+
   const handleSwitchToRegister = () => {
     setShowLoginModal(false);
     setShowRegisterModal(true);
@@ -565,22 +570,22 @@ const MenuView = ({ table, onBack }) => {
          />
        )}
 
-       {/* Login Modal */}
-       <LoginModal 
-         isOpen={showLoginModal}
-         onClose={() => setShowLoginModal(false)}
-         onLogin={handleLogin}
-         onSwitchToRegister={handleSwitchToRegister}
-       />
+      {/* Login Modal */}
+      <LoginModal 
+        isOpen={showLoginModal}
+        onClose={() => setShowLoginModal(false)}
+        onLogin={handleLogin}
+        onSwitchToRegister={handleSwitchToRegister}
+      />
 
-       {/* Register Modal */}
-       <RegisterModal 
-         isOpen={showRegisterModal}
-         onClose={() => setShowRegisterModal(false)}
-         onRegister={handleRegister}
-         onSwitchToLogin={handleSwitchToLogin}
-       />
-     </div>
+      {/* Register Modal */}
+      <RegisterModal 
+        isOpen={showRegisterModal}
+        onClose={() => setShowRegisterModal(false)}
+        onRegister={handleRegister}
+        onSwitchToLogin={handleSwitchToLogin}
+      />
+    </div>
   );
 };
 
