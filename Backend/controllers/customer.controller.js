@@ -125,10 +125,133 @@ exports.getItemById = async (req, res) => {
 exports.createOrder = async (req, res) => {
   try {
     const { tableId, orderItems, userId } = req.body;
+    let finalTableId = tableId;
+
+    console.log(`[createOrder] Initial tableId from request: ${tableId}, userId: ${userId}`);
+    console.log(`[createOrder] Raw activeOrderIds cookie: ${req.cookies?.activeOrderIds}`);
+    console.log(`[createOrder] All cookies received:`, req.cookies);
+
+    // 🔍 Tự động tìm tableId nếu không được cung cấp
+    if (!finalTableId) {
+      // Case 1: Customer đã đăng nhập - tìm theo userId
+      if (userId) {
+        const latestActiveOrder = await Order.findOne({
+          userId: userId,
+          status: { $in: ["confirmed", "preparing", "served"] },
+          tableId: { $ne: null }
+        })
+        .sort({ createdAt: -1 })
+        .limit(1);
+        
+        if (latestActiveOrder?.tableId) {
+          finalTableId = latestActiveOrder.tableId;
+          console.log(`✅ Auto-assigned tableId from userId: ${finalTableId} (Order ID: ${latestActiveOrder._id}, Status: ${latestActiveOrder.status})`);
+        } else {
+          console.log(`❌ No active order with tableId found for userId: ${userId}`);
+        }
+      }
+      
+      // Case 2: Customer chưa đăng nhập - tìm theo cookie
+      if (!finalTableId && req.cookies?.activeOrderIds) {
+        try {
+          const activeOrderIds = JSON.parse(req.cookies.activeOrderIds);
+          console.log(`[createOrder] Parsed activeOrderIds from cookie: ${activeOrderIds}`);
+
+          if (activeOrderIds.length > 0) {
+            // Tìm order có tableId gần nhất (ưu tiên active orders)
+            let latestOrder = await Order.findOne({
+              _id: { $in: activeOrderIds },
+              status: { $in: ["confirmed", "preparing", "served"] },
+              tableId: { $ne: null }
+            })
+            .sort({ createdAt: -1 })
+            .limit(1);
+            
+            console.log(`[createOrder] Result of first query (active orders): ${latestOrder ? `ID: ${latestOrder._id}, Status: ${latestOrder.status}, TableId: ${latestOrder.tableId}` : 'Not found'}`);
+
+            // Nếu không tìm thấy order active có tableId, tìm order pending có tableId
+            if (!latestOrder) {
+              latestOrder = await Order.findOne({
+                _id: { $in: activeOrderIds },
+                status: "pending",
+                tableId: { $ne: null }
+              })
+              .sort({ createdAt: -1 })
+              .limit(1);
+              console.log(`[createOrder] Result of second query (pending orders): ${latestOrder ? `ID: ${latestOrder._id}, Status: ${latestOrder.status}, TableId: ${latestOrder.tableId}` : 'Not found'}`);
+            }
+            
+            // Nếu vẫn không tìm thấy, tìm order gần nhất (có thể chưa có tableId)
+            if (!latestOrder) {
+              latestOrder = await Order.findOne({
+                _id: { $in: activeOrderIds }
+              })
+              .sort({ createdAt: -1 })
+              .limit(1);
+              console.log(`[createOrder] Result of third query (any order): ${latestOrder ? `ID: ${latestOrder._id}, Status: ${latestOrder.status}, TableId: ${latestOrder.tableId}` : 'Not found'}`);
+            }
+            
+            if (latestOrder?.tableId) {
+              finalTableId = latestOrder.tableId;
+              console.log(`✅ Auto-assigned tableId from cookie: ${finalTableId} (Order ID: ${latestOrder._id}, Status: ${latestOrder.status})`);
+            } else {
+              console.log(`⚠️ Found order in cookie but no tableId: ${latestOrder?._id}`);
+            }
+          } else {
+            console.log(`⚠️ Cookie exists but activeOrderIds array is empty`);
+          }
+        } catch (e) {
+          console.error("❌ Error parsing activeOrderIds cookie:", e);
+        }
+      }
+      
+      // 🔄 Fallback: Nếu không có cookie, tìm order gần nhất của guest user (trong 2 giờ)
+      if (!finalTableId && !userId) {
+        console.log(`🔄 Fallback: Tìm order gần nhất của guest user trong 2 giờ`);
+        const twoHoursAgo = new Date(Date.now() - 2 * 60 * 60 * 1000);
+        
+        // Tìm order gần nhất của guest user (mở rộng thời gian)
+        const latestGuestOrder = await Order.findOne({
+          userId: null,
+          createdAt: { $gte: twoHoursAgo },
+          status: { $in: ["confirmed", "preparing", "served"] },
+          tableId: { $ne: null }
+        })
+        .sort({ createdAt: -1 })
+        .limit(1);
+        
+        if (latestGuestOrder?.tableId) {
+          finalTableId = latestGuestOrder.tableId;
+          console.log(`✅ Fallback: Auto-assigned tableId from recent guest order: ${finalTableId} (Order ID: ${latestGuestOrder._id}, Status: ${latestGuestOrder.status})`);
+          
+          // 🔄 Tự động tạo cookie mới với order tìm được
+          try {
+            const newActiveOrderIds = [latestGuestOrder._id.toString()];
+            res.cookie('activeOrderIds', JSON.stringify(newActiveOrderIds), {
+              httpOnly: true,
+              secure: process.env.NODE_ENV === 'production',
+              sameSite: 'lax',
+              maxAge: 24 * 60 * 60 * 1000 // 24 hours
+            });
+            console.log(`🍪 Auto-created cookie with fallback order: ${JSON.stringify(newActiveOrderIds)}`);
+          } catch (e) {
+            console.error("❌ Error creating fallback cookie:", e);
+          }
+        } else {
+          console.log(`⚠️ Fallback: Không tìm thấy order gần nhất của guest user trong 2 giờ`);
+        }
+      }
+      
+      if (!finalTableId) {
+        console.log(`⚠️ Không thể tự động gán tableId - waiter sẽ cần chọn bàn`);
+      }
+    }
+
+    console.log(`[createOrder] Final tableId before order creation: ${finalTableId}`);
 
     // Kiểm tra bàn có tồn tại không (chỉ khi có tableId)
-    if (tableId) {
-      const table = await Table.findById(tableId);
+    if (finalTableId) {
+      const table = await Table.findById(finalTableId);
       if (!table) {
         return res.status(404).json({ 
           success: false, 
@@ -151,7 +274,7 @@ exports.createOrder = async (req, res) => {
 
     // Tạo Order
     const order = new Order({
-      tableId: tableId,
+      tableId: finalTableId,
       orderItems: createdOrderItems,
       paymentId: payment._id,
       status: "pending",
@@ -187,6 +310,59 @@ exports.createOrder = async (req, res) => {
       .populate("tableId")
       .populate("paymentId");
 
+    // 🍪 Lưu orderId vào cookie
+    let activeOrderIds = [];
+    if (req.cookies?.activeOrderIds) {
+      try {
+        activeOrderIds = JSON.parse(req.cookies.activeOrderIds);
+      } catch (e) {
+        console.error("Error parsing activeOrderIds:", e);
+        activeOrderIds = [];
+      }
+    }
+    
+    // Thêm order mới vào cookie
+    if (!activeOrderIds.includes(order._id.toString())) {
+      activeOrderIds.push(order._id.toString());
+    }
+    
+    // 🔄 Smart recovery: Nếu có tableId từ fallback, thêm các orders khác cùng bàn
+    if (finalTableId && !tableId) {
+      console.log(`🔄 Smart recovery: Tìm các orders khác cùng bàn ${finalTableId}`);
+      const sameTableOrders = await Order.find({
+        tableId: finalTableId,
+        status: { $in: ["confirmed", "preparing", "served"] },
+        _id: { $ne: order._id }
+      })
+      .sort({ createdAt: -1 })
+      .limit(10)
+      .select('_id');
+      
+      sameTableOrders.forEach(sameOrder => {
+        if (!activeOrderIds.includes(sameOrder._id.toString())) {
+          activeOrderIds.push(sameOrder._id.toString());
+        }
+      });
+      
+      console.log(`🔄 Smart recovery: Thêm ${sameTableOrders.length} orders cùng bàn vào cookie`);
+    }
+    
+    // Giới hạn tối đa 50 orders
+    if (activeOrderIds.length > 50) {
+      activeOrderIds = activeOrderIds.slice(-50);
+    }
+    
+    // Set cookie
+    res.cookie('activeOrderIds', JSON.stringify(activeOrderIds), {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === 'production',
+      sameSite: 'lax',
+      maxAge: 24 * 60 * 60 * 1000 // 24 hours
+    });
+    
+    console.log(`🍪 Updated cookie with ${activeOrderIds.length} orders: ${JSON.stringify(activeOrderIds)}`);
+    console.log(`🍪 Cookie options: httpOnly=true, secure=${process.env.NODE_ENV === 'production'}, sameSite=lax, maxAge=24h`);
+
     // Emit WebSocket event để thông báo waiter có đơn hàng mới cần xác nhận
     const webSocketService = req.app.get("webSocketService");
     if (webSocketService) {
@@ -198,7 +374,8 @@ exports.createOrder = async (req, res) => {
     res.status(201).json({
       success: true,
       message: "Đặt món thành công",
-      data: populatedOrder
+      data: populatedOrder,
+      autoTableAssigned: finalTableId && !tableId // Flag báo tableId tự động
     });
   } catch (error) {
     res.status(500).json({ 
@@ -530,43 +707,81 @@ exports.updateOrderStatus = async (req, res) => {
           }
         );
       }
-      
-      // Reload order để có payment data mới nhất
-      const updatedOrder = await Order.findById(orderId)
-        .populate("orderItems")
-        .populate("tableId")
-        .populate("paymentId");
-      
-      // Emit WebSocket với order đã cập nhật payment
-      const webSocketService = req.app.get("webSocketService");
-      if (webSocketService) {
-        webSocketService.broadcastToOrder(order._id, "order:updated", updatedOrder);
-      }
-      
-      return res.status(200).json({
-        success: true,
-        message: status === 'paid' 
-          ? "Cập nhật trạng thái đơn hàng và thanh toán thành công"
-          : "Cập nhật trạng thái đơn hàng thành công",
-        data: updatedOrder
-      });
     }
 
-    // Emit WebSocket event để cập nhật real-time
+    // Xóa order khỏi table.orderNow khi order chuyển sang paid/cancelled
+    if (['paid', 'cancelled'].includes(status) && order.tableId) {
+      const table = await Table.findById(order.tableId);
+      if (table && table.orderNow) {
+        table.orderNow = table.orderNow.filter(oid => oid.toString() !== orderId);
+        if (table.orderNow.length === 0) {
+          table.status = "available";
+        }
+        await table.save();
+      }
+    }
+
+    // 🍪 Cleanup cookie khi order hoàn thành
+    if (['paid', 'cancelled'].includes(status)) {
+      if (req.cookies?.activeOrderIds) {
+        try {
+          let activeOrderIds = JSON.parse(req.cookies.activeOrderIds);
+          
+          // Xóa order này khỏi cookie
+          activeOrderIds = activeOrderIds.filter(id => id !== orderId);
+          
+          // Cleanup: Xóa các orders không còn active nữa
+          if (activeOrderIds.length > 0) {
+            const stillActiveOrders = await Order.find({
+              _id: { $in: activeOrderIds },
+              status: { $in: ["pending", "confirmed", "preparing", "served"] }
+            }).select('_id');
+            
+            activeOrderIds = stillActiveOrders.map(o => o._id.toString());
+          }
+          
+          // Update hoặc clear cookie
+          if (activeOrderIds.length > 0) {
+            res.cookie('activeOrderIds', JSON.stringify(activeOrderIds), {
+              httpOnly: true,
+              secure: process.env.NODE_ENV === 'production',
+              sameSite: 'lax',
+              maxAge: 24 * 60 * 60 * 1000
+            });
+            console.log(`🍪 Cleaned cookie, ${activeOrderIds.length} orders remaining`);
+          } else {
+            res.clearCookie('activeOrderIds');
+            console.log(`🍪 Cleared cookie - no active orders`);
+          }
+        } catch (e) {
+          console.error("Error cleaning up cookie:", e);
+        }
+      }
+    }
+      
+    // Reload order để có payment data mới nhất
+    const updatedOrder = await Order.findById(orderId)
+      .populate("orderItems")
+      .populate("tableId")
+      .populate("paymentId");
+    
+    // Emit WebSocket với order đã cập nhật payment
     const webSocketService = req.app.get("webSocketService");
     if (webSocketService) {
-      webSocketService.broadcastToOrder(order._id, "order:updated", order);
+      webSocketService.broadcastToOrder(order._id, "order:updated", updatedOrder);
       
       // Nếu đơn hàng bị hủy, thông báo waiter
       if (status === 'cancelled') {
-        webSocketService.broadcastToAllWaiters("order:cancelled", order);
+        webSocketService.broadcastToAllWaiters("order:cancelled", updatedOrder);
       }
     }
-
-    res.status(200).json({
+    
+    return res.status(200).json({
       success: true,
-      message: "Cập nhật trạng thái đơn hàng thành công",
-      data: order
+      message: status === 'paid' 
+        ? "Cập nhật trạng thái đơn hàng và thanh toán thành công"
+        : "Cập nhật trạng thái đơn hàng thành công",
+      data: updatedOrder
     });
   } catch (error) {
     res.status(500).json({ 
@@ -1007,10 +1222,13 @@ exports.startEditOrder = async (req, res) => {
       
       if (oldTable) {
         // Kiểm tra bàn này có đang giữ order này không
-        if (oldTable.orderNow && oldTable.orderNow.toString() === orderId) {
-          // Giải phóng bàn
-          oldTable.status = "available";
-          oldTable.orderNow = null;
+        if (oldTable.orderNow && oldTable.orderNow.some(oid => oid.toString() === orderId)) {
+          // Remove order khỏi mảng
+          oldTable.orderNow = oldTable.orderNow.filter(oid => oid.toString() !== orderId);
+          // Nếu không còn order nào active, set bàn về available
+          if (oldTable.orderNow.length === 0) {
+            oldTable.status = "available";
+          }
           await oldTable.save();
         }
       }
@@ -1036,7 +1254,7 @@ exports.startEditOrder = async (req, res) => {
         _id: oldTable._id,
         tableNumber: oldTable.tableNumber,
         status: oldTable.status, // đã là "available" sau khi save
-        orderNow: null
+        orderNow: []
       };
       
       const webSocketService = req.app.get("webSocketService");

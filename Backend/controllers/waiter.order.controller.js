@@ -62,23 +62,91 @@ exports.respondToOrder = async (req, res) => {
 
     // nếu waiter xác nhận
     if (approved) {
-      const table = await Table.findById(selectedTable);
-      if (!table) return res.status(404).json({ success: false, message: "Bàn không tồn tại" });
-      if (table.status === 'occupied') return res.status(409).json({ success: false, message: "Bàn đã có người chọn" });
+      let table;
+      let finalTableId;
+      
+      // 🎯 Ưu tiên bàn mà waiter chọn (nếu có)
+      if (selectedTable) {
+        table = await Table.findById(selectedTable);
+        if (!table) {
+          return res.status(404).json({ 
+            success: false, 
+            message: "Bàn không tồn tại" 
+          });
+        }
+        
+        // Check occupied cho bàn waiter chọn
+        if (table.status === 'occupied') {
+          return res.status(409).json({ 
+            success: false, 
+            message: "Bàn đã có người chọn" 
+          });
+        }
+        
+        finalTableId = selectedTable;
+        console.log(`✅ Waiter chọn bàn: ${table.tableNumber}`);
+        
+      } else if (order.tableId) {
+        // 🔄 Fallback: Sử dụng bàn auto-assigned
+        table = await Table.findById(order.tableId);
+        if (!table) {
+          return res.status(404).json({ 
+            success: false, 
+            message: "Bàn auto-assigned không tồn tại" 
+          });
+        }
+        
+        finalTableId = order.tableId;
+        console.log(`✅ Sử dụng bàn auto-assigned: ${table.tableNumber}`);
+        
+      } else {
+        // ❌ Không có bàn nào được chọn
+        return res.status(400).json({ 
+          success: false, 
+          message: "Cần chọn bàn khi xác nhận đơn hàng" 
+        });
+      }
+      
+      // 🔄 Cập nhật tableId cho order (nếu khác với bàn hiện tại)
+      let oldTableId = null;
+      if (order.tableId?.toString() !== finalTableId.toString()) {
+        oldTableId = order.tableId;
+        order.tableId = new mongoose.Types.ObjectId(finalTableId);
+        console.log(`🔄 Order ${order._id} được cập nhật tableId: ${order.tableId}`);
+        
+        // 🧹 Xử lý bàn cũ (nếu có)
+        if (oldTableId) {
+          const oldTable = await Table.findById(oldTableId);
+          if (oldTable && oldTable.orderNow) {
+            oldTable.orderNow = oldTable.orderNow.filter(oid => oid.toString() !== order._id.toString());
+            if (oldTable.orderNow.length === 0) {
+              oldTable.status = "available";
+            }
+            await oldTable.save();
+            console.log(`🧹 Đã xóa order khỏi bàn cũ: ${oldTable.tableNumber}`);
+          }
+        }
+      }
 
-      // tìm người phục vụ
+      // Tìm người phục vụ
       const waiter = await User.findById(waiterId);
-      if (!waiter) return res.status(404).json({ success: false, message: "Nhân viên phục vụ không tồn tại" });
+      if (!waiter) {
+        return res.status(404).json({ 
+          success: false, 
+          message: "Nhân viên phục vụ không tồn tại" 
+        });
+      }
 
       order.servedBy = new mongoose.Types.ObjectId(waiter._id);
-      order.tableId = new mongoose.Types.ObjectId(table._id);
       order.waiterResponse.status = 'approved';
       order.waiterResponse.reason = null;
       order.waiterResponse.respondedAt = new Date();
 
-      // Table chuyển sang occupied
+      // Table chuyển sang occupied và thêm order vào mảng
       table.status = 'occupied';
-      table.orderNow = order._id;
+      if (!table.orderNow.includes(order._id)) {
+        table.orderNow.push(order._id);
+      }
       await table.save();
     } else {
       // ❌ Từ chối
@@ -95,6 +163,8 @@ exports.respondToOrder = async (req, res) => {
     });
 
     await order.save();
+    
+    console.log(`💾 Order ${order._id} đã được save với tableId: ${order.tableId}`);
 
     // Populate để trả về cho UI bên phía khách hàng
     const populatedOrder = await Order.findById(order._id)
