@@ -82,7 +82,6 @@ const RegisterModal = ({ isOpen, onClose, onRegister, onSwitchToLogin }) => {
 
       if (response.ok && result.success) {
         // Registration successful
-        alert(`Chào mừng ${result.user.name}! Đăng ký thành công!`);
         onRegister(result.user, result.token);
         onClose();
         // Reset form

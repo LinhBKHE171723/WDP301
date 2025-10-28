@@ -208,11 +208,6 @@ const MenuView = ({ table, onBack }) => {
     alert('Đã đăng xuất thành công!');
   };
 
-  const handleRegister = (userData, token) => {
-    login(userData, token);
-    alert(`Chào mừng ${userData.name}! Đăng ký thành công!`);
-  };
-
   const handleSwitchToRegister = () => {
     setShowLoginModal(false);
     setShowRegisterModal(true);
