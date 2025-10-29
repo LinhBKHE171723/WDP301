@@ -10,67 +10,134 @@ export default function Header() {
     return (
         <Navbar
             bg="white"
-            expand="md"
+            expand={false}
             className="shadow-sm sticky-top border-bottom"
+            style={{ zIndex: 1030 }}
         >
-            <Container fluid className="px-3">
-                {/* Logo + tên nhà hàng */}
-                {/* Logo + tên nhà hàng */}
+            <Container fluid className="px-2 px-md-3 py-2">
+                {/* Desktop Layout: 1 hàng */}
+                <div className="d-none d-lg-flex align-items-center justify-content-between w-100">
+                    {/* Logo */}
                 <Navbar.Brand
-                    className="fw-bold text-dark d-flex align-items-center"
-                    style={{ cursor: "pointer" }}
+                        className="fw-bold text-dark d-flex align-items-center p-0"
+                        style={{ cursor: "pointer", flexShrink: 0 }}
                     onClick={() => navigate("/waiter/dashboard")}
                 >
-                    🍽️ <span className="ms-2">Nhà hàng WDP</span>
+                        <span style={{ fontSize: '22px' }}>🍽️</span>
+                        <span className="ms-2" style={{ fontSize: '16px' }}>Nhà hàng WDP</span>
                 </Navbar.Brand>
 
-                {/* Nút toggle hiển thị khi mobile */}
-                <Navbar.Toggle aria-controls="main-navbar" />
-
-                <Navbar.Collapse id="main-navbar">
-                    {/* Navigation links - căn giữa khi rộng, xuống hàng khi hẹp */}
-                    <Nav className="mx-auto my-2 my-md-0 text-center">
-                        <Nav.Link
-                            as={Link}
+                    {/* Navigation links */}
+                    <div className="d-flex align-items-center gap-2">
+                        <Link
                             to="/waiter/tables"
-                            className="btn btn-warning text-dark fw-semibold mx-1 mb-2 mb-md-0"
+                            className="btn btn-warning text-dark fw-semibold px-3 py-1"
+                            style={{ fontSize: '14px' }}
                         >
                             Sơ đồ bàn
-                        </Nav.Link>
-                        <Button variant="warning" className="text-dark fw-semibold mx-1 mb-2 mb-md-0">
-                            <Link to="/waiter/checkin" className="text-dark text-decoration-none">
+                        </Link>
+                        <Link
+                            to="/waiter/checkin"
+                            className="btn btn-warning text-dark fw-semibold px-3 py-1"
+                            style={{ fontSize: '14px' }}
+                        >
                                 Check-in
                             </Link>
-                        </Button>
-                        <Button variant="warning" className="text-dark fw-semibold mx-1 mb-2 mb-md-0">
+                        <Link
+                            to="/waiter/dashboard"
+                            className="btn btn-warning text-dark fw-semibold px-3 py-1"
+                            style={{ fontSize: '14px' }}
+                        >
                             Danh sách Order
-                        </Button>
-                    </Nav>
+                        </Link>
+                    </div>
 
-                    {/* Phần profile bên phải */}
-                    <div className="d-flex align-items-center justify-content-center gap-2 mt-3 mt-md-0">
+                    {/* Profile */}
+                    <div className="d-flex align-items-center gap-2">
                         <Link to="/profile" className="text-dark text-decoration-none">
                             <img
                                 src={user?.avatar || "https://cdn-icons-png.flaticon.com/512/149/149071.png"}
                                 alt="profile"
-                                width="35"
-                                height="35"
+                                width="36"
+                                height="36"
                                 className="rounded-circle border"
+                                style={{ objectFit: 'cover' }}
                             />
                         </Link>
-                        <span className="fw-bold text-dark d-none d-sm-inline">
+                        <span className="fw-bold text-dark" style={{ fontSize: '14px' }}>
                             {user?.name}
                         </span>
                         <Button
                             variant="outline-danger"
                             size="sm"
                             onClick={logout}
-                            className="fw-semibold"
+                            className="fw-semibold px-2"
                         >
                             Đăng xuất
                         </Button>
                     </div>
-                </Navbar.Collapse>
+                </div>
+
+                {/* Mobile Layout: Stacked */}
+                <div className="d-flex d-lg-none flex-column gap-2 w-100">
+                    {/* Row 1: Logo + Profile */}
+                    <div className="d-flex align-items-center justify-content-between">
+                        <Navbar.Brand
+                            className="fw-bold text-dark d-flex align-items-center p-0"
+                            style={{ cursor: "pointer" }}
+                            onClick={() => navigate("/waiter/dashboard")}
+                        >
+                            <span style={{ fontSize: '20px' }}>🍽️</span>
+                            <span className="ms-2" style={{ fontSize: '16px' }}>Nhà hàng WDP</span>
+                        </Navbar.Brand>
+                        <div className="d-flex align-items-center gap-2">
+                            <Link to="/profile" className="text-dark text-decoration-none">
+                                <img
+                                    src={user?.avatar || "https://cdn-icons-png.flaticon.com/512/149/149071.png"}
+                                    alt="profile"
+                                    width="32"
+                                    height="32"
+                                    className="rounded-circle border"
+                                    style={{ objectFit: 'cover' }}
+                                />
+                            </Link>
+                            <Button
+                                variant="outline-danger"
+                                size="sm"
+                                onClick={logout}
+                                className="fw-semibold px-2 py-1"
+                                style={{ fontSize: '12px' }}
+                            >
+                                Thoát
+                            </Button>
+                        </div>
+                    </div>
+
+                    {/* Row 2: Navigation buttons */}
+                    <div className="d-flex gap-1 justify-content-between">
+                        <Link
+                            to="/waiter/tables"
+                            className="btn btn-warning text-dark fw-semibold flex-fill px-2 py-1"
+                            style={{ fontSize: '12px' }}
+                        >
+                            Sơ đồ bàn
+                        </Link>
+                        <Link
+                            to="/waiter/checkin"
+                            className="btn btn-warning text-dark fw-semibold flex-fill px-2 py-1"
+                            style={{ fontSize: '12px' }}
+                        >
+                            Check-in
+                        </Link>
+                        <Link
+                            to="/waiter/dashboard"
+                            className="btn btn-warning text-dark fw-semibold flex-fill px-2 py-1"
+                            style={{ fontSize: '12px' }}
+                        >
+                            Danh sách
+                        </Link>
+                    </div>
+                </div>
             </Container>
         </Navbar>
     );

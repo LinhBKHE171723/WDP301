@@ -29,7 +29,7 @@ mongoose
   // .connect(process.env.MONGO_URI)
   .connect(process.env.MONGO_URI)
   .then(() => {
-   
+    seedDatabase();
     console.log("✅ MongoDB connected");
   })
   .catch((err) => console.error(" MongoDB connection error:", err));

@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from "react";
 import kitchenApi from "../api/kitchenApi";
+import useKitchenWebSocket from "../hooks/useKitchenWebSocket";
 
 import OrderQueue from "../components/kitchenmanager/OrderQueue";
 import OrderDetails from "../components/kitchenmanager/OrderDetails";
@@ -27,7 +28,31 @@ export default function KitchenDashboard() {
   const [error, setError] = useState("");
   const [chefs, setChefs] = useState([]);
 
+  // ✅ WebSocket hook cho real-time updates
+  const { connectionState, lastMessage, subscribeToOrders, unsubscribeFromAllOrders } = useKitchenWebSocket();
+
   // ✅ Fetch dữ liệu theo tab
+  const fetchOrders = async () => {
+    setLoading(true);
+    setError("");
+    try {
+      const res = await kitchenApi.getConfirmedOrders();
+      const ordersData = res.data || [];
+      setOrders(ordersData);
+      
+      // Subscribe to all orders for real-time updates
+      if (ordersData.length > 0 && connectionState === 'connected') {
+        const orderIds = ordersData.map(order => order._id);
+        subscribeToOrders(orderIds);
+      }
+    } catch (err) {
+      console.error("Fetch error:", err);
+      setError(err.message || "Không thể tải dữ liệu.");
+    } finally {
+      setLoading(false);
+    }
+  };
+
   useEffect(() => {
     const fetchData = async () => {
       setLoading(true);
@@ -35,24 +60,18 @@ export default function KitchenDashboard() {
 
       try {
         if (activeTab === "kds") {
-          const res = await kitchenApi.getConfirmedOrders();
-
-          setOrders(res.data || []);
+          await fetchOrders();
         } else if (activeTab === "items") {
           const res = await kitchenApi.getAllItems();
-
           setItems(res.data || []);
         } else if (activeTab === "menus") {
           const res = await kitchenApi.getAllMenus();
-
           setMenus(res.data || []);
         } else if (activeTab === "inventory") {
           const res = await kitchenApi.getAllIngredients();
-
           setIngredients(res.data || res || []);
         } else if (activeTab === "purchase") {
           const res = await kitchenApi.getPurchaseOrders();
-
           setPurchaseOrders(res.data || res || []);
         }
       } catch (err) {
@@ -64,7 +83,62 @@ export default function KitchenDashboard() {
     };
 
     fetchData();
-  }, [activeTab]);
+  }, [activeTab, connectionState]);
+
+  // ✅ Subscribe to orders when WebSocket connects
+  useEffect(() => {
+    if (connectionState === 'connected' && orders.length > 0) {
+      const orderIds = orders.map(order => order._id);
+      subscribeToOrders(orderIds);
+    }
+    
+    return () => {
+      if (activeTab !== "kds") {
+        unsubscribeFromAllOrders();
+      }
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [connectionState, activeTab, orders.length]);
+
+  // ✅ Handle WebSocket messages for real-time updates
+  useEffect(() => {
+    if (lastMessage) {
+      console.log('📨 Kitchen received WebSocket message:', lastMessage);
+
+      switch (lastMessage.type) {
+        case 'order:updated':
+          // Cập nhật order trong danh sách
+          if (lastMessage.data && activeTab === "kds") {
+            setOrders((prevOrders) =>
+              prevOrders.map((order) =>
+                order._id === lastMessage.data._id ? lastMessage.data : order
+              )
+            );
+            console.log('✅ Updated order in queue:', lastMessage.data._id);
+          }
+          break;
+
+        case 'order:confirmed':
+          // Đơn hàng mới được confirm - thêm vào danh sách
+          if (lastMessage.data && activeTab === "kds") {
+            setOrders((prevOrders) => {
+              const exists = prevOrders.some(o => o._id === lastMessage.data._id);
+              if (!exists) {
+                subscribeToOrders([lastMessage.data._id]);
+                return [...prevOrders, lastMessage.data];
+              }
+              return prevOrders;
+            });
+            console.log('🆕 New confirmed order added:', lastMessage.data._id);
+          }
+          break;
+
+        default:
+          console.log('📨 Unknown message type:', lastMessage.type);
+      }
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [lastMessage, activeTab]);
 
   useEffect(() => {
     const fetchChefs = async () => {
@@ -141,6 +215,19 @@ export default function KitchenDashboard() {
             <h1 className="text-2xl font-bold text-gray-900">
               Hệ thống Quản lý Bếp - KDS
             </h1>
+            {/* WebSocket Connection Status */}
+            <div className={`ml-4 px-3 py-1 rounded-full text-xs font-medium ${
+              connectionState === 'connected' 
+                ? 'bg-green-100 text-green-700' 
+                : connectionState === 'connecting' || connectionState === 'reconnecting'
+                ? 'bg-yellow-100 text-yellow-700'
+                : 'bg-red-100 text-red-700'
+            }`}>
+              {connectionState === 'connected' && '🟢 Realtime'}
+              {connectionState === 'connecting' && '🟡 Đang kết nối...'}
+              {connectionState === 'reconnecting' && '🟡 Đang kết nối lại...'}
+              {connectionState === 'disconnected' && '🔴 Mất kết nối'}
+            </div>
           </div>
 
           <nav className="flex space-x-2">
