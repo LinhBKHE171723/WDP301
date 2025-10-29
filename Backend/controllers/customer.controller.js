@@ -537,7 +537,13 @@ exports.addItemsToOrder = async (req, res) => {
 
     // Populate để trả về thông tin đầy đủ
     const populatedOrder = await Order.findById(order._id)
-      .populate("orderItems")
+      .populate({
+        path: "orderItems",
+        populate: {
+          path: "assignedChef",
+          select: "name username"
+        }
+      })
       .populate("tableId")
       .populate("paymentId");
 
@@ -922,7 +928,13 @@ exports.confirmOrder = async (req, res) => {
 
     // Populate để trả về thông tin đầy đủ
     const populatedOrder = await Order.findById(order._id)
-      .populate("orderItems")
+      .populate({
+        path: "orderItems",
+        populate: {
+          path: "assignedChef",
+          select: "name username"
+        }
+      })
       .populate("tableId")
       .populate("paymentId");
 

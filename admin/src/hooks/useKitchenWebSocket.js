@@ -168,4 +168,3 @@ const useKitchenWebSocket = () => {
 };
 
 export default useKitchenWebSocket;
-
