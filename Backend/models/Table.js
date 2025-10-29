@@ -9,7 +9,13 @@ const tableSchema = new Schema({
     enum: ["available", "occupied"],
     default: "available",
   },
-  orderNow: { type: Schema.Types.ObjectId, ref: "Order", default: null },
+  // Cho phép 1 bàn có nhiều order cùng lúc (VD: chia order, nhiều khách)
+  orderNow: [
+    {
+      type: Schema.Types.ObjectId,
+      ref: "Order",
+    },
+  ],
 });
 
 module.exports = mongoose.model("Table", tableSchema);

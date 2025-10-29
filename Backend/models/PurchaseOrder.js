@@ -11,7 +11,6 @@ const purchaseOrderSchema = new Schema({
   unit: { type: String, required: true },
   price: { type: Number, required: true },
   time: { type: Date, default: Date.now },
-  
 });
 
 // ✅ Sau khi lưu PurchaseOrder → cập nhật lại Ingredient
@@ -25,19 +24,21 @@ purchaseOrderSchema.post("save", async function (doc, next) {
       return next();
     }
 
-    // 🔹 Tính giá nhập trung bình mới (priceNow)
-    // Giả sử `price` là tổng giá của lô hàng này
-    // => Giá đơn vị mới = price / quantity
-    const newUnitPrice = doc.price / doc.quantity;
+    // Ở đây doc.price là giá đơn vị (VNĐ / 1 đơn vị hàng)
+    // => Không cần chia cho quantity nữa
+    const newUnitPrice = doc.price;
 
-    // 🔸 Công thức cập nhật trung bình có trọng số:
-    // priceNow = (priceNow * stockQuantity + newUnitPrice * quantity) / (stockQuantity + quantity)
+    // Tổng giá trị kho cũ + tổng giá trị lô mới
     const totalStockValue =
       ingredient.priceNow * ingredient.stockQuantity +
       newUnitPrice * doc.quantity;
+
+    // Tổng số lượng mới
     const totalStockQty = ingredient.stockQuantity + doc.quantity;
 
-    ingredient.priceNow = totalStockValue / totalStockQty;
+    // Cập nhật giá trung bình mới
+    ingredient.priceNow =
+      totalStockQty > 0 ? totalStockValue / totalStockQty : newUnitPrice;
     ingredient.stockQuantity = totalStockQty;
 
     await ingredient.save();

@@ -1,4 +1,3 @@
-
 const express = require("express");
 const router = express.Router();
 
@@ -49,8 +48,7 @@ router.get("/items/trend", itemTrendCtrl.getItemTrendStats);
 // trang khách hàng thân thiết
 router.get("/reports/customers", customerReportCtrl.getCustomerReport);
 
-
-// hsuat nhân vien 
+// hieu suat nhan vien 
 router.get("/waiters", performanceController.getWaiterStats);
 router.get("/chefs", performanceController.getChefStats);
 router.get("/cashiers", performanceController.getCashierStats);

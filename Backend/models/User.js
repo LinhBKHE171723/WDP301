@@ -35,6 +35,10 @@ const userSchema = new mongoose.Schema(
       type: String,
       trim: true,
     },
+    avatar: {
+      type: String, // URL ảnh từ Cloudinary
+      default: "https://cdn-icons-png.flaticon.com/512/149/149071.png"
+    },
     role: {
       type: String,
       enum: [

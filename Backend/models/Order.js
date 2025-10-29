@@ -14,7 +14,6 @@ const orderSchema = new Schema(
         "pending",
         "confirmed",
         "preparing",
-        "ready",
         "served",
         "paid",
         "cancelled",
@@ -38,7 +37,7 @@ const orderSchema = new Schema(
       default: false
     },
     confirmationHistory: [{
-      action: String, 
+      action: String, // 'waiter_approved', 'waiter_rejected', 'customer_confirmed', 'order_modified'
       timestamp: Date,
       details: String
     }]

@@ -1,46 +1,27 @@
-import { Routes, Route } from "react-router-dom";
-import Sidebar from "./components/admin/Sidebar";
-import { Header } from "./components/admin/Header";
-import DashboardPage from "./pages/admin/DashboardPage";
-import AnalyticsPage from "./pages/admin/AnalyticsPage";
-import AnalyticsPage2 from "./pages/admin/AnalyticsPage2";
-import AccountsPage from "./pages/admin/AccountsPage";
-import FeedbackPage from "./pages/admin/FeedbackPage";
-import SettingsPage from "./pages/admin/SettingsPage";
-import { Toaster } from "sonner";
-import ItemReportPage from "./pages/admin/ItemReportPage";
-import CustomerReportPage from "./pages/admin/CustomerReportPage";
-import PerformancePage from "./pages/admin/PerformancePage";
-import PerformanceDetailPage from "./pages/admin/PerformancePageDetail";
-export default function App() {
+import { BrowserRouter as Router } from "react-router-dom";
+import AppRouter from "./routes/AppRouter";
+import { AuthProvider } from "./context/AuthContext";
+import { ToastContainer } from "react-toastify";
+import "react-toastify/dist/ReactToastify.css";
+
+function App() {
   return (
-    <div className="min-h-screen">
-      <div className="flex">
-        <Sidebar />
-        <main className="flex-1 p-6 space-y-6 ml-64">
-          <Header />
-          <div className="container-page">
-            <Routes>
-              <Route path="/" element={<DashboardPage />} />
-              <Route path="/analytics" element={<AnalyticsPage />} />
-              <Route path="/item-report" element={<ItemReportPage />} />
-              <Route
-                path="/item-analytics/:itemId"
-                element={<AnalyticsPage2 />}
-              />
-              <Route path="/accounts" element={<AccountsPage />} />
-              <Route path="/feedback" element={<FeedbackPage />} />
-              <Route path="/settings" element={<SettingsPage />} />
-              <Route path="/customers" element={<CustomerReportPage />} />
-              <Route path="/performance" element={<PerformancePage />} />
-              <Route path="/performance/:userId" element={< PerformanceDetailPage/>} />
-
-            </Routes>
-          </div>
-        </main>
-      </div>
-
-      <Toaster richColors position="top-right" />
-    </div>
+    <AuthProvider>
+      <Router>
+        <AppRouter />
+        <ToastContainer
+          position="top-right"
+          autoClose={2500}
+          hideProgressBar={false}
+          newestOnTop={false}
+          closeOnClick
+          pauseOnHover
+          draggable
+          theme="colored"
+        />
+      </Router>
+    </AuthProvider>
   );
 }
+
+export default App;

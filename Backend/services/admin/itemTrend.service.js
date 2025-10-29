@@ -25,11 +25,18 @@ const TYPE_TO_TRUNC = {
   },
 };
 
+/**
+ * Cắt ngày tháng theo đơn vị (day, week, month, year)
+ */
 function truncateDate(date, unit) {
   const d = new Date(date);
   switch (unit) {
-    case "year": d.setMonth(0, 1); break;
-    case "month": d.setDate(1); break;
+    case "year":
+      d.setMonth(0, 1);
+      break;
+    case "month":
+      d.setDate(1);
+      break;
     case "week":
       const dayOfWeek = d.getDay();
       const distanceToMonday = dayOfWeek === 0 ? -6 : 1 - dayOfWeek;
@@ -40,21 +47,46 @@ function truncateDate(date, unit) {
   return d;
 }
 
-function fmtVND(n) {
-  return new Intl.NumberFormat("vi-VN", { style: "currency", currency: "VND" }).format(n || 0);
+/**
+ * Parse date với fallback
+ */
+function parseDate(v, fallback) {
+  if (!v) return fallback;
+  const d = new Date(v);
+  return isNaN(d.getTime()) ? fallback : d;
 }
 
-/* -------------------------------------------------------------------------- */
-/*                              GET ITEM TREND                                */
-/* -------------------------------------------------------------------------- */
+/**
+ * Định dạng số tiền VNĐ
+ */
+function fmtVND(n) {
+  try {
+    return new Intl.NumberFormat("vi-VN", { style: "currency", currency: "VND" }).format(n || 0);
+  } catch {
+    return `${(n || 0).toLocaleString("vi-VN")} ₫`;
+  }
+}
+
+/**
+ * Lấy dữ liệu xu hướng hiệu suất của một món ăn cụ thể.
+ * Bao gồm: revenue, expense, profit theo thời gian.
+ * 
+ * @param {string} itemId - ID của món ăn (bắt buộc)
+ * @param {string} type - Loại nhóm (daily, weekly, monthly, yearly)
+ * @param {string} from - Ngày bắt đầu
+ * @param {string} to - Ngày kết thúc
+ * @returns {Object} { summary, trend }
+ */
 exports.getItemTrend = async ({ itemId, type = "daily", from, to }) => {
-  if (!Types.ObjectId.isValid(itemId)) {
-    throw new Error("Invalid itemId");
+  if (!itemId || !Types.ObjectId.isValid(itemId)) {
+    throw new Error("Item ID không hợp lệ.");
   }
 
   const conf = TYPE_TO_TRUNC[type] || TYPE_TO_TRUNC.daily;
-  const fromDate = from ? new Date(from) : new Date(Date.now() - 7 * 86400000);
-  const toDate = to ? new Date(to) : new Date();
+  const now = new Date();
+  const toDate = parseDate(to, now);
+  const defaultFrom = new Date(Date.now() - 7 * 86400000); // Mặc định 7 ngày
+  const fromDate = parseDate(from, defaultFrom);
 
   // 1️⃣ Lấy item + giá vốn (expense) & nguyên liệu hiện tại
   const item = await Item.findById(itemId).populate({

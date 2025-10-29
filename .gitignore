@@ -1,8 +1,6 @@
 # Node modules (mọi nơi trong repo)
 **/node_modules/
 
-# Env files (mọi nơi trong repo)
-**/.env
 
 # Build folders (React, Vite, Angular, v.v.)
 **/build/

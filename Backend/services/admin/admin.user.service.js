@@ -148,6 +148,20 @@ static async update(id, data) {
     existingUser.role = updateData.role;
   }
 
+  // Xóa các giá trị undefined/null trước khi cập nhật
+  Object.keys(updateData).forEach((key) => {
+    if (updateData[key] === undefined || updateData[key] === null) {
+      delete updateData[key];
+    }
+  });
+
+  // Cập nhật các field còn lại
+  Object.keys(updateData).forEach((key) => {
+    if (key !== "accountStatus" && key !== "role") {
+      existingUser[key] = updateData[key];
+    }
+  });
+
   await existingUser.save();  // ✅ lưu đúng tất cả các thay đổi
   return existingUser;
 }
