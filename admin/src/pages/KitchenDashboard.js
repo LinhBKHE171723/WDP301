@@ -1,6 +1,8 @@
 import React, { useState, useEffect } from "react";
+import { useNavigate } from "react-router-dom";
 import kitchenApi from "../api/kitchenApi";
 import useKitchenWebSocket from "../hooks/useKitchenWebSocket";
+import { useAuth } from "../context/AuthContext";
 
 import OrderQueue from "../components/kitchenmanager/OrderQueue";
 import OrderDetails from "../components/kitchenmanager/OrderDetails";
@@ -13,6 +15,8 @@ import InventoryManager from "../components/kitchenmanager/InventoryManager";
 import PurchaseHistoryManager from "../components/kitchenmanager/PurchaseHistoryManager"; // ✅ import mới
 
 export default function KitchenDashboard() {
+  const navigate = useNavigate();
+  const { logout, user } = useAuth();
   const [activeTab, setActiveTab] = useState("kds");
   const [orders, setOrders] = useState([]);
   const [items, setItems] = useState([]);
@@ -30,6 +34,12 @@ export default function KitchenDashboard() {
 
   // ✅ WebSocket hook cho real-time updates
   const { connectionState, lastMessage, subscribeToOrders, unsubscribeFromAllOrders } = useKitchenWebSocket();
+
+  // ✅ Hàm xử lý đăng xuất
+  const handleLogout = () => {
+    logout();
+    navigate("/auth/login");
+  };
 
   // ✅ Fetch orders function
   const fetchOrders = async () => {
@@ -289,29 +299,45 @@ export default function KitchenDashboard() {
             </div>
           </div>
 
-          <nav className="flex space-x-2">
-            {["kds", "items", "menus", "inventory", "purchase"].map((tab) => (
+          <div className="flex items-center space-x-4">
+            <nav className="flex space-x-2">
+              {["kds", "items", "menus", "inventory", "purchase"].map((tab) => (
+                <button
+                  key={tab}
+                  onClick={() => setActiveTab(tab)}
+                  className={`px-4 py-2 rounded-lg font-medium transition-colors ${
+                    activeTab === tab
+                      ? "bg-orange-500 text-white"
+                      : "text-gray-600 hover:bg-gray-100"
+                  }`}
+                >
+                  {tab === "kds"
+                    ? "Bảng điều khiển Bếp"
+                    : tab === "items"
+                    ? "Quản lý Món ăn"
+                    : tab === "menus"
+                    ? "Quản lý Combo"
+                    : tab === "inventory"
+                    ? "Quản lý Kho"
+                    : "Lịch sử Nhập hàng"}
+                </button>
+              ))}
+            </nav>
+
+            {/* User info và nút đăng xuất */}
+            <div className="flex items-center space-x-3 border-l pl-4">
+              <div className="text-right">
+                <p className="text-sm font-semibold text-gray-900">{user?.name || "Kitchen Manager"}</p>
+                <p className="text-xs text-gray-500">{user?.role === "kitchen_manager" ? "Bếp trưởng" : user?.role}</p>
+              </div>
               <button
-                key={tab}
-                onClick={() => setActiveTab(tab)}
-                className={`px-4 py-2 rounded-lg font-medium transition-colors ${
-                  activeTab === tab
-                    ? "bg-orange-500 text-white"
-                    : "text-gray-600 hover:bg-gray-100"
-                }`}
+                onClick={handleLogout}
+                className="px-4 py-2 bg-red-500 text-white rounded-lg hover:bg-red-600 transition-colors font-medium text-sm"
               >
-                {tab === "kds"
-                  ? "Bảng điều khiển Bếp"
-                  : tab === "items"
-                  ? "Quản lý Món ăn"
-                  : tab === "menus"
-                  ? "Quản lý Combo"
-                  : tab === "inventory"
-                  ? "Quản lý Kho"
-                  : "Lịch sử Nhập hàng"}
+                Đăng xuất
               </button>
-            ))}
-          </nav>
+            </div>
+          </div>
         </div>
       </header>
 
