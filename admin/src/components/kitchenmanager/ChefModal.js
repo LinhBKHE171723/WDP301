@@ -32,7 +32,11 @@ export default function ChefModal({
       onClose();
     } catch (err) {
       console.error("Lỗi khi giao đầu bếp:", err);
-      alert("Không thể giao món. Vui lòng thử lại.");
+      // Hiển thị thông báo lỗi chi tiết từ backend
+      // err.response có thể là response từ axios interceptor (đã bị unwrap)
+      // hoặc err.response.data nếu từ axios error
+      const errorMessage = err.response?.message || err.message || err.error?.message || "Không thể giao món. Vui lòng thử lại.";
+      toast.error(errorMessage);
     } finally {
       setLoading(false);
     }
