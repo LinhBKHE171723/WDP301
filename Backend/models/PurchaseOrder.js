@@ -10,7 +10,6 @@ const purchaseOrderSchema = new Schema({
   quantity: { type: Number, required: true },
   unit: { type: String, required: true },
   price: { type: Number, required: true },
-
   time: { type: Date, default: Date.now },
   
 });

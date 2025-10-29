@@ -1,7 +1,10 @@
 import React, { useState, useEffect } from "react";
 import {
   LineChart, Line, XAxis, YAxis,
-  CartesianGrid, Tooltip, ResponsiveContainer
+  CartesianGrid, Tooltip, ResponsiveContainer,
+  Bar,
+  Legend,
+  BarChart
 } from "recharts";
 import { Clock, TrendingUp, DollarSign, XCircle } from "lucide-react";
 
@@ -89,16 +92,21 @@ export default function ItemTrendAnalytics({ itemId, itemName = "Chi Tiết Món
           totalRevenue: Number(t.totalRevenue) || 0,
           cancellationRate: Number(t.cancellationRate) || 0,
           avgServiceTimeMinutes: Number(t.avgServiceTimeMinutes) || 0,
+        
+           revenue: Number(t.totalRevenue) || 0,
+  cost: Number(t.totalExpense || t.cost || 0),
+  profit: Number(t.totalProfit || t.profit || (t.totalRevenue - (t.totalExpense || 0)) || 0),
+
         }));
 
-        if (trend.length === 1) {
-          trend = [
-            trend[0],
-            { ...trend[0], label: `${trend[0].label} (copy)` },
-          ];
-        }
+      if (trend.length === 1) {
+  const copy = { ...trend[0] };
+  copy.__isDuplicate = true;
+  copy.label = null;
+  trend.push(copy);
+}
+setTrendData(trend);
 
-        setTrendData(trend);
         setSummaryData(summary);
       } catch (e) {
         console.error("❌ Fetch Trend Error:", e);
@@ -231,9 +239,20 @@ export default function ItemTrendAnalytics({ itemId, itemName = "Chi Tiết Món
 
             <div className="h-96">
               <ResponsiveContainer width="100%" height="100%">
-                <LineChart data={trendData} margin={{ top: 10, right: 10, left: 0, bottom: 5 }}>
+                <LineChart data={trendData.filter(t => !t.__isDuplicate)} margin={{ top: 10, right: 10, left: 0, bottom: 5 }}>
                   <CartesianGrid strokeDasharray="3 3" stroke="#e0e0e0" />
-                  <XAxis dataKey="label" stroke="#555" tick={{ fontSize: 10 }} />
+                  <XAxis
+  dataKey="label"
+  stroke="#555"
+  tick={{ fontSize: 10 }}
+  tickFormatter={(label, index) => {
+    const item = trendData[index];
+    // ✅ Nếu không có label hoặc là bản sao -> không hiển thị
+    if (!item || item.__isDuplicate || !item.label) return "";
+    return item.label;
+  }}
+/>
+
                   <YAxis
                     stroke="#555"
                     tick={{ fontSize: 10 }}
@@ -287,6 +306,67 @@ export default function ItemTrendAnalytics({ itemId, itemName = "Chi Tiết Món
                   />
                 </LineChart>
               </ResponsiveContainer>
+              {/* ================== BIỂU ĐỒ CỘT SO SÁNH DOANH THU - GIÁ VỐN - LỢI NHUẬN ================== */}
+<div className="bg-white p-4 rounded-xl shadow-xl mt-10">
+  <h2 className="text-lg font-semibold text-gray-700 mb-4">
+    So sánh Doanh thu – Giá vốn – Lợi nhuận theo thời gian
+  </h2>
+
+  <div className="h-[420px]">
+    <ResponsiveContainer width="100%" height="100%">
+      <BarChart
+       data={trendData.filter(t => !t.__isDuplicate)}
+        margin={{ top: 10, right: 20, left: 0, bottom: 5 }}
+        barGap={6}
+      >
+        <CartesianGrid strokeDasharray="3 3" stroke="#e0e0e0" />
+       <XAxis
+  dataKey="label"
+  stroke="#555"
+  tick={{ fontSize: 10 }}
+  tickFormatter={(label, index) => {
+    const item = trendData[index];
+    // ✅ Nếu không có label hoặc là bản sao -> không hiển thị
+    if (!item || item.__isDuplicate || !item.label) return "";
+    return item.label;
+  }}
+/>
+
+        <YAxis
+          stroke="#555"
+          tick={{ fontSize: 10 }}
+          tickFormatter={(v) =>
+            v >= 1_000_000
+              ? `${(v / 1_000_000).toFixed(1)}tr`
+              : v.toLocaleString("vi-VN")
+          }
+        />
+        <Tooltip
+          formatter={(val, name) => [
+            new Intl.NumberFormat("vi-VN", {
+              style: "currency",
+              currency: "VND",
+            }).format(val || 0),
+            name,
+          ]}
+          labelFormatter={(label) => `Thời gian: ${label}`}
+        />
+        <Legend verticalAlign="top" height={30} />
+
+        {/* 🟩 Doanh thu */}
+        <Bar dataKey="revenue" name="Doanh thu" fill="#22c55e" radius={[4, 4, 0, 0]} />
+
+        {/* 🟧 Giá vốn */}
+        <Bar dataKey="cost" name="Giá vốn" fill="#f97316" radius={[4, 4, 0, 0]} />
+
+        {/* 🟦 Lợi nhuận */}
+        <Bar dataKey="profit" name="Lợi nhuận" fill="#3b82f6" radius={[4, 4, 0, 0]} />
+      </BarChart>
+    </ResponsiveContainer>
+  </div>
+</div>
+{/* ================== HẾT PHẦN BIỂU ĐỒ CỘT ================== */}
+
             </div>
           </div>
         </>

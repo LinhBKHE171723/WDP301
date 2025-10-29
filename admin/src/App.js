@@ -10,7 +10,8 @@ import SettingsPage from "./pages/admin/SettingsPage";
 import { Toaster } from "sonner";
 import ItemReportPage from "./pages/admin/ItemReportPage";
 import CustomerReportPage from "./pages/admin/CustomerReportPage";
-
+import PerformancePage from "./pages/admin/PerformancePage";
+import PerformanceDetailPage from "./pages/admin/PerformancePageDetail";
 export default function App() {
   return (
     <div className="min-h-screen">
@@ -30,7 +31,10 @@ export default function App() {
               <Route path="/accounts" element={<AccountsPage />} />
               <Route path="/feedback" element={<FeedbackPage />} />
               <Route path="/settings" element={<SettingsPage />} />
-               <Route path="/customers" element={<CustomerReportPage/>} />
+              <Route path="/customers" element={<CustomerReportPage />} />
+              <Route path="/performance" element={<PerformancePage />} />
+              <Route path="/performance/:userId" element={< PerformanceDetailPage/>} />
+
             </Routes>
           </div>
         </main>

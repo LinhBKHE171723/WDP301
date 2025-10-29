@@ -1,13 +1,14 @@
+
 const express = require("express");
 const router = express.Router();
 
 const userCtrl = require("../controllers/admin/user.controller");
 const feedbackController = require("../controllers/admin/feedback.controller");
 const statsCtrl = require("../controllers/admin/adminStats.controller");
-
+const performanceController = require("../controllers/admin/performance.controller");
 const itemCtrl = require("../controllers/admin/item.controller");
 const itemTrendCtrl = require("../controllers/admin/itemTrend.controller");
-
+const performanceDetailCtrl = require("../controllers/admin/performanceDetail.controller");
 const customerReportCtrl = require("../controllers/admin/customerReport.controller");
 
 // =======================================================
@@ -47,5 +48,13 @@ router.get("/items/trend", itemTrendCtrl.getItemTrendStats);
 
 // trang khách hàng thân thiết
 router.get("/reports/customers", customerReportCtrl.getCustomerReport);
+
+
+// hsuat nhân vien 
+router.get("/waiters", performanceController.getWaiterStats);
+router.get("/chefs", performanceController.getChefStats);
+router.get("/cashiers", performanceController.getCashierStats);
+// ca lam viec
+router.get("/performance/shifts/:userId", performanceDetailCtrl.getShiftDetailsByUser);
 
 module.exports = router;

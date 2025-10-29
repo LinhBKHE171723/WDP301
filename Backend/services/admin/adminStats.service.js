@@ -6,33 +6,32 @@ const mongoose = require("mongoose");
 
 const VN_TZ = "Asia/Ho_Chi_Minh";
 
+/* ----------------- HÀM CẮT THỜI GIAN THEO NGÀY/THÁNG/NĂM ----------------- */
 function truncateDate(date, unit) {
-  // Tạo một bản sao để không thay đổi ngày gốc
   const d = new Date(date);
-
   switch (unit) {
     case "year":
-      d.setMonth(0, 1); // Tháng 1, ngày 1
+      d.setMonth(0, 1);
       d.setHours(0, 0, 0, 0);
       break;
     case "month":
-      d.setDate(1); // Ngày đầu tiên của tháng
+      d.setDate(1);
       d.setHours(0, 0, 0, 0);
       break;
     case "week":
-      const dayOfWeek = d.getDay(); // 0=Chủ Nhật, 1=Thứ Hai, ..., 6=Thứ Bảy
-      // Lùi về ngày thứ Hai gần nhất
+      const dayOfWeek = d.getDay();
       const distanceToMonday = dayOfWeek === 0 ? -6 : 1 - dayOfWeek;
       d.setDate(d.getDate() + distanceToMonday);
       d.setHours(0, 0, 0, 0);
       break;
     case "day":
     default:
-      d.setHours(0, 0, 0, 0); // Đầu ngày
+      d.setHours(0, 0, 0, 0);
       break;
   }
   return d;
 }
+
 const TYPE_TO_TRUNC = {
   daily: {
     unit: "day",
@@ -55,54 +54,69 @@ const TYPE_TO_TRUNC = {
   },
 };
 
+/* -------------------------------------------------------------------------- */
+/*                             GET REVENUE STATS                              */
+/* -------------------------------------------------------------------------- */
 exports.getRevenueStats = async ({ type = "daily", from, to }) => {
   const { fromDate, toDate, conf } = normalizeTimeInputs(type, from, to);
 
+  // 1️⃣ Lấy đơn hàng đã thanh toán
   const paidOrdersPromise = Order.find({
     status: "paid",
     createdAt: { $gte: fromDate, $lte: toDate },
-  });
+  }).select("_id createdAt totalAmount");
 
+  // 2️⃣ Lấy phiếu nhập hàng trong khoảng thời gian
   const purchaseOrdersPromise = PurchaseOrder.find({
     time: { $gte: fromDate, $lte: toDate },
-  });
+  }).populate("ingredientId", "name");
 
-  // Chạy song song 2 câu lệnh truy vấn để tiết kiệm thời gian
-  const [paidOrders, allPurchaseOrders] = await Promise.all([
+  const [paidOrders, purchaseOrders] = await Promise.all([
     paidOrdersPromise,
     purchaseOrdersPromise,
   ]);
 
-  // B3: Gom nhóm và tính toán thủ công bằng JavaScript
+  // 3️⃣ Gom nhóm doanh thu & chi phí theo ngày / tuần / tháng / năm
   const statsByTime = new Map();
 
-  // Xử lý doanh thu từ các đơn hàng đã thanh toán
+  // 👉 Doanh thu: cộng dồn theo ngày tạo đơn hàng
   for (const order of paidOrders) {
     const timeBucket = truncateDate(order.createdAt, conf.unit);
     const key = timeBucket.toISOString();
 
-    const currentStats = statsByTime.get(key) || { time: timeBucket, revenue: 0, cost: 0, waste: 0 };
-    currentStats.revenue += order.totalAmount || 0;
-    statsByTime.set(key, currentStats);
+    const current = statsByTime.get(key) || {
+      time: timeBucket,
+      revenue: 0,
+      cost: 0,
+      waste: 0,
+    };
+
+    current.revenue += order.totalAmount || 0;
+    statsByTime.set(key, current);
   }
 
-  // Xử lý chi phí và thất thoát từ các đơn nhập hàng
-  // Xử lý chi phí từ các đơn nhập hàng
-for (const po of allPurchaseOrders) {
-  const timeBucket = truncateDate(po.time, conf.unit);
-  const key = timeBucket.toISOString();
+  // 👉 Chi phí: cộng dồn tổng giá trị nhập hàng từ PurchaseOrder
+  for (const po of purchaseOrders) {
+    const timeBucket = truncateDate(po.time, conf.unit);
+    const key = timeBucket.toISOString();
 
-  const currentStats = statsByTime.get(key) || { time: timeBucket, revenue: 0, cost: 0 };
-  
-  currentStats.cost += po.price || 0;
-  
-  statsByTime.set(key, currentStats);
-}
+    const current = statsByTime.get(key) || {
+      time: timeBucket,
+      revenue: 0,
+      cost: 0,
+      waste: 0,
+    };
 
+    // ✅ “po.price” ở đây là tổng giá trị nhập của phiếu (đã có sẵn trong DB)
+    //    Nếu bạn muốn hiển thị thêm chi tiết nguyên liệu, có thể log ingredientId.name
+    current.cost += po.price || 0;
 
-  // B4: Định dạng dữ liệu cuối cùng để trả về
+    statsByTime.set(key, current);
+  }
+
+  // 4️⃣ Chuyển map → mảng, tính lợi nhuận
   const rows = Array.from(statsByTime.values())
-    .sort((a, b) => a.time - b.time) // Sắp xếp theo thứ tự thời gian
+    .sort((a, b) => a.time - b.time)
     .map((row) => {
       const profit = row.revenue - row.cost - row.waste;
       const label = conf.label(new Date(row.time));
@@ -112,7 +126,7 @@ for (const po of allPurchaseOrders) {
         revenue: row.revenue,
         cost: row.cost,
         waste: row.waste,
-        profit: profit,
+        profit,
         revenueVND: fmtVND(row.revenue),
         costVND: fmtVND(row.cost),
         profitVND: fmtVND(profit),
@@ -123,6 +137,9 @@ for (const po of allPurchaseOrders) {
 };
 
 
+/* -------------------------------------------------------------------------- */
+/*                                GET TOP ITEMS                               */
+/* -------------------------------------------------------------------------- */
 exports.getTopItems = async ({ from, to, limit }) => {
   const { fromDate, toDate } = normalizeTimeInputs("daily", from, to);
   const resultLimit = clampInt(limit, 10, 5, 100);
@@ -132,43 +149,36 @@ exports.getTopItems = async ({ from, to, limit }) => {
   });
 
   if (paidOrders.length === 0) {
-    return []; 
+    return [];
   }
 
-  const allOrderItemIds = paidOrders.flatMap(order => order.orderItems);
+  const allOrderItemIds = paidOrders.flatMap((order) => order.orderItems);
   const allOrderItems = await OrderItem.find({ _id: { $in: allOrderItemIds } });
 
-  // B4: Gom nhóm thủ công bằng JavaScript để tính số lượng và doanh thu
   const statsByItem = new Map();
   for (const orderItem of allOrderItems) {
-    // Bỏ qua nếu orderItem không có itemId (dữ liệu cũ/lỗi)
     if (!orderItem.itemId) continue;
 
     const itemId = orderItem.itemId.toString();
-    const currentStats = statsByItem.get(itemId) || { totalQuantity: 0, totalRevenue: 0 };
+    const currentStats =
+      statsByItem.get(itemId) || { totalQuantity: 0, totalRevenue: 0 };
 
     currentStats.totalQuantity += orderItem.quantity;
-    // Doanh thu được tính bằng giá bán đã lưu tại thời điểm đặt hàng
     currentStats.totalRevenue += orderItem.quantity * orderItem.price;
-
     statsByItem.set(itemId, currentStats);
   }
 
-  // B5: Lấy thông tin chi tiết (tên, danh mục, và giá vốn HIỆN TẠI)
   const itemIds = Array.from(statsByItem.keys());
   const items = await Item.find({ _id: { $in: itemIds } });
 
-  // B6: Kết hợp dữ liệu và tính toán các chỉ số cuối cùng
   const finalResults = [];
   for (const item of items) {
     const itemId = item._id.toString();
     const stats = statsByItem.get(itemId);
 
     if (stats) {
-      // Giá vốn được tính bằng giá vốn HIỆN TẠI của món ăn
       const totalExpense = stats.totalQuantity * item.expense;
       const totalProfit = stats.totalRevenue - totalExpense;
-
       finalResults.push({
         _id: item._id,
         name: item.name,
@@ -181,27 +191,27 @@ exports.getTopItems = async ({ from, to, limit }) => {
     }
   }
 
-  // B7: Sắp xếp kết quả theo lợi nhuận giảm dần và giới hạn số lượng
-  const sortedResults = finalResults.sort((a, b) => b.totalProfit - a.totalProfit);
-
+  const sortedResults = finalResults.sort(
+    (a, b) => b.totalProfit - a.totalProfit
+  );
   return sortedResults.slice(0, resultLimit);
 };
 
-
+/* ------------------------- HÀM HỖ TRỢ ĐỊNH DẠNG ------------------------- */
 function normalizeTimeInputs(type, from, to) {
-    const conf = TYPE_TO_TRUNC[(type || "daily").toLowerCase()] || TYPE_TO_TRUNC.daily;
-    const now = new Date();
+  const conf =
+    TYPE_TO_TRUNC[(type || "daily").toLowerCase()] || TYPE_TO_TRUNC.daily;
+  const now = new Date();
 
-    let toDate = parseDate(to, now);
-    toDate.setHours(23, 59, 59, 999);
+  let toDate = parseDate(to, now);
+  toDate.setHours(23, 59, 59, 999);
 
-    const defaultFrom = new Date(toDate.getTime() - 30 * 24 * 60 * 60 * 1000);
-    let fromDate = parseDate(from, defaultFrom);
-    fromDate.setHours(0, 0, 0, 0);
+  const defaultFrom = new Date(toDate.getTime() - 30 * 24 * 60 * 60 * 1000);
+  let fromDate = parseDate(from, defaultFrom);
+  fromDate.setHours(0, 0, 0, 0);
 
-    return { conf, fromDate, toDate };
+  return { conf, fromDate, toDate };
 }
-
 
 function parseDate(v, fallback) {
   if (!v) return fallback;
@@ -217,7 +227,10 @@ function clampInt(v, defVal, min, max) {
 
 function fmtVND(n) {
   try {
-    return new Intl.NumberFormat("vi-VN", { style: "currency", currency: "VND" }).format(n || 0);
+    return new Intl.NumberFormat("vi-VN", {
+      style: "currency",
+      currency: "VND",
+    }).format(n || 0);
   } catch {
     return `${(n || 0).toLocaleString("vi-VN")} ₫`;
   }
@@ -229,4 +242,3 @@ function fmtDateYMD(date) {
   const d = String(date.getDate()).padStart(2, "0");
   return `${y}-${m}-${d}`;
 }
-

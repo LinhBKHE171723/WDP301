@@ -1,135 +1,164 @@
-const mongoose = require('mongoose');
 const Order = require("../../models/Order");
+const OrderItem = require("../../models/OrderItem");
 const Item = require("../../models/Item");
+const { Types } = require("mongoose");
 
-exports.getItemTrend = async ({ itemId, type, from, to }) => {
-    if (!itemId || !mongoose.Types.ObjectId.isValid(itemId)) {
-        throw new Error("Item ID không hợp lệ.");
-    }
-    const item = await Item.findById(itemId).select('price');
-    if (!item) {
-        throw new Error("Không tìm thấy món ăn.");
-    }
-    const itemPrice = item.price || 0;
-    const { conf, fromDate, toDate } = normalizeTimeInputs(type, from, to);
-
-    const ordersInDateRange = await Order.find({
-        createdAt: { $gte: fromDate, $lte: toDate }
-    }).populate('orderItems'); // Lấy kèm các món ăn trong đơn hàng
-
-    const relevantOrderItems = [];
-    for (const order of ordersInDateRange) {
-        for (const orderItem of order.orderItems) {
-            // Chỉ lấy các orderItem của món ăn đang cần phân tích
-            if (orderItem.itemId.toString() === itemId) {
-                relevantOrderItems.push({
-                    ...orderItem.toObject(),
-                    orderStatus: order.status,
-                    orderCreatedAt: order.createdAt,
-                    orderServedAt: order.servedAt,
-                });
-            }
-        }
-    }
-    
-    const groupedData = {};
-    for (const orderItem of relevantOrderItems) {
-        const timeLabel = conf.label(orderItem.orderCreatedAt);
-        // Khởi tạo nhóm nếu chưa tồn tại
-        if (!groupedData[timeLabel]) {
-            groupedData[timeLabel] = {
-                time: orderItem.orderCreatedAt,
-                totalQuantity: 0,
-                totalRevenue: 0,
-                totalQuantityCancelled: 0,
-                totalServiceTimeMs: 0,
-                completedCount: 0,
-            };
-        }
-        // Cộng dồn dữ liệu vào nhóm tương ứng
-        const group = groupedData[timeLabel];
-        group.totalQuantity += orderItem.quantity;
-        const isCompleted = ["served", "paid"].includes(orderItem.orderStatus);
-        if (isCompleted) {
-            group.completedCount += 1;
-            group.totalRevenue += orderItem.quantity * itemPrice;
-            if (orderItem.orderServedAt) {
-                const serviceTime = orderItem.orderServedAt.getTime() - orderItem.orderCreatedAt.getTime();
-                group.totalServiceTimeMs += serviceTime;
-            }
-        }
-        if (orderItem.orderStatus === "cancelled") {
-            group.totalQuantityCancelled += orderItem.quantity;
-        }
-    }
-
-    const trend = Object.values(groupedData).sort((a, b) => a.time - b.time);
-    const summary = calculateSummary(trend);
-
-    // Trả về kết quả cuối cùng cho controller
-    return {
-        summary: {
-            ...summary,
-            cancellationRate: parseFloat(
-                (summary.totalQuantity > 0 ? (summary.totalQuantityCancelled / summary.totalQuantity) * 100 : 0).toFixed(2)
-            ),
-            avgServiceTimeMinutes: parseFloat(
-                (summary.completedCount > 0 ? (summary.totalServiceTimeMs / summary.completedCount / 60000) : 0).toFixed(2)
-            ),
-            formattedRevenue: fmtVND(summary.totalRevenue),
-        },
-        trend: formatTrendData(trend, conf),
-    };
+const TYPE_TO_TRUNC = {
+  daily: {
+    unit: "day",
+    label: (d) => d.toLocaleDateString("vi-VN"),
+  },
+  weekly: {
+    unit: "week",
+    label: (d) => {
+      const week = Math.ceil(d.getDate() / 7);
+      return `Tuần ${week} - ${d.getMonth() + 1}/${d.getFullYear()}`;
+    },
+  },
+  monthly: {
+    unit: "month",
+    label: (d) => `${d.getMonth() + 1}/${d.getFullYear()}`,
+  },
+  yearly: {
+    unit: "year",
+    label: (d) => `${d.getFullYear()}`,
+  },
 };
 
-
-// Tính toán các chỉ số tổng hợp
-function calculateSummary(trendData) {
-    return trendData.reduce((acc, current) => {
-        acc.totalQuantity += current.totalQuantity;
-        acc.totalRevenue += current.totalRevenue;
-        acc.totalQuantityCancelled += current.totalQuantityCancelled;
-        acc.totalServiceTimeMs += current.totalServiceTimeMs;
-        acc.completedCount += current.completedCount;
-        return acc;
-    }, {
-        totalQuantity: 0, totalRevenue: 0, totalQuantityCancelled: 0,
-        totalServiceTimeMs: 0, completedCount: 0,
-    });
+function truncateDate(date, unit) {
+  const d = new Date(date);
+  switch (unit) {
+    case "year": d.setMonth(0, 1); break;
+    case "month": d.setDate(1); break;
+    case "week":
+      const dayOfWeek = d.getDay();
+      const distanceToMonday = dayOfWeek === 0 ? -6 : 1 - dayOfWeek;
+      d.setDate(d.getDate() + distanceToMonday);
+      break;
+  }
+  d.setHours(0, 0, 0, 0);
+  return d;
 }
 
-// Định dạng dữ liệu trend để trả về cho FE
-function formatTrendData(trendData, conf) {
-    return trendData.map(item => ({
-        time: item.time,
-        label: conf.label(item.time),
-        totalQuantity: item.totalQuantity,
-        totalRevenue: item.totalRevenue,
-        formattedRevenue: fmtVND(item.totalRevenue),
-        cancellationRate: item.totalQuantity > 0 ? (item.totalQuantityCancelled / item.totalQuantity) * 100 : 0,
-        avgServiceTimeMinutes: item.completedCount > 0 ? (item.totalServiceTimeMs / item.completedCount / 60000) : 0, // 60000 ms = 1 min
-    }));
-}
-
-// Cấu hình nhóm thời gian
-const TYPE_CONFIG = {
-    monthly: { label: (d) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}` },
-    daily:   { label: (d) => d.toISOString().split('T')[0] },
-    yearly:  { label: (d) => `${d.getFullYear()}` },
-};
-
-// Chuẩn hóa đầu vào thời gian
-function normalizeTimeInputs(type, from, to) {
-    const conf = TYPE_CONFIG[(type || "monthly").toLowerCase()] || TYPE_CONFIG.monthly;
-    const toDate = to ? new Date(to) : new Date();
-    toDate.setHours(23, 59, 59, 999);
-    let fromDate = from ? new Date(from) : new Date(new Date().setDate(toDate.getDate() - 30));
-    fromDate.setHours(0, 0, 0, 0);
-    return { conf, fromDate, toDate };
-}
-
-// Định dạng tiền tệ VND
 function fmtVND(n) {
-    if (typeof n !== 'number') return '0 ₫';
-    return new Intl.NumberFormat("vi-VN", { style: "currency", currency: "VND" }).format(n);
+  return new Intl.NumberFormat("vi-VN", { style: "currency", currency: "VND" }).format(n || 0);
 }
+
+/* -------------------------------------------------------------------------- */
+/*                              GET ITEM TREND                                */
+/* -------------------------------------------------------------------------- */
+exports.getItemTrend = async ({ itemId, type = "daily", from, to }) => {
+  if (!Types.ObjectId.isValid(itemId)) {
+    throw new Error("Invalid itemId");
+  }
+
+  const conf = TYPE_TO_TRUNC[type] || TYPE_TO_TRUNC.daily;
+  const fromDate = from ? new Date(from) : new Date(Date.now() - 7 * 86400000);
+  const toDate = to ? new Date(to) : new Date();
+
+  // 1️⃣ Lấy item + giá vốn (expense) & nguyên liệu hiện tại
+  const item = await Item.findById(itemId).populate({
+    path: "ingredients.ingredient",
+    select: "priceNow name unit"
+  });
+
+  if (!item) throw new Error("Item not found");
+
+  // 2️⃣ Lấy toàn bộ Order chứa món này trong khoảng thời gian
+  const orders = await Order.find({
+    status: { $in: ["paid", "served", "cancelled"] },
+    createdAt: { $gte: fromDate, $lte: toDate },
+  }).populate("orderItems");
+
+  const statsByTime = new Map();
+
+  for (const order of orders) {
+    const timeBucket = truncateDate(order.createdAt, conf.unit);
+    const key = timeBucket.toISOString();
+    const current = statsByTime.get(key) || {
+      time: timeBucket,
+      totalQuantity: 0,
+      totalRevenue: 0,
+      totalExpense: 0,
+      totalProfit: 0,
+      cancelled: 0,
+      serviceTimes: [],
+    };
+
+    // Duyệt các orderItem trong đơn
+    for (const orderItemId of order.orderItems) {
+      const orderItem = await OrderItem.findById(orderItemId);
+
+      if (!orderItem || !orderItem.itemId || orderItem.itemId.toString() !== itemId.toString())
+        continue;
+
+      const qty = orderItem.quantity || 0;
+      const price = orderItem.price || item.price;
+      const revenue = qty * price;
+
+      // ✅ Tính giá vốn món tại thời điểm đó (dựa trên Ingredient.priceNow)
+      let expenseAtTime = 0;
+      if (item.ingredients?.length) {
+        for (const ing of item.ingredients) {
+          const ingDoc = ing.ingredient;
+          if (ingDoc && ingDoc.priceNow != null) {
+            expenseAtTime += ingDoc.priceNow * ing.quantity;
+          }
+        }
+      }
+      const totalExpense = expenseAtTime * qty;
+
+      // ✅ Gộp dữ liệu
+      current.totalQuantity += qty;
+      current.totalRevenue += revenue;
+      current.totalExpense += totalExpense;
+      current.totalProfit += revenue - totalExpense;
+
+      if (order.status === "cancelled") current.cancelled += qty;
+    }
+
+    statsByTime.set(key, current);
+  }
+
+  // 3️⃣ Chuyển map → mảng & tính trung bình
+  const trend = Array.from(statsByTime.values())
+    .sort((a, b) => a.time - b.time)
+    .map((row) => ({
+      time: row.time.toISOString(),
+      label: conf.label(row.time),
+      totalQuantity: row.totalQuantity,
+      totalRevenue: row.totalRevenue,
+      totalExpense: row.totalExpense,
+      totalProfit: row.totalProfit,
+      cancellationRate:
+        row.totalQuantity === 0 ? 0 : (row.cancelled / row.totalQuantity) * 100,
+      formattedRevenue: fmtVND(row.totalRevenue),
+      formattedExpense: fmtVND(row.totalExpense),
+      formattedProfit: fmtVND(row.totalProfit),
+    }));
+
+  // 4️⃣ Tổng kết summary
+  const totalQuantity = trend.reduce((s, t) => s + t.totalQuantity, 0);
+  const totalRevenue = trend.reduce((s, t) => s + t.totalRevenue, 0);
+  const totalExpense = trend.reduce((s, t) => s + t.totalExpense, 0);
+  const totalProfit = trend.reduce((s, t) => s + t.totalProfit, 0);
+  const totalCancelled = trend.reduce(
+    (s, t) => s + (t.cancellationRate / 100) * t.totalQuantity,
+    0
+  );
+
+  const summary = {
+    totalQuantity,
+    totalRevenue,
+    totalExpense,
+    totalProfit,
+    totalCancelled,
+    cancellationRate:
+      totalQuantity === 0 ? 0 : (totalCancelled / totalQuantity) * 100,
+    formattedRevenue: fmtVND(totalRevenue),
+    formattedExpense: fmtVND(totalExpense),
+    formattedProfit: fmtVND(totalProfit),
+  };
+
+  return { summary, trend };
+};

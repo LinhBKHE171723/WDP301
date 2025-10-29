@@ -1,5 +1,5 @@
 import { Link, useLocation } from "react-router-dom";
-import { BarChart3, Utensils, Users, MessageSquare, Settings, LayoutDashboard } from 'lucide-react';
+import { BarChart3, Utensils, Users, MessageSquare, Settings, LayoutDashboard, PieChart } from 'lucide-react';
 
 export default function Sidebar() {
   const { pathname } = useLocation();
@@ -12,6 +12,7 @@ export default function Sidebar() {
     { to: "/accounts", label: "Tài khoản", icon: Users },
     { to: "/feedback", label: "Feedback", icon: MessageSquare },
     { to: "/customers", label: "khách hàng thân thiết", icon: Users },
+    { to: "/performance", label: "Hsuat nhan vien", icon: PieChart  },
 
     { to: "/settings", label: "Cài đặt", icon: Settings },
   ];
