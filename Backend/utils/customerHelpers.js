@@ -2,6 +2,7 @@
 
 const Item = require("../models/Item");
 const Menu = require("../models/Menu");
+const Ingredient = require("../models/Ingredient");
 
 /**
  * Populates order item details by finding items in both Item and Menu collections
@@ -64,6 +65,57 @@ const validateTableAvailability = (table) => {
 };
 
 /**
+ * Tính expense (giá vốn) cho Item hoặc Menu tại thời điểm hiện tại
+ * @param {Object} itemOrMenu - Item hoặc Menu object (đã populate ingredients nếu cần)
+ * @param {String} type - 'item' hoặc 'menu'
+ * @returns {Number} Expense (giá vốn)
+ */
+const calculateExpense = async (itemOrMenu, type) => {
+  if (type === 'menu') {
+    // Menu: expense = tổng expense của các items trong menu
+    if (!itemOrMenu.items || itemOrMenu.items.length === 0) {
+      return 0;
+    }
+    
+    let totalExpense = 0;
+    for (const itemId of itemOrMenu.items) {
+      const item = await Item.findById(itemId).populate('ingredients.ingredient');
+      if (item && item.ingredients) {
+        for (const ing of item.ingredients) {
+          const ingDoc = ing.ingredient;
+          if (ingDoc && ingDoc.priceNow != null) {
+            totalExpense += ingDoc.priceNow * ing.quantity;
+          }
+        }
+      }
+    }
+    return totalExpense;
+  } else {
+    // Item: expense = tổng (ingredient.priceNow * quantity) của tất cả ingredients
+    if (!itemOrMenu.ingredients || itemOrMenu.ingredients.length === 0) {
+      return 0;
+    }
+    
+    let totalExpense = 0;
+    // Nếu ingredients chưa được populate, cần populate
+    let ingredients = itemOrMenu.ingredients;
+    if (ingredients.length > 0 && !ingredients[0].ingredient || typeof ingredients[0].ingredient === 'string') {
+      // Chưa populate, cần populate
+      const populatedItem = await Item.findById(itemOrMenu._id).populate('ingredients.ingredient');
+      ingredients = populatedItem.ingredients;
+    }
+    
+    for (const ing of ingredients) {
+      const ingDoc = ing.ingredient;
+      if (ingDoc && ingDoc.priceNow != null) {
+        totalExpense += ingDoc.priceNow * ing.quantity;
+      }
+    }
+    return totalExpense;
+  }
+};
+
+/**
  * Creates order items from cart data
  * @param {Array} orderItems - Cart items
  * @returns {Object} Result with created order items and total amount
@@ -77,16 +129,19 @@ const createOrderItemsFromCart = async (orderItems) => {
     
     // Kiểm tra type để xác định tìm trong Menu hay Item
     if (orderItem.type === 'menu') {
-      item = await Menu.findById(orderItem.itemId);
+      item = await Menu.findById(orderItem.itemId).populate('items');
       if (!item) {
         throw new Error(`Không tìm thấy menu với ID: ${orderItem.itemId}`);
       }
     } else {
-      item = await Item.findById(orderItem.itemId);
+      item = await Item.findById(orderItem.itemId).populate('ingredients.ingredient');
       if (!item) {
         throw new Error(`Không tìm thấy món ăn với ID: ${orderItem.itemId}`);
       }
     }
+
+    // Tính expense tại thời điểm đặt món
+    const expense = await calculateExpense(item, orderItem.type);
 
     // Tạo OrderItem với số lượng được yêu cầu
     const OrderItem = require("../models/OrderItem");
@@ -97,6 +152,7 @@ const createOrderItemsFromCart = async (orderItems) => {
       itemType: orderItem.type,
       quantity: orderItem.quantity, // Sử dụng số lượng từ frontend
       price: item.price,
+      expense: expense, // Giá vốn tại thời điểm đặt món
       status: "pending", // Đảm bảo status là pending
       note: orderItem.note || "",
     });
@@ -115,6 +171,7 @@ const createOrderItemsFromCart = async (orderItems) => {
 module.exports = {
   populateOrderItemDetails,
   validateTableAvailability,
-  createOrderItemsFromCart
+  createOrderItemsFromCart,
+  calculateExpense
 };
 
