@@ -223,9 +223,9 @@ const seedDatabase = async () => {
       console.log(`✅ Tạo user: ${user.username}`);
     }
 
-    const customer = users.find((u) => u.role === "customer");
+    const customers = users.filter((u) => u.role === "customer");
     const waiters = users.filter((u) => u.role === "waiter");
-    const chef = users.find((u) => u.role === "chef");
+    const chefs = users.filter((u) => u.role === "chef");
 
     // 3️⃣ Nguyên liệu
     const ingredients = await Ingredient.insertMany([
@@ -894,22 +894,27 @@ const seedDatabase = async () => {
     ]);
     console.log("🍽️ Đã tạo các Menu mẫu.");
 
-    // 5️⃣ Bàn ăn (35 bàn)
+    // ===============================
+    // 🪑 5️⃣ Tạo bàn ăn (35 bàn)
+    // ===============================
     const tables = await Promise.all(
       Array.from({ length: 35 }, (_, i) =>
         Table.create({
           tableNumber: i + 1,
           qrCode: `QR_TABLE_${i + 1}`,
-          status: i < 15 ? "occupied" : "available", // 15 bàn occupied, 20 bàn available
+          status: i < 15 ? "occupied" : "available",
+          orderNow: [],
         })
       )
     );
 
     // 6️⃣ Tạo orders với nhiều trạng thái khác nhau
-    const customers = users.filter((u) => u.role === "customer");
-    const chefs = users.filter((u) => u.role === "chef");
 
-    // Helper function để tạo orderItem với status phù hợp
+
+    // ===============================
+    // ⚙️ Helper functions
+    // ===============================
+
     const createOrderItems = async (items, status, assignedChef = null) => {
       const selectedItems = [];
       for (let j = 0; j < Math.min(3, items.length); j++) {
@@ -920,22 +925,20 @@ const seedDatabase = async () => {
           itemType: "item",
           quantity: Math.floor(Math.random() * 2) + 1,
           price: randomItem.price,
-          assignedChef: assignedChef,
-          status: status,
+          assignedChef,
+          status,
         });
         selectedItems.push(orderItem);
       }
       return selectedItems;
     };
 
-    // Helper function để tạo confirmation history
-    const createConfirmationHistory = (actions) => {
-      return actions.map((action) => ({
-        action: action,
+    const createConfirmationHistory = (actions) =>
+      actions.map((action) => ({
+        action,
         timestamp: new Date(),
         details: getActionDetails(action),
       }));
-    };
 
     const getActionDetails = (action) => {
       const details = {
@@ -948,183 +951,49 @@ const seedDatabase = async () => {
       return details[action] || action;
     };
 
+    // ===============================
+    // 📌 Cập nhật table theo order
+    // ===============================
+    const updateTableOrders = async (table, order) => {
+      const canAttach =
+        order.waiterResponse?.status === "approved" &&
+        ["pending", "preparing", "served"].includes(order.status);
+
+      const shouldRemove =
+        ["paid", "cancelled"].includes(order.status) ||
+        ["pending", "rejected"].includes(order.waiterResponse?.status);
+
+      if (canAttach) {
+        table.status = "occupied";
+        if (!Array.isArray(table.orderNow)) table.orderNow = [];
+        if (!table.orderNow.some((id) => id.toString() === order._id.toString())) {
+          table.orderNow.push(order._id);
+        }
+      } else if (shouldRemove) {
+        table.orderNow = (table.orderNow || []).filter(
+          (id) => id.toString() !== order._id.toString()
+        );
+        if (table.orderNow.length === 0) table.status = "available";
+      }
+
+      await table.save();
+    };
+
+    // ===============================
+    // 🍽️ 6️⃣ Tạo orders mẫu
+    // ===============================
     let orderCount = 0;
 
-    // A. pending (waiterResponse: pending) - 4 orders
-    for (let i = 0; i < 4; i++) {
-      const table = tables[i];
-      const customer = customers[i % customers.length];
-      const waiter = waiters[i % waiters.length];
+    // A. pending orders đã được xóa để test hệ thống sạch
 
-      const orderItems = await createOrderItems(items, "pending");
-      const totalAmount = orderItems.reduce(
-        (sum, oi) => sum + oi.price * oi.quantity,
-        0
-      );
+    // B. pending orders (waiter approved, customer chưa confirm) đã được xóa để test hệ thống sạch
 
-      const payment = await Payment.create({
-        paymentMethod: "cash",
-        status: "unpaid",
-        amountPaid: 0,
-        totalAmount: totalAmount,
-      });
-
-      const order = await Order.create({
-        userId: customer._id,
-        servedBy: waiter._id,
-        tableId: table._id,
-        orderItems: orderItems.map((oi) => oi._id),
-        paymentId: payment._id,
-        status: "pending",
-        totalAmount: totalAmount,
-        discount: 0,
-        waiterResponse: { status: "pending" },
-        customerConfirmed: false,
-        confirmationHistory: createConfirmationHistory(["order_created"]),
-      });
-
-      // Update OrderItems với orderId
-      await OrderItem.updateMany(
-        { _id: { $in: orderItems.map((oi) => oi._id) } },
-        { orderId: order._id }
-      );
-
-      payment.orderId = order._id;
-      await payment.save();
-      // Sau khi tạo xong order
-      if (["confirmed", "preparing", "served"].includes(order.status)) {
-        table.status = "occupied";
-        table.orderNow = order._id;
-      } else {
-        table.status = "available";
-        table.orderNow = null;
-      }
-      await table.save();
-      orderCount++;
-    }
-
-    // B. pending (waiterResponse: approved, customerConfirmed: false) - 3 orders
-    for (let i = 4; i < 7; i++) {
-      const table = tables[i];
-      const customer = customers[i % customers.length];
-      const waiter = waiters[i % waiters.length];
-
-      const orderItems = await createOrderItems(items, "pending");
-      const totalAmount = orderItems.reduce(
-        (sum, oi) => sum + oi.price * oi.quantity,
-        0
-      );
-
-      const payment = await Payment.create({
-        paymentMethod: "cash",
-        status: "unpaid",
-        amountPaid: 0,
-        totalAmount: totalAmount,
-      });
-
-      const order = await Order.create({
-        userId: customer._id,
-        servedBy: waiter._id,
-        tableId: table._id,
-        orderItems: orderItems.map((oi) => oi._id),
-        paymentId: payment._id,
-        status: "pending",
-        totalAmount: totalAmount,
-        discount: 0,
-        waiterResponse: {
-          status: "approved",
-          respondedAt: new Date(),
-        },
-        customerConfirmed: false,
-        confirmationHistory: createConfirmationHistory([
-          "order_created",
-          "waiter_approved",
-        ]),
-      });
-
-      await OrderItem.updateMany(
-        { _id: { $in: orderItems.map((oi) => oi._id) } },
-        { orderId: order._id }
-      );
-
-      payment.orderId = order._id;
-      await payment.save();
-      // Sau khi tạo xong order
-      if (["confirmed", "preparing", "served"].includes(order.status)) {
-        table.status = "occupied";
-        table.orderNow = order._id;
-      } else {
-        table.status = "available";
-        table.orderNow = null;
-      }
-      await table.save();
-
-      orderCount++;
-    }
-
-    // C. pending (waiterResponse: rejected) - 6 orders
-    for (let i = 7; i < 13; i++) {
-      const table = tables[i];
-      const customer = customers[i % customers.length];
-      const waiter = waiters[i % waiters.length];
-
-      const orderItems = await createOrderItems(items, "pending");
-      const totalAmount = orderItems.reduce(
-        (sum, oi) => sum + oi.price * oi.quantity,
-        0
-      );
-
-      const payment = await Payment.create({
-        paymentMethod: "cash",
-        status: "unpaid",
-        amountPaid: 0,
-        totalAmount: totalAmount,
-      });
-
-      const order = await Order.create({
-        userId: customer._id,
-        servedBy: waiter._id,
-        tableId: table._id,
-        orderItems: orderItems.map((oi) => oi._id),
-        paymentId: payment._id,
-        status: "pending",
-        totalAmount: totalAmount,
-        discount: 0,
-        waiterResponse: {
-          status: "rejected",
-          reason: "Không đủ nguyên liệu",
-          respondedAt: new Date(),
-        },
-        customerConfirmed: false,
-        confirmationHistory: createConfirmationHistory([
-          "order_created",
-          "waiter_rejected",
-        ]),
-      });
-
-      await OrderItem.updateMany(
-        { _id: { $in: orderItems.map((oi) => oi._id) } },
-        { orderId: order._id }
-      );
-
-      payment.orderId = order._id;
-      await payment.save();
-      // Sau khi tạo xong order
-      if (["confirmed", "preparing", "served"].includes(order.status)) {
-        table.status = "occupied";
-        table.orderNow = order._id;
-      } else {
-        table.status = "available";
-        table.orderNow = null;
-      }
-      await table.save();
-      orderCount++;
-    }
+    // C. rejected orders đã được xóa để test hệ thống sạch
 
     // thiếu confirmed và xoá ready, vì ready bị bỏ còn confirmed để demo với kitchen cho đẹp
 
     // E. preparing - 5 orders
-    for (let i = 13; i < 18; i++) {
+    for (let i = 0; i < 5; i++) {
       const table = tables[i];
       const customer = customers[i % customers.length];
       const waiter = waiters[i % waiters.length];
@@ -1150,18 +1019,10 @@ const seedDatabase = async () => {
         orderItems: orderItems.map((oi) => oi._id),
         paymentId: payment._id,
         status: "preparing",
-        totalAmount: totalAmount,
-        discount: 0,
-        waiterResponse: {
-          status: "approved",
-          respondedAt: new Date(),
-        },
+        waiterResponse: { status: "approved", respondedAt: new Date() },
         customerConfirmed: true,
-        confirmationHistory: createConfirmationHistory([
-          "order_created",
-          "waiter_approved",
-          "customer_confirmed",
-        ]),
+        actions: ["order_created", "waiter_approved", "customer_confirmed"],
+        chef: true,
       });
 
       await OrderItem.updateMany(
@@ -1174,10 +1035,13 @@ const seedDatabase = async () => {
       // Sau khi tạo xong order
       if (["confirmed", "preparing", "served"].includes(order.status)) {
         table.status = "occupied";
-        table.orderNow = order._id;
+        if (!table.orderNow || !table.orderNow.includes(order._id)) {
+          if (!table.orderNow) table.orderNow = [];
+          table.orderNow.push(order._id);
+        }
       } else {
         table.status = "available";
-        table.orderNow = null;
+        // Không thêm vào orderNow nếu không active
       }
       await table.save();
       orderCount++;
@@ -1186,7 +1050,7 @@ const seedDatabase = async () => {
    
 
     // G. served - 4 orders
-    for (let i = 21; i < 25; i++) {
+    for (let i = 5; i < 9; i++) {
       const table = tables[i];
       const customer = customers[i % customers.length];
       const waiter = waiters[i % waiters.length];
@@ -1212,19 +1076,10 @@ const seedDatabase = async () => {
         orderItems: orderItems.map((oi) => oi._id),
         paymentId: payment._id,
         status: "served",
-        totalAmount: totalAmount,
-        discount: 0,
-        servedAt: new Date(),
-        waiterResponse: {
-          status: "approved",
-          respondedAt: new Date(),
-        },
+        waiterResponse: { status: "approved", respondedAt: new Date() },
         customerConfirmed: true,
-        confirmationHistory: createConfirmationHistory([
-          "order_created",
-          "waiter_approved",
-          "customer_confirmed",
-        ]),
+        actions: ["order_created", "waiter_approved", "customer_confirmed"],
+        chef: true,
       });
 
       await OrderItem.updateMany(
@@ -1237,17 +1092,20 @@ const seedDatabase = async () => {
       // Sau khi tạo xong order
       if (["confirmed", "preparing", "served"].includes(order.status)) {
         table.status = "occupied";
-        table.orderNow = order._id;
+        if (!table.orderNow || !table.orderNow.includes(order._id)) {
+          if (!table.orderNow) table.orderNow = [];
+          table.orderNow.push(order._id);
+        }
       } else {
         table.status = "available";
-        table.orderNow = null;
+        // Không thêm vào orderNow nếu không active
       }
       await table.save();
       orderCount++;
     }
 
     // H. paid - 6 orders (completed, created 1-2 weeks ago)
-    for (let i = 25; i < 31; i++) {
+    for (let i = 9; i < 15; i++) {
       const table = tables[i];
       const customer = customers[i % customers.length];
       const waiter = waiters[i % waiters.length];
@@ -1266,13 +1124,6 @@ const seedDatabase = async () => {
         totalAmount: totalAmount,
       });
 
-      const createdAt = new Date(
-        Date.now() - Math.random() * 14 * 24 * 60 * 60 * 1000
-      ); // 1-2 tuần trước
-      const servedAt = new Date(
-        createdAt.getTime() + Math.random() * 2 * 60 * 60 * 1000
-      ); // 2 giờ sau khi tạo
-
       const order = await Order.create({
         userId: customer._id,
         servedBy: waiter._id,
@@ -1280,20 +1131,10 @@ const seedDatabase = async () => {
         orderItems: orderItems.map((oi) => oi._id),
         paymentId: payment._id,
         status: "paid",
-        totalAmount: totalAmount,
-        discount: 0,
-        servedAt: servedAt,
-        waiterResponse: {
-          status: "approved",
-          respondedAt: new Date(createdAt.getTime() + 5 * 60 * 1000), // 5 phút sau
-        },
+        waiterResponse: { status: "approved", respondedAt: new Date() },
         customerConfirmed: true,
-        confirmationHistory: createConfirmationHistory([
-          "order_created",
-          "waiter_approved",
-          "customer_confirmed",
-        ]),
-        createdAt: createdAt,
+        actions: ["order_created", "waiter_approved", "customer_confirmed"],
+        paid: true,
       });
 
       await OrderItem.updateMany(
@@ -1306,17 +1147,20 @@ const seedDatabase = async () => {
       // Sau khi tạo xong order
       if (["confirmed", "preparing", "served"].includes(order.status)) {
         table.status = "occupied";
-        table.orderNow = order._id;
+        if (!table.orderNow || !table.orderNow.includes(order._id)) {
+          if (!table.orderNow) table.orderNow = [];
+          table.orderNow.push(order._id);
+        }
       } else {
         table.status = "available";
-        table.orderNow = null;
+        // Không thêm vào orderNow nếu không active
       }
       await table.save();
       orderCount++;
     }
 
     // I. cancelled - 3 orders
-    for (let i = 31; i < 34; i++) {
+    for (let i = 15; i < 18; i++) {
       const table = tables[i];
       const customer = customers[i % customers.length];
       const waiter = waiters[i % waiters.length];
@@ -1341,13 +1185,9 @@ const seedDatabase = async () => {
         orderItems: orderItems.map((oi) => oi._id),
         paymentId: payment._id,
         status: "cancelled",
-        totalAmount: totalAmount,
-        discount: 0,
-        waiterResponse: {
-          status: "pending",
-        },
+        waiterResponse: { status: "pending" },
         customerConfirmed: false,
-        confirmationHistory: createConfirmationHistory(["order_created"]),
+        actions: ["order_created"],
       });
 
       await OrderItem.updateMany(
@@ -1360,16 +1200,83 @@ const seedDatabase = async () => {
       // Sau khi tạo xong order
       if (["confirmed", "preparing", "served"].includes(order.status)) {
         table.status = "occupied";
-        table.orderNow = order._id;
+        if (!table.orderNow || !table.orderNow.includes(order._id)) {
+          if (!table.orderNow) table.orderNow = [];
+          table.orderNow.push(order._id);
+        }
       } else {
         table.status = "available";
-        table.orderNow = null;
+        // Không thêm vào orderNow nếu không active
       }
       await table.save();
       orderCount++;
     }
 
     console.log(`📋 Đã tạo ${orderCount} orders với các trạng thái khác nhau.`);
+
+    // J. Tạo bàn có nhiều orders đang hoạt động - 3 bàn (table 18, 19, 20)
+    // Mỗi bàn sẽ có 2-3 orders với status preparing/served
+    for (let tableIdx = 18; tableIdx < 21; tableIdx++) {
+      const table = tables[tableIdx];
+      const numOrders = tableIdx === 18 ? 2 : 3; // Bàn 18 có 2 orders, bàn 19-20 có 3 orders
+      
+      for (let orderIdx = 0; orderIdx < numOrders; orderIdx++) {
+        const customer = customers[(tableIdx + orderIdx) % customers.length];
+        const waiter = waiters[tableIdx % waiters.length];
+        const chef = chefs[tableIdx % chefs.length];
+        
+        // Random status: preparing hoặc served
+        const orderStatus = orderIdx % 2 === 0 ? "preparing" : "served";
+        const orderItems = await createOrderItems(items, orderStatus, chef._id);
+        const totalAmount = orderItems.reduce((sum, oi) => sum + oi.price * oi.quantity, 0);
+        
+        const payment = await Payment.create({
+          paymentMethod: "cash",
+          status: "unpaid",
+          amountPaid: 0,
+          totalAmount: totalAmount,
+        });
+        
+        const order = await Order.create({
+          userId: customer._id,
+          servedBy: waiter._id,
+          tableId: table._id,
+          orderItems: orderItems.map((oi) => oi._id),
+          paymentId: payment._id,
+          status: orderStatus,
+          totalAmount: totalAmount,
+          discount: 0,
+          servedAt: orderStatus === "served" ? new Date() : null,
+          waiterResponse: { status: "approved", respondedAt: new Date() },
+          customerConfirmed: true,
+          confirmationHistory: createConfirmationHistory([
+            "order_created",
+            "waiter_approved",
+            "customer_confirmed",
+          ]),
+        });
+        
+        await OrderItem.updateMany(
+          { _id: { $in: orderItems.map((oi) => oi._id) } },
+          { orderId: order._id }
+        );
+        
+        payment.orderId = order._id;
+        await payment.save();
+        
+        // Push order vào mảng orderNow của bàn
+        if (!table.orderNow || !table.orderNow.includes(order._id)) {
+          if (!table.orderNow) table.orderNow = [];
+          table.orderNow.push(order._id);
+        }
+        table.status = "occupied";
+        
+        orderCount++;
+      }
+      
+      await table.save();
+      console.log(`✅ Bàn ${table.tableNumber} có ${table.orderNow.length} orders đang hoạt động`);
+    }
 
     // 7️⃣ Purchase Orders
     const purchaseOrders = await PurchaseOrder.insertMany([
@@ -1584,17 +1491,26 @@ const seedDatabase = async () => {
   // 🧹 Cleanup: đồng bộ lại logic table - order
   const tables = await Table.find().populate("orderNow");
   for (const table of tables) {
-    if (table.status === "occupied") {
-      const order = table.orderNow;
-      if (!order || !["confirmed", "preparing", "served"].includes(order.status)) {
-        table.status = "available";
-        table.orderNow = null;
-        await table.save();
-      }
-    } else if (table.status === "available" && table.orderNow) {
-      table.orderNow = null;
-      await table.save();
+    // Đảm bảo orderNow là mảng
+    if (!table.orderNow) {
+      table.orderNow = [];
     }
+    
+    // Filter ra các orders active (populated orders)
+    const activeOrders = table.orderNow.filter(order => 
+      order && order.status && ["confirmed", "preparing", "served"].includes(order.status)
+    );
+    
+    // Chuyển về array of ObjectIds
+    table.orderNow = activeOrders.map(o => o._id);
+    
+    if (activeOrders.length > 0) {
+      table.status = "occupied";
+    } else {
+      table.status = "available";
+    }
+    
+    await table.save();
   }
   console.log("✅ Đã đồng bộ bàn và đơn hàng đúng logic mới!");
 

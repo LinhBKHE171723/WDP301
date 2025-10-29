@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
+import { authenticatedFetch } from '../utils/fetchHelper';
 
 // WebSocket configuration constants
 const RETRY_INTERVALS = [1000, 2000, 4000, 8000, 16000, 30000];
@@ -182,7 +183,7 @@ export const useOrderWebSocket = (orderId) => {
     if (!orderId) return null;
 
     try {
-      const response = await fetch(`http://localhost:5000/api/customer/orders/${orderId}`);
+      const response = await authenticatedFetch(`http://localhost:5000/api/customer/orders/${orderId}`);
       const data = await response.json();
       
       if (data.success) {

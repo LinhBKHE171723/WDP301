@@ -278,6 +278,27 @@ class WebSocketService {
   }
 
   // ==================================================
+  // 📢 Gửi thông báo cập nhật bàn cho waiter (khi bàn được giải phóng/đổi trạng thái)
+  // ==================================================
+  broadcastTableUpdate(tableId, tableData) {
+    const message = {
+      type: 'table:updated',
+      data: tableData,
+      timestamp: new Date().toISOString()
+    };
+
+    let sentCount = 0;
+    this.wss.clients.forEach(ws => {
+      if (ws.readyState === WebSocket.OPEN && ws.userRole === 'waiter') {
+        ws.send(JSON.stringify(message));
+        sentCount++;
+      }
+    });
+
+    console.log(`📡 Broadcasted table:updated for table ${tableId} to ${sentCount} waiter(s)`);
+  }
+
+  // ==================================================
   // ❤️ Heartbeat: kiểm tra connection còn sống
   // ==================================================
   startHeartbeat() {

@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import './LoginModal.css';
 
-const LoginModal = ({ isOpen, onClose, onLogin }) => {
+const LoginModal = ({ isOpen, onClose, onLogin, onSwitchToRegister }) => {
   const [form, setForm] = useState({ email: "", password: "" });
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
@@ -107,7 +107,7 @@ const LoginModal = ({ isOpen, onClose, onLogin }) => {
           </form>
 
           <div className="login-footer">
-            <p>Chưa có tài khoản? <span className="register-link">Đăng ký ngay</span></p>
+            <p>Chưa có tài khoản? <span className="register-link" onClick={onSwitchToRegister}>Đăng ký ngay</span></p>
           </div>
         </div>
       </div>

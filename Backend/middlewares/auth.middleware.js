@@ -1,4 +1,5 @@
 const jwt = require("jsonwebtoken");
+const User = require("../models/User");
 
 // 🧾 Tạo Access Token (thời hạn ngắn, dùng khi gọi API)
 function signAccessToken(payload) {
@@ -47,25 +48,45 @@ function authRequired(req, res, next) {
     // ✅ Giải mã & verify token bằng secret của server và trả về payload là 1 object
     const decoded = jwt.verify(token, process.env.JWT_SECRET);
 
-    // Lưu thông tin người dùng đã xác thực vào req.user để route khác dùng
-    req.user = {
-      id: String(decoded.id || ""),
-      role: decoded.role,
-      username: decoded.username,
-      avatar: decoded.avatar,
-      phone: decoded.phone,
-      name: decoded.name,
-      email: decoded.email,
-    };
-    // Nếu token không có id thì xem như không hợp lệ
-    if (!req.user.id) {
-      return next({
-        status: 401,
-        message: "Token không chứa thông tin hợp lệ.",
+    // Kiểm tra user có tồn tại trong DB
+    User.findById(decoded.id)
+      .then((user) => {
+        if (!user) {
+          return next({
+            status: 401,
+            message: "Tài khoản không tồn tại hoặc đã bị xóa.",
+          });
+        }
+
+        // Nếu token không có id thì xem như không hợp lệ
+        if (!decoded.id) {
+          return next({
+            status: 401,
+            message: "Token không chứa thông tin hợp lệ.",
+          });
+        }
+
+        // Lưu thông tin người dùng đã xác thực vào req.user để route khác dùng
+        req.user = {
+          id: String(user._id),
+          role: user.role,
+          username: user.username,
+          avatar: user.avatar,
+          phone: user.phone,
+          name: user.name,
+          email: user.email,
+        };
+
+        // Cho phép đi tiếp đến route controller
+        next();
+      })
+      .catch((err) => {
+        console.error("Database error in auth middleware:", err);
+        return next({
+          status: 401,
+          message: "Lỗi xác thực người dùng.",
+        });
       });
-    }
-    // Cho phép đi tiếp đến route controller
-    next();
   } catch (err) {
     console.error(err);
     // Token hết hạn hoặc không hợp lệ

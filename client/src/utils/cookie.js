@@ -1,3 +1,5 @@
+import { authenticatedFetch } from './fetchHelper';
+
 // setCookie: days is optional; defaults to 7
 export function setCookie(name, value, days = 7) {
   const date = new Date();
@@ -105,7 +107,7 @@ export async function validateAndCleanGuestOrderIds() {
     // Kiểm tra từng order ID với database
     for (const orderId of orderIds) {
       try {
-        const response = await fetch(`http://localhost:5000/api/customer/orders/${orderId}`);
+        const response = await authenticatedFetch(`http://localhost:5000/api/customer/orders/${orderId}`);
         const data = await response.json();
         
         if (data.success) {
