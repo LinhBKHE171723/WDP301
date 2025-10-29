@@ -229,54 +229,54 @@ const seedDatabase = async () => {
 
     // 3️⃣ Nguyên liệu
     const ingredients = await Ingredient.insertMany([
-      { name: "Thịt bò", unit: "kg", stockQuantity: 50, minStock: 10 },
-      { name: "Cá hồi", unit: "kg", stockQuantity: 30, minStock: 5 },
-      { name: "Khoai tây", unit: "kg", stockQuantity: 40, minStock: 8 },
-      { name: "Rau xà lách", unit: "bó", stockQuantity: 60, minStock: 10 },
-      { name: "Trứng gà", unit: "quả", stockQuantity: 100, minStock: 20 },
-      { name: "Tôm tươi", unit: "kg", stockQuantity: 45, minStock: 10 },
-      { name: "Phô mai", unit: "kg", stockQuantity: 25, minStock: 5 },
-      { name: "Bột mì", unit: "kg", stockQuantity: 30, minStock: 8 },
-      { name: "Thịt gà", unit: "kg", stockQuantity: 35, minStock: 5 },
-      { name: "Ớt chuông", unit: "kg", stockQuantity: 20, minStock: 3 },
-      { name: "Cà chua", unit: "kg", stockQuantity: 40, minStock: 8 },
-      { name: "Hành tây", unit: "kg", stockQuantity: 25, minStock: 5 },
-      { name: "Bơ", unit: "hộp", stockQuantity: 15, minStock: 3 },
-      { name: "Nước mắm", unit: "chai", stockQuantity: 50, minStock: 10 },
-      { name: "Tỏi", unit: "kg", stockQuantity: 30, minStock: 6 },
+      { name: "Thịt bò", unit: "kg", stockQuantity: 50, minStock: 10, priceNow: 100000 }, // 2000000/20
+      { name: "Cá hồi", unit: "kg", stockQuantity: 30, minStock: 5, priceNow: 100000 }, // 1500000/15
+      { name: "Khoai tây", unit: "kg", stockQuantity: 40, minStock: 8, priceNow: 20000 },
+      { name: "Rau xà lách", unit: "bó", stockQuantity: 60, minStock: 10, priceNow: 10000 }, // 500000/50
+      { name: "Trứng gà", unit: "quả", stockQuantity: 100, minStock: 20, priceNow: 3000 },
+      { name: "Tôm tươi", unit: "kg", stockQuantity: 45, minStock: 10, priceNow: 100000 }, // 2000000/20
+      { name: "Phô mai", unit: "kg", stockQuantity: 25, minStock: 5, priceNow: 80000 }, // 800000/10
+      { name: "Bột mì", unit: "kg", stockQuantity: 30, minStock: 8, priceNow: 12000 }, // 600000/50
+      { name: "Thịt gà", unit: "kg", stockQuantity: 35, minStock: 5, priceNow: 70000 },
+      { name: "Ớt chuông", unit: "kg", stockQuantity: 20, minStock: 3, priceNow: 25000 },
+      { name: "Cà chua", unit: "kg", stockQuantity: 40, minStock: 8, priceNow: 15000 },
+      { name: "Hành tây", unit: "kg", stockQuantity: 25, minStock: 5, priceNow: 20000 },
+      { name: "Bơ", unit: "hộp", stockQuantity: 15, minStock: 3, priceNow: 80000 },
+      { name: "Nước mắm", unit: "chai", stockQuantity: 50, minStock: 10, priceNow: 40000 },
+      { name: "Tỏi", unit: "kg", stockQuantity: 30, minStock: 6, priceNow: 50000 },
       // Thêm nguyên liệu mới
-      { name: "Thịt heo", unit: "kg", stockQuantity: 8, minStock: 10 }, // Stock thấp để test cảnh báo
-      { name: "Cá basa", unit: "kg", stockQuantity: 25, minStock: 5 },
-      { name: "Mực tươi", unit: "kg", stockQuantity: 20, minStock: 5 },
-      { name: "Cua biển", unit: "kg", stockQuantity: 15, minStock: 3 },
-      { name: "Nấm hương", unit: "kg", stockQuantity: 12, minStock: 2 },
-      { name: "Rau muống", unit: "bó", stockQuantity: 30, minStock: 5 },
-      { name: "Rau cải", unit: "bó", stockQuantity: 25, minStock: 5 },
-      { name: "Cà rốt", unit: "kg", stockQuantity: 35, minStock: 8 },
-      { name: "Khoai lang", unit: "kg", stockQuantity: 20, minStock: 5 },
-      { name: "Bí đỏ", unit: "kg", stockQuantity: 15, minStock: 3 },
-      { name: "Dưa chuột", unit: "kg", stockQuantity: 18, minStock: 4 },
-      { name: "Cà tím", unit: "kg", stockQuantity: 12, minStock: 3 },
-      { name: "Đậu phụ", unit: "miếng", stockQuantity: 50, minStock: 10 },
-      { name: "Mì tôm", unit: "gói", stockQuantity: 100, minStock: 20 },
-      { name: "Bún tươi", unit: "kg", stockQuantity: 25, minStock: 5 },
-      { name: "Phở tươi", unit: "kg", stockQuantity: 20, minStock: 4 },
-      { name: "Gạo", unit: "kg", stockQuantity: 200, minStock: 50 },
-      { name: "Dầu ăn", unit: "chai", stockQuantity: 30, minStock: 5 },
-      { name: "Muối", unit: "kg", stockQuantity: 50, minStock: 10 },
-      { name: "Đường", unit: "kg", stockQuantity: 40, minStock: 8 },
-      { name: "Tiêu", unit: "kg", stockQuantity: 15, minStock: 3 },
-      { name: "Ớt hiểm", unit: "kg", stockQuantity: 8, minStock: 2 },
-      { name: "Chanh", unit: "quả", stockQuantity: 60, minStock: 10 },
-      { name: "Coca Cola", unit: "lon", stockQuantity: 200, minStock: 50 },
-      { name: "Pepsi", unit: "lon", stockQuantity: 150, minStock: 30 },
-      { name: "Nước suối", unit: "chai", stockQuantity: 300, minStock: 50 },
-      { name: "Trà đá", unit: "ly", stockQuantity: 100, minStock: 20 },
-      { name: "Cà phê đen", unit: "ly", stockQuantity: 80, minStock: 15 },
-      { name: "Sữa tươi", unit: "hộp", stockQuantity: 50, minStock: 10 },
-      { name: "Kem vani", unit: "hộp", stockQuantity: 20, minStock: 5 },
-      { name: "Bánh mì", unit: "ổ", stockQuantity: 100, minStock: 20 },
-      { name: "Bánh ngọt", unit: "cái", stockQuantity: 30, minStock: 5 },
+      { name: "Thịt heo", unit: "kg", stockQuantity: 8, minStock: 10, priceNow: 72000 }, // 1800000/25 - Stock thấp để test cảnh báo
+      { name: "Cá basa", unit: "kg", stockQuantity: 25, minStock: 5, priceNow: 40000 }, // 1200000/30
+      { name: "Mực tươi", unit: "kg", stockQuantity: 20, minStock: 5, priceNow: 100000 }, // 1500000/15
+      { name: "Cua biển", unit: "kg", stockQuantity: 15, minStock: 3, priceNow: 180000 },
+      { name: "Nấm hương", unit: "kg", stockQuantity: 12, minStock: 2, priceNow: 150000 },
+      { name: "Rau muống", unit: "bó", stockQuantity: 30, minStock: 5, priceNow: 8000 },
+      { name: "Rau cải", unit: "bó", stockQuantity: 25, minStock: 5, priceNow: 7000 },
+      { name: "Cà rốt", unit: "kg", stockQuantity: 35, minStock: 8, priceNow: 18000 },
+      { name: "Khoai lang", unit: "kg", stockQuantity: 20, minStock: 5, priceNow: 15000 },
+      { name: "Bí đỏ", unit: "kg", stockQuantity: 15, minStock: 3, priceNow: 12000 },
+      { name: "Dưa chuột", unit: "kg", stockQuantity: 18, minStock: 4, priceNow: 16000 },
+      { name: "Cà tím", unit: "kg", stockQuantity: 12, minStock: 3, priceNow: 20000 },
+      { name: "Đậu phụ", unit: "miếng", stockQuantity: 50, minStock: 10, priceNow: 5000 },
+      { name: "Mì tôm", unit: "gói", stockQuantity: 100, minStock: 20, priceNow: 5000 },
+      { name: "Bún tươi", unit: "kg", stockQuantity: 25, minStock: 5, priceNow: 15000 },
+      { name: "Phở tươi", unit: "kg", stockQuantity: 20, minStock: 4, priceNow: 20000 },
+      { name: "Gạo", unit: "kg", stockQuantity: 200, minStock: 50, priceNow: 10000 }, // 1000000/100
+      { name: "Dầu ăn", unit: "chai", stockQuantity: 30, minStock: 5, priceNow: 45000 },
+      { name: "Muối", unit: "kg", stockQuantity: 50, minStock: 10, priceNow: 8000 },
+      { name: "Đường", unit: "kg", stockQuantity: 40, minStock: 8, priceNow: 15000 },
+      { name: "Tiêu", unit: "kg", stockQuantity: 15, minStock: 3, priceNow: 250000 },
+      { name: "Ớt hiểm", unit: "kg", stockQuantity: 8, minStock: 2, priceNow: 80000 },
+      { name: "Chanh", unit: "quả", stockQuantity: 60, minStock: 10, priceNow: 2000 },
+      { name: "Coca Cola", unit: "lon", stockQuantity: 200, minStock: 50, priceNow: 2500 }, // 500000/200
+      { name: "Pepsi", unit: "lon", stockQuantity: 150, minStock: 30, priceNow: 2500 },
+      { name: "Nước suối", unit: "chai", stockQuantity: 300, minStock: 50, priceNow: 5000 },
+      { name: "Trà đá", unit: "ly", stockQuantity: 100, minStock: 20, priceNow: 3000 },
+      { name: "Cà phê đen", unit: "ly", stockQuantity: 80, minStock: 15, priceNow: 5000 },
+      { name: "Sữa tươi", unit: "hộp", stockQuantity: 50, minStock: 10, priceNow: 13333 }, // 400000/30
+      { name: "Kem vani", unit: "hộp", stockQuantity: 20, minStock: 5, priceNow: 50000 },
+      { name: "Bánh mì", unit: "ổ", stockQuantity: 100, minStock: 20, priceNow: 10000 },
+      { name: "Bánh ngọt", unit: "cái", stockQuantity: 30, minStock: 5, priceNow: 20000 },
     ]);
     console.log("🥦 Đã tạo các Ingredient mẫu.");
 
@@ -779,7 +779,7 @@ const seedDatabase = async () => {
         ingredients: [],
       },
     ]);
-    console.log("🍱 Đã tạo các Item mẫu và tính expense tự động.");
+    console.log("🍱 Đã tạo các Item mẫu.");
 
     // 5️⃣ Tạo menu mẫu
     const menus = await Menu.insertMany([
@@ -915,16 +915,45 @@ const seedDatabase = async () => {
     // ⚙️ Helper functions
     // ===============================
 
+    // Helper function tính expense từ ingredients
+    const calculateItemExpense = async (item) => {
+      if (!item.ingredients || item.ingredients.length === 0) {
+        return 0;
+      }
+      
+      // Luôn populate ingredients vì items từ insertMany() chưa được populate
+      // và ingredients.ingredient chỉ là ObjectId references
+      const populatedItem = await Item.findById(item._id).populate('ingredients.ingredient');
+      
+      if (!populatedItem || !populatedItem.ingredients) {
+        return 0;
+      }
+      
+      let totalExpense = 0;
+      for (const ing of populatedItem.ingredients) {
+        const ingDoc = ing.ingredient;
+        if (ingDoc && typeof ingDoc.priceNow === 'number') {
+          totalExpense += ingDoc.priceNow * ing.quantity;
+        }
+      }
+      return totalExpense;
+    };
+
     const createOrderItems = async (items, status, assignedChef = null) => {
       const selectedItems = [];
       for (let j = 0; j < Math.min(3, items.length); j++) {
         const randomItem = items[Math.floor(Math.random() * items.length)];
+        
+        // Tính expense tại thời điểm tạo OrderItem
+        const expense = await calculateItemExpense(randomItem);
+        
         const orderItem = await OrderItem.create({
           itemId: randomItem._id,
           itemName: randomItem.name,
           itemType: "item",
           quantity: Math.floor(Math.random() * 2) + 1,
           price: randomItem.price,
+          expense: expense, // Giá vốn tại thời điểm đặt món
           assignedChef,
           status,
         });
@@ -949,6 +978,56 @@ const seedDatabase = async () => {
         order_modified: "Customer sửa đổi đơn hàng",
       };
       return details[action] || action;
+    };
+
+    // Helper functions cho việc tạo nhiều paid orders
+    const getRandomInt = (min, max) => {
+      return Math.floor(Math.random() * (max - min + 1)) + min;
+    };
+
+    const getRandomExpenseMultiplier = () => {
+      // Random multiplier từ 0.8 đến 1.2 (±20%)
+      return 0.8 + Math.random() * 0.4;
+    };
+
+    const getRandomTimeInDay = (date) => {
+      // Random giờ trong ngày từ 8h đến 22h
+      const hour = getRandomInt(8, 22);
+      const minute = getRandomInt(0, 59);
+      const second = getRandomInt(0, 59);
+      const newDate = new Date(date);
+      newDate.setHours(hour, minute, second);
+      return newDate;
+    };
+
+    // Tạo order items với expense biến động ngẫu nhiên
+    const createOrderItemsWithVariableExpense = async (items, status, assignedChef = null) => {
+      const selectedItems = [];
+      const numItems = getRandomInt(1, 5); // 1-5 items mỗi order
+      
+      for (let j = 0; j < numItems; j++) {
+        const randomItem = items[Math.floor(Math.random() * items.length)];
+        
+        // Tính expense base tại thời điểm tạo OrderItem
+        const baseExpense = await calculateItemExpense(randomItem);
+        
+        // Áp dụng multiplier ngẫu nhiên (0.8x - 1.2x)
+        const expenseMultiplier = getRandomExpenseMultiplier();
+        const finalExpense = baseExpense * expenseMultiplier;
+        
+        const orderItem = await OrderItem.create({
+          itemId: randomItem._id,
+          itemName: randomItem.name,
+          itemType: "item",
+          quantity: getRandomInt(1, 3), // 1-3 quantity
+          price: randomItem.price,
+          expense: Math.round(finalExpense), // Làm tròn expense
+          assignedChef,
+          status,
+        });
+        selectedItems.push(orderItem);
+      }
+      return selectedItems;
     };
 
     // ===============================
@@ -1158,6 +1237,105 @@ const seedDatabase = async () => {
       await table.save();
       orderCount++;
     }
+
+    // I. Tạo nhiều paid orders phân bố trong 3 tháng với expense biến động
+    console.log("🔄 Bắt đầu tạo paid orders phân bố trong 3 tháng...");
+    const threeMonthsAgo = new Date();
+    threeMonthsAgo.setMonth(threeMonthsAgo.getMonth() - 3);
+    const today = new Date();
+    
+    let bulkOrderCount = 0;
+    const totalDays = Math.floor((today - threeMonthsAgo) / (1000 * 60 * 60 * 24));
+    
+    // Tạo orders cho mỗi ngày trong 90 ngày
+    for (let day = 0; day < totalDays; day++) {
+      const currentDate = new Date(threeMonthsAgo);
+      currentDate.setDate(currentDate.getDate() + day);
+      
+      // Mỗi ngày tạo 15-25 orders ngẫu nhiên
+      const ordersPerDay = getRandomInt(15, 25);
+      
+      for (let i = 0; i < ordersPerDay; i++) {
+        const randomTable = tables[getRandomInt(0, tables.length - 1)];
+        const randomCustomer = customers[getRandomInt(0, customers.length - 1)];
+        const randomWaiter = waiters[getRandomInt(0, waiters.length - 1)];
+        const randomChef = chefs[getRandomInt(0, chefs.length - 1)];
+        
+        // Tạo order items với expense biến động
+        const orderItems = await createOrderItemsWithVariableExpense(
+          items,
+          "served",
+          randomChef._id
+        );
+        
+        const totalAmount = orderItems.reduce(
+          (sum, oi) => sum + oi.price * oi.quantity,
+          0
+        );
+        
+        // Random time trong ngày
+        const orderCreatedAt = getRandomTimeInDay(currentDate);
+        const orderUpdatedAt = new Date(orderCreatedAt.getTime() + getRandomInt(30, 120) * 60 * 1000); // 30-120 phút sau
+        const paymentTime = new Date(orderCreatedAt.getTime() + getRandomInt(60, 180) * 60 * 1000); // Thanh toán sau 60-180 phút
+        
+        // Random payment method
+        const paymentMethods = ["cash", "card", "momo", "zaloPay"];
+        const paymentMethod = paymentMethods[getRandomInt(0, paymentMethods.length - 1)];
+        
+        // Tạo payment
+        const payment = await Payment.create({
+          paymentMethod: paymentMethod,
+          status: "paid",
+          amountPaid: totalAmount,
+          totalAmount: totalAmount,
+          payTime: paymentTime,
+        });
+        
+        // Tạo order với createdAt và updatedAt cụ thể
+        const order = await Order.create({
+          userId: randomCustomer._id,
+          servedBy: randomWaiter._id,
+          tableId: randomTable._id,
+          orderItems: orderItems.map((oi) => oi._id),
+          paymentId: payment._id,
+          status: "paid",
+          totalAmount: totalAmount,
+          waiterResponse: { status: "approved", respondedAt: orderCreatedAt },
+          customerConfirmed: true,
+          actions: ["order_created", "waiter_approved", "customer_confirmed"],
+          paid: true,
+          createdAt: orderCreatedAt,
+          updatedAt: orderUpdatedAt,
+        });
+        
+        // Update order items với orderId
+        await OrderItem.updateMany(
+          { _id: { $in: orderItems.map((oi) => oi._id) } },
+          { orderId: order._id }
+        );
+        
+        // Update payment với orderId
+        payment.orderId = order._id;
+        await payment.save();
+        
+        // Không update table vì orders đã paid (không còn active)
+        
+        bulkOrderCount++;
+        
+        // Log tiến độ mỗi 100 orders
+        if (bulkOrderCount % 100 === 0) {
+          console.log(`  ✅ Đã tạo ${bulkOrderCount} paid orders...`);
+        }
+      }
+      
+      // Log tiến độ mỗi 10 ngày
+      if (day % 10 === 0 && day > 0) {
+        console.log(`  📅 Đã tạo orders cho ${day}/${totalDays} ngày (${bulkOrderCount} orders tổng cộng)...`);
+      }
+    }
+    
+    orderCount += bulkOrderCount;
+    console.log(`✅ Đã tạo ${bulkOrderCount} paid orders phân bố trong ${totalDays} ngày.`);
 
     // I. cancelled - 3 orders
     for (let i = 15; i < 18; i++) {

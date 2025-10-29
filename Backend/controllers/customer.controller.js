@@ -472,12 +472,14 @@ exports.addItemsToOrder = async (req, res) => {
     const createdOrderItems = [];
     let additionalAmount = 0;
 
+    const { calculateExpense } = require("../utils/customerHelpers");
+
     for (const orderItem of orderItems) {
       let item;
       
       // Kiểm tra type để xác định tìm trong Menu hay Item
       if (orderItem.type === 'menu') {
-        item = await Menu.findById(orderItem.itemId);
+        item = await Menu.findById(orderItem.itemId).populate('items');
         if (!item) {
           return res.status(404).json({ 
             success: false, 
@@ -485,7 +487,7 @@ exports.addItemsToOrder = async (req, res) => {
           });
         }
       } else {
-        item = await Item.findById(orderItem.itemId);
+        item = await Item.findById(orderItem.itemId).populate('ingredients.ingredient');
         if (!item) {
           return res.status(404).json({ 
             success: false, 
@@ -493,6 +495,9 @@ exports.addItemsToOrder = async (req, res) => {
           });
         }
       }
+
+      // Tính expense tại thời điểm đặt món
+      const expense = await calculateExpense(item, orderItem.type);
 
       // Tạo OrderItem với số lượng được yêu cầu
       const newOrderItem = new OrderItem({
@@ -502,6 +507,7 @@ exports.addItemsToOrder = async (req, res) => {
         itemType: orderItem.type,
         quantity: orderItem.quantity, // Sử dụng số lượng từ frontend
         price: item.price,
+        expense: expense, // Giá vốn tại thời điểm đặt món
         status: "pending",
         note: orderItem.note || "",
       });

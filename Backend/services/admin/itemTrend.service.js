@@ -128,17 +128,20 @@ exports.getItemTrend = async ({ itemId, type = "daily", from, to }) => {
       const price = orderItem.price || item.price;
       const revenue = qty * price;
 
-      // ✅ Tính giá vốn món tại thời điểm đó (dựa trên Ingredient.priceNow)
-      let expenseAtTime = 0;
-      if (item.ingredients?.length) {
+      // ✅ Dùng expense từ OrderItem (snapshot tại thời điểm đặt món)
+      // Nếu OrderItem cũ không có expense, fallback về tính lại (cho backward compatibility)
+      let expensePerUnit = orderItem.expense;
+      if (expensePerUnit == null && item.ingredients?.length) {
+        // Fallback: tính lại từ ingredients hiện tại (cho orders cũ)
+        expensePerUnit = 0;
         for (const ing of item.ingredients) {
           const ingDoc = ing.ingredient;
           if (ingDoc && ingDoc.priceNow != null) {
-            expenseAtTime += ingDoc.priceNow * ing.quantity;
+            expensePerUnit += ingDoc.priceNow * ing.quantity;
           }
         }
       }
-      const totalExpense = expenseAtTime * qty;
+      const totalExpense = (expensePerUnit || 0) * qty;
 
       // ✅ Gộp dữ liệu
       current.totalQuantity += qty;
