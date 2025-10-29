@@ -23,11 +23,14 @@ export default function OrderDetails({
         prevOrders.map((order) => {
           if (order._id !== selectedOrder._id) return order;
 
-          const updatedItems = order.items.map((item) =>
-            item.orderItemId === orderItemId
+          // Handle cả items (API format) và orderItems (WebSocket format)
+          const currentItems = order.items || order.orderItems || [];
+          const updatedItems = currentItems.map((item) => {
+            const itemId = item.orderItemId || item._id;
+            return itemId === orderItemId
               ? { ...item, status: "ready" } // Chuyển status item sang "ready"
-              : item
-          );
+              : item;
+          });
 
           // Tính toán lại số món còn lại
           const newItemsRemaining = updatedItems.filter(
@@ -38,9 +41,11 @@ export default function OrderDetails({
           const newOrderStatus =
             newItemsRemaining === 0 ? "ready" : order.status;
 
+          // Giữ nguyên cấu trúc dữ liệu (items hoặc orderItems)
           return {
             ...order,
-            items: updatedItems,
+            items: order.items ? updatedItems : undefined,
+            orderItems: order.orderItems ? updatedItems : undefined,
             itemsRemaining: newItemsRemaining,
             status: newOrderStatus,
           };
@@ -77,7 +82,9 @@ export default function OrderDetails({
   }
 
   // Kiểm tra xem tất cả các món đã sẵn sàng chưa
-  const isAllItemsReady = selectedOrder.items.every(
+  // Handle cả items (từ API format) và orderItems (từ WebSocket raw data)
+  const orderItems = selectedOrder.items || selectedOrder.orderItems || [];
+  const isAllItemsReady = orderItems.length > 0 && orderItems.every(
     (item) => item.status === "ready"
   );
 
@@ -107,30 +114,41 @@ export default function OrderDetails({
       ) : (
         /* Ngược lại, hiển thị danh sách món ăn */
         <div className="space-y-3 max-h-[70vh] overflow-y-auto">
-          {selectedOrder.items.map((item) => (
+          {orderItems.map((item) => {
+            // Normalize item structure (handle cả API format và raw WebSocket data)
+            const normalizedItem = {
+              orderItemId: item.orderItemId || item._id,
+              itemName: item.itemName || (item.itemId?.name) || "Món đã xóa",
+              quantity: item.quantity,
+              note: item.note,
+              status: item.status,
+              chef: item.chef || (item.assignedChef?.name) || item.assignedChef
+            };
+            
+            return (
             <div
-              key={item.orderItemId}
+              key={normalizedItem.orderItemId}
               className="p-4 border rounded-lg bg-gray-50 flex items-start justify-between space-x-4"
             >
               {/* Phần thông tin (bên trái) */}
               <div className="flex-grow">
                 <h4 className="font-semibold text-lg text-gray-900">
-                  {item.itemName} (x{item.quantity})
+                  {normalizedItem.itemName} (x{normalizedItem.quantity})
                 </h4>
 
-                {item.note && (
+                {normalizedItem.note && (
                   <p className="text-sm italic text-red-600 font-medium">
-                    Ghi chú: {item.note}
+                    Ghi chú: {normalizedItem.note}
                   </p>
                 )}
 
                 {/* HIỂN THỊ TÊN CHEF */}
-                {item.chef ? (
+                {normalizedItem.chef ? (
                   <p className="text-sm text-blue-600 font-medium mt-1">
-                    👨‍🍳 Bếp phụ trách: {item.chef}
+                    👨‍🍳 Bếp phụ trách: {normalizedItem.chef}
                   </p>
                 ) : (
-                  item.status === "pending" && (
+                  normalizedItem.status === "pending" && (
                     <p className="text-sm text-gray-500 italic mt-1">
                       (Chưa giao bếp)
                     </p>
@@ -140,10 +158,10 @@ export default function OrderDetails({
 
               {/* Phần trạng thái/hành động (bên phải) */}
               <div className="flex-shrink-0 flex flex-col items-end min-w-[100px]">
-                {item.status === "pending" && (
+                {normalizedItem.status === "pending" && (
                   <button
                     onClick={() => {
-                      setCurrentItem(item.orderItemId);
+                      setCurrentItem(normalizedItem.orderItemId);
                       setShowChefModal(true);
                     }}
                     className="bg-orange-500 hover:bg-orange-600 text-white px-3 py-1 rounded text-sm font-medium transition-colors"
@@ -153,9 +171,9 @@ export default function OrderDetails({
                 )}
 
                 {/* NÚT HOÀN THÀNH */}
-                {item.status === "preparing" && (
+                {normalizedItem.status === "preparing" && (
                   <button
-                    onClick={() => handleMarkAsReady(item.orderItemId)}
+                    onClick={() => handleMarkAsReady(normalizedItem.orderItemId)}
                     disabled={loading}
                     className="bg-green-500 hover:bg-green-600 text-white px-3 py-1 rounded text-sm font-medium transition-colors disabled:bg-gray-400"
                   >
@@ -163,14 +181,15 @@ export default function OrderDetails({
                   </button>
                 )}
 
-                {item.status === "ready" && (
+                {normalizedItem.status === "ready" && (
                   <span className="text-green-700 font-medium text-sm px-3 py-1 bg-green-100 rounded-full">
                     ✅ Sẵn sàng
                   </span>
                 )}
               </div>
             </div>
-          ))}
+            );
+          })}
         </div>
       )}
     </div>

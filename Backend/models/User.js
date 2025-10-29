@@ -63,7 +63,13 @@ const userSchema = new mongoose.Schema(
       default: function () {
         return this.role === "customer" ? 0 : undefined;
       },
+
     },
+    accountStatus: {
+  type: String,
+  enum: ["active", "banned"],
+  default: "active",
+},
   },
   { timestamps: true }
 );

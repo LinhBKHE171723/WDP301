@@ -39,7 +39,7 @@ export default function KitchenDashboard() {
       const res = await kitchenApi.getConfirmedOrders();
       const ordersData = res.data || [];
       setOrders(ordersData);
-
+      
       // Subscribe to all orders for real-time updates
       if (ordersData.length > 0 && connectionState === 'connected') {
         const orderIds = ordersData.map(order => order._id);
@@ -53,7 +53,6 @@ export default function KitchenDashboard() {
     }
   };
 
-  // ✅ Fetch dữ liệu theo tab
   useEffect(() => {
     const fetchData = async () => {
       setLoading(true);
@@ -64,19 +63,15 @@ export default function KitchenDashboard() {
           await fetchOrders();
         } else if (activeTab === "items") {
           const res = await kitchenApi.getAllItems();
-
           setItems(res.data || []);
         } else if (activeTab === "menus") {
           const res = await kitchenApi.getAllMenus();
-
           setMenus(res.data || []);
         } else if (activeTab === "inventory") {
           const res = await kitchenApi.getAllIngredients();
-
           setIngredients(res.data || res || []);
         } else if (activeTab === "purchase") {
           const res = await kitchenApi.getPurchaseOrders();
-
           setPurchaseOrders(res.data || res || []);
         }
       } catch (err) {
