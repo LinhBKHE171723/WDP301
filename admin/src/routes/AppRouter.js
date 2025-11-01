@@ -6,6 +6,22 @@ import WaiterDashboard from "../pages/WaiterDashboard";
 import TableMap from "../components/waiter/TableMap";
 import TableDetail from "../components/waiter/TableDetail";
 import Profile from "../components/user/Profile";
+
+// Admin components
+import Sidebar from "../components/admin/Sidebar";
+import { Header } from "../components/admin/Header";
+import DashboardPage from "../pages/admin/DashboardPage";
+import AnalyticsPage from "../pages/admin/AnalyticsPage";
+import AnalyticsPage2 from "../pages/admin/AnalyticsPage2";
+import AccountsPage from "../pages/admin/AccountsPage";
+import FeedbackPage from "../pages/admin/FeedbackPage";
+import SettingsPage from "../pages/admin/SettingsPage";
+import { Toaster } from "sonner";
+import ItemReportPage from "../pages/admin/ItemReportPage";
+import CustomerReportPage from "../pages/admin/CustomerReportPage";
+import PerformancePage from "../pages/admin/PerformancePage";
+import PerformanceDetailPage from "../pages/admin/PerformancePageDetail";
+
 export default function AppRouter() {
   const { user, token, isLoggedIn, loading } = useAuth();
   
@@ -30,8 +46,60 @@ export default function AppRouter() {
 
   return (
     <Routes>
-      {/* Nếu chưa đăng nhập → chỉ cho vào trang login */}
-      {!isLoggedIn && <Route path="/auth/login" element={<LoginPage />} />}
+      {/* Route login luôn có sẵn (không cần điều kiện) */}
+      <Route path="/auth/login" element={<LoginPage />} />
+      
+      {/* Redirect root path về login nếu chưa đăng nhập */}
+      <Route 
+        path="/" 
+        element={
+          !isLoggedIn || !token ? (
+            <Navigate to="/auth/login" replace />
+          ) : user?.role === "admin" ? (
+            <Navigate to="/admin" replace />
+          ) : user?.role === "kitchen_manager" ? (
+            <Navigate to="/kitchen/dashboard" replace />
+          ) : user?.role === "waiter" ? (
+            <Navigate to="/waiter/dashboard" replace />
+          ) : (
+            <Navigate to="/auth/login" replace />
+          )
+        } 
+      />
+
+      {/* Nếu đã đăng nhập và có quyền admin */}
+      {isLoggedIn && user?.role === "admin" && token && (
+        <>
+          <Route 
+            path="/admin/*" 
+            element={
+              <div className="min-h-screen">
+                <div className="flex">
+                  <Sidebar />
+                  <main className="flex-1 p-6 space-y-6 ml-64">
+                    <Header />
+                    <div className="container-page">
+                      <Routes>
+                        <Route path="/" element={<DashboardPage />} />
+                        <Route path="/analytics" element={<AnalyticsPage />} />
+                        <Route path="/item-report" element={<ItemReportPage />} />
+                        <Route path="/item-analytics/:itemId" element={<AnalyticsPage2 />} />
+                        <Route path="/accounts" element={<AccountsPage />} />
+                        <Route path="/feedback" element={<FeedbackPage />} />
+                        <Route path="/settings" element={<SettingsPage />} />
+                        <Route path="/customers" element={<CustomerReportPage />} />
+                        <Route path="/performance" element={<PerformancePage />} />
+                        <Route path="/performance/:userId" element={<PerformanceDetailPage />} />
+                      </Routes>
+                    </div>
+                  </main>
+                </div>
+                <Toaster richColors position="top-right" />
+              </div>
+            } 
+          />
+        </>
+      )}
 
       {/* Nếu đã đăng nhập và có quyền kitchen_manager */}
       {isLoggedIn && user?.role === "kitchen_manager" && token && (
@@ -54,6 +122,8 @@ export default function AppRouter() {
         element={
           !isLoggedIn || !token ? (
             <Navigate to="/auth/login" replace />
+          ) : user?.role === "admin" ? (
+            <Navigate to="/admin" replace />
           ) : user?.role === "kitchen_manager" ? (
             <Navigate to="/kitchen/dashboard" replace />
           ) : user?.role === "waiter" ? (

@@ -8,6 +8,7 @@ const orderItemSchema = new Schema({
   itemType: String, // 'item' hoặc 'menu'
   quantity: Number,
   price: Number, // Giá tại thời điểm đặt món = price của item bán ra thị trường
+  expense: Number, // Giá vốn tại thời điểm đặt món (tính từ ingredients.priceNow)
   assignedChef: { type: Schema.Types.ObjectId, ref: "User" },
   status: {
     type: String,

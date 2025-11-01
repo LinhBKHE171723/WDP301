@@ -13,6 +13,7 @@ const cloudinary = require("./routes/cloudinary.route");
 const userRoutes = require("./routes/user.route");
 // load env
 dotenv.config();
+const { checkExpiryAndUpdateStock } = require("./utils/checkExpiryAndUpdateStock.js");
 
 const app = express();
 
@@ -37,6 +38,11 @@ mongoose
 app.get("/", (req, res) => {
   res.send("API is running...");
 });
+//auth
+app.use("/api/auth", authRoutes);
+
+//admin
+app.use("/api/admin", require("./routes/admin.route.js"));
 
 //CLOUD
 app.use("/api/cloudinary", cloudinary);
@@ -44,18 +50,14 @@ app.use("/api/cloudinary", cloudinary);
 // profile 
 app.use("/api/user", userRoutes);
 
-//auth
-app.use("/api/auth", authRoutes);
-
 //chef
 app.use("/api/kitchen", kitchenRoutes);
 
+//customer
 app.use("/api/customer", customerRoutes);
 
 // waiter
 app.use("/api/waiter", waiterRoutes);
-//admin
-app.use("/api/admin", require("./routes/admin.route.js"));
 
 // export app để server.js dùng
 module.exports = app;

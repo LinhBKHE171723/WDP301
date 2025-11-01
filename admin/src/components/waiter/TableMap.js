@@ -17,7 +17,6 @@ export default function TableMap() {
   const [filterWaiter, setFilterWaiter] = useState("all");
 
   const navigate = useNavigate();
-  const { logout, user } = useAuth();
 
   const fetchTables = async () => {
     try {
@@ -72,7 +71,7 @@ export default function TableMap() {
 
   return (
     <div className="min-vh-100 bg-light d-flex flex-column">
-      <Header onLogout={logout} user={user} />
+      <Header />
 
       <Container className="flex-grow-1 mt-4 pb-5">
         <div className="d-flex flex-wrap justify-content-between align-items-center mb-3">

@@ -18,13 +18,16 @@ export default function LoginPage() {
     try {
       const res = await Client.post("auth/login", form);
       login(res.user, res.token);
-      if (res.user.role === "kitchen_manager") {
+      
+      // Redirect dựa trên role
+      if (res.user.role === "admin") {
+        navigate("/admin");
+      } else if (res.user.role === "kitchen_manager") {
         navigate("/kitchen/dashboard");
       } else if (res.user.role === "waiter") {
         navigate("/waiter/dashboard");
-      }
-      else {
-        setError("Tài khoản này không có quyền truy cập Kitchen.");
+      } else {
+        setError("Tài khoản này không có quyền truy cập hệ thống.");
       }
     } catch (err) {
       console.error(err);

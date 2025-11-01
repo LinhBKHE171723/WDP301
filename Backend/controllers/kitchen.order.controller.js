@@ -90,7 +90,10 @@ exports.startPreparingOrder = async (req, res) => {
     const updatedOrder = await Order.findById(orderId)
       .populate({
         path: "orderItems",
-        populate: { path: "itemId", select: "name" },
+        populate: [
+          { path: "itemId", select: "name" },
+          { path: "assignedChef", select: "name username" }
+        ],
       })
       .populate("tableId", "number");
 
@@ -158,21 +161,39 @@ exports.assignChefToItem = async (req, res) => {
       .populate("assignedChef", "name username")
       .populate("itemId", "name");
 
+    if (!populatedItem) {
+      return res.status(404).json({
+        message: "Không tìm thấy OrderItem sau khi cập nhật",
+      });
+    }
+
     // Emit WebSocket event với full order data
     const webSocketService = req.app.get("webSocketService");
     if (webSocketService && orderItem.orderId) {
-      const fullOrder = await Order.findById(orderItem.orderId)
-        .populate("orderItems")
-        .populate("tableId")
-        .populate("paymentId");
-      
-      if (fullOrder) {
-        webSocketService.broadcastToOrder(orderItem.orderId, "order:updated", fullOrder);
+      try {
+        const fullOrder = await Order.findById(orderItem.orderId)
+          .populate({
+            path: "orderItems",
+            populate: {
+              path: "assignedChef",
+              select: "name username"
+            }
+          })
+          .populate("tableId")
+          .populate("paymentId");
+        
+        if (fullOrder) {
+          webSocketService.broadcastToOrder(orderItem.orderId, "order:updated", fullOrder);
+        }
+      } catch (wsError) {
+        console.error("Lỗi khi emit WebSocket:", wsError);
+        // Không throw lỗi, vì việc gán chef đã thành công
       }
     }
 
+    const itemName = populatedItem.itemId?.name || populatedItem.itemName || "Món ăn";
     res.status(200).json({
-      message: `Món '${populatedItem.itemId.name}' đã được phân công cho ${chefToAssign.name}.`,
+      message: `Món '${itemName}' đã được phân công cho ${chefToAssign.name}.`,
       data: populatedItem,
     });
   } catch (error) {
@@ -362,7 +383,13 @@ exports.markItemReady = async (req, res) => {
     const webSocketService = req.app.get("webSocketService");
     if (webSocketService && orderItem.orderId) {
       const fullOrder = await Order.findById(orderItem.orderId)
-        .populate("orderItems")
+        .populate({
+          path: "orderItems",
+          populate: {
+            path: "assignedChef",
+            select: "name username"
+          }
+        })
         .populate("tableId")
         .populate("paymentId");
       

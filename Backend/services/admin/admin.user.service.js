@@ -132,24 +132,38 @@ static async update(id, data) {
   const { email, password, _id, createdAt, updatedAt, ...updateData } = data;
   const existingUser = await User.findById(id);
   if (!existingUser) throw { status: 404, message: "User not found" };
-   if (updateData.accountStatus === "banned") {
-  updateData.status = "inactive";
-} else if (updateData.accountStatus === "active") {
-  updateData.status = "active";  // (optional)
-}
 
+  // Nếu bị ban → khóa toàn bộ
+  if (updateData.accountStatus === "banned") {
+    existingUser.accountStatus = "banned";
+    existingUser.status = "inactive";
+  }
+  // Nếu unban → chỉ mở account
+  else if (updateData.accountStatus === "active") {
+    existingUser.accountStatus = "active";
+  }
+
+  // Nếu đổi role
+  if (updateData.role) {
+    existingUser.role = updateData.role;
+  }
+
+  // Xóa các giá trị undefined/null trước khi cập nhật
   Object.keys(updateData).forEach((key) => {
     if (updateData[key] === undefined || updateData[key] === null) {
-      delete updateData[key]; 
+      delete updateData[key];
     }
   });
 
-  const user = await User.findByIdAndUpdate(id, updateData, {
-    new: true, 
-    runValidators: true,
+  // Cập nhật các field còn lại
+  Object.keys(updateData).forEach((key) => {
+    if (key !== "accountStatus" && key !== "role") {
+      existingUser[key] = updateData[key];
+    }
   });
 
-  return user;
+  await existingUser.save();  // ✅ lưu đúng tất cả các thay đổi
+  return existingUser;
 }
 
 
