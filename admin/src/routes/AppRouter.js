@@ -6,7 +6,8 @@ import WaiterDashboard from "../pages/WaiterDashboard";
 import TableMap from "../components/waiter/TableMap";
 import TableDetail from "../components/waiter/TableDetail";
 import Profile from "../components/user/Profile";
-
+import ServingHistory from "../components/waiter/ServingHistory";
+import ServingHistoryDetail from "../components/waiter/ServingHistoryDetail";
 // Admin components
 import Sidebar from "../components/admin/Sidebar";
 import { Header } from "../components/admin/Header";
@@ -24,7 +25,7 @@ import PerformanceDetailPage from "../pages/admin/PerformancePageDetail";
 
 export default function AppRouter() {
   const { user, token, isLoggedIn, loading } = useAuth();
-  
+
   /*
   function PrivateRoute({ element, roles }) {
     const { isLoggedIn, user } = useAuth();
@@ -48,10 +49,10 @@ export default function AppRouter() {
     <Routes>
       {/* Route login luôn có sẵn (không cần điều kiện) */}
       <Route path="/auth/login" element={<LoginPage />} />
-      
+
       {/* Redirect root path về login nếu chưa đăng nhập */}
-      <Route 
-        path="/" 
+      <Route
+        path="/"
         element={
           !isLoggedIn || !token ? (
             <Navigate to="/auth/login" replace />
@@ -64,14 +65,14 @@ export default function AppRouter() {
           ) : (
             <Navigate to="/auth/login" replace />
           )
-        } 
+        }
       />
 
       {/* Nếu đã đăng nhập và có quyền admin */}
       {isLoggedIn && user?.role === "admin" && token && (
         <>
-          <Route 
-            path="/admin/*" 
+          <Route
+            path="/admin/*"
             element={
               <div className="min-h-screen">
                 <div className="flex">
@@ -96,7 +97,7 @@ export default function AppRouter() {
                 </div>
                 <Toaster richColors position="top-right" />
               </div>
-            } 
+            }
           />
         </>
       )}
@@ -110,8 +111,10 @@ export default function AppRouter() {
       {isLoggedIn && user?.role === "waiter" && token && (
         <>
           <Route path="/waiter/dashboard" element={<WaiterDashboard />} />
-          <Route path="/waiter/tables" element={<TableMap />} /> 
-          <Route path="/waiter/tables/details/:tableId" element={<TableDetail />} />  
+          <Route path="/waiter/tables" element={<TableMap />} />
+          <Route path="/waiter/tables/details/:tableId" element={<TableDetail />} />
+          <Route path="/waiter/orders/history" element={<ServingHistory />} />
+          <Route path="/waiter/orders/history/:orderId" element={<ServingHistoryDetail />} />
           <Route path="/profile" element={<Profile />} />
         </>
       )}

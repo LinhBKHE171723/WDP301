@@ -66,50 +66,50 @@ exports.respondToOrder = async (req, res) => {
     if (approved) {
       let table;
       let finalTableId;
-      
+
       // 🎯 Ưu tiên bàn mà waiter chọn (nếu có)
       if (selectedTable) {
         table = await Table.findById(selectedTable);
         if (!table) {
-          return res.status(404).json({ 
-            success: false, 
-            message: "Bàn không tồn tại" 
+          return res.status(404).json({
+            success: false,
+            message: "Bàn không tồn tại"
           });
         }
-        
+
         // ✅ Cho phép nhiều order trên cùng một bàn
         // Chỉ kiểm tra nếu bàn không tồn tại, không kiểm tra status occupied
         finalTableId = selectedTable;
         console.log(`✅ Waiter chọn bàn: ${table.tableNumber}`);
-        
+
       } else if (order.tableId) {
         // 🔄 Fallback: Sử dụng bàn auto-assigned
         table = await Table.findById(order.tableId);
         if (!table) {
-          return res.status(404).json({ 
-            success: false, 
-            message: "Bàn auto-assigned không tồn tại" 
+          return res.status(404).json({
+            success: false,
+            message: "Bàn auto-assigned không tồn tại"
           });
         }
-        
+
         finalTableId = order.tableId;
         console.log(`✅ Sử dụng bàn auto-assigned: ${table.tableNumber}`);
-        
+
       } else {
         // ❌ Không có bàn nào được chọn
-        return res.status(400).json({ 
-          success: false, 
-          message: "Cần chọn bàn khi xác nhận đơn hàng" 
+        return res.status(400).json({
+          success: false,
+          message: "Cần chọn bàn khi xác nhận đơn hàng"
         });
       }
-      
+
       // 🔄 Cập nhật tableId cho order (nếu khác với bàn hiện tại)
       let oldTableId = null;
       if (order.tableId?.toString() !== finalTableId.toString()) {
         oldTableId = order.tableId;
         order.tableId = new mongoose.Types.ObjectId(finalTableId);
         console.log(`🔄 Order ${order._id} được cập nhật tableId: ${order.tableId}`);
-        
+
         // 🧹 Xử lý bàn cũ (nếu có)
         if (oldTableId) {
           const oldTable = await Table.findById(oldTableId);
@@ -127,9 +127,9 @@ exports.respondToOrder = async (req, res) => {
       // Tìm người phục vụ
       const waiter = await User.findById(waiterId);
       if (!waiter) {
-        return res.status(404).json({ 
-          success: false, 
-          message: "Nhân viên phục vụ không tồn tại" 
+        return res.status(404).json({
+          success: false,
+          message: "Nhân viên phục vụ không tồn tại"
         });
       }
 
@@ -159,7 +159,7 @@ exports.respondToOrder = async (req, res) => {
     });
 
     await order.save();
-    
+
     console.log(`💾 Order ${order._id} đã được save với tableId: ${order.tableId}`);
 
     // Populate để trả về cho UI bên phía khách hàng
@@ -279,3 +279,83 @@ exports.updateOrderStatus = async (req, res) => {
 };
 
 
+// Lịch sử phục vụ của chính waiter
+exports.getServingHistory = async (req, res) => {
+  try {
+    const waiterId = req.user.id;
+    const page = parseInt(req.query.page) || 1;
+    const limit = 10;
+    const skip = (page - 1) * limit;
+
+    const orders = await Order.find({
+      servedBy: waiterId,
+      status: "served" // hoặc nếu bạn muốn xem tất cả phục vụ thì bỏ điều kiện này
+    })
+      .populate('tableId', 'tableNumber')
+      .populate('orderItems')
+      .populate('userId', 'name phone')
+      .populate('servedBy', 'name email')
+      .sort({ servedAt: -1 })
+      .skip(skip)
+      .limit(limit);
+
+    // ✅ Populate thêm chi tiết menu cho từng orderItem
+    for (const order of orders) {
+      await populateOrderItemDetails(order.orderItems);
+    }
+
+    const total = await Order.countDocuments({ servedBy: waiterId, status: "served" });
+
+    res.status(200).json({
+      success: true,
+      page,
+      totalPages: Math.ceil(total / limit),
+      totalOrders: total,
+      orders
+    });
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      message: error.message
+    });
+  }
+};
+
+
+
+// GET /waiter/orders/history/:orderId
+exports.getServingHistoryDetails = async (req, res) => {
+  try {
+    const waiterId = req.user.id;
+    const { orderId } = req.params;
+
+    const order = await Order.findOne({
+      _id: orderId,
+      servedBy: waiterId
+    })
+      .populate('tableId', 'tableNumber')
+      .populate('orderItems')
+      .populate('userId', 'name phone email')
+      .populate('servedBy', 'name email');
+
+    if (!order) {
+      return res.status(404).json({
+        success: false,
+        message: "Order không tồn tại hoặc không thuộc quyền của bạn"
+      });
+    }
+
+    // ✅ Populate chi tiết item
+    await populateOrderItemDetails(order.orderItems);
+
+    res.status(200).json({
+      success: true,
+      order
+    });
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      message: error.message
+    });
+  }
+};
