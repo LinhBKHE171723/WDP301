@@ -135,7 +135,7 @@ const seedDatabase = async () => {
         name: "Phạm Văn Phục Vụ 2",
         username: "waiter02",
         password: "waiter2@123",
-        email: "waiter2@example.com",
+        email: "manhamsterdam2003@gmail.com",
         phone: "0987654322",
         role: "waiter",
       },
@@ -288,6 +288,7 @@ const seedDatabase = async () => {
         description: "Thịt bò Úc nướng chảo gang, kèm khoai tây chiên",
         category: "Món chính",
         price: 250000,
+        image: "https://barona.vn/storage/meo-vat/50/bo-bit-tet-kieu-viet-nam.jpg",
         ingredients: [
           {
             ingredient: ingredients.find((i) => i.name === "Thịt bò")._id,
@@ -304,6 +305,7 @@ const seedDatabase = async () => {
         description: "Cá hồi Na Uy sốt chanh dây",
         category: "Món chính",
         price: 280000,
+        image: "https://cores.com.vn/upload/elfinder/cach-lam-ca-hoi-tai-nha.jpg",
         ingredients: [
           {
             ingredient: ingredients.find((i) => i.name === "Cá hồi")._id,
@@ -320,6 +322,7 @@ const seedDatabase = async () => {
         description: "Tôm chiên xù kiểu Nhật",
         category: "Món chính",
         price: 180000,
+        image: "https://product.hstatic.net/200000438645/product/z6113115772659_f817b46e6c391caf8a1fd67dae63ab67_b05ba067a12f4c1dadf15985a4f91b81_master.jpg",
         ingredients: [
           {
             ingredient: ingredients.find((i) => i.name === "Tôm tươi")._id,
@@ -336,6 +339,7 @@ const seedDatabase = async () => {
         description: "Rau củ tươi trộn dầu giấm",
         category: "Khai vị",
         price: 70000,
+        image: "https://i-giadinh.vnecdn.net/2021/10/26/saladrauqua-1635240739-5476-1635240778.jpg",
         ingredients: [
           {
             ingredient: ingredients.find((i) => i.name === "Rau xà lách")._id,
@@ -357,6 +361,7 @@ const seedDatabase = async () => {
         description: "Pizza Ý với phô mai mozzarella và cà chua",
         category: "Món chính",
         price: 200000,
+        image: "https://assets.tmecosys.com/image/upload/t_web_rdp_recipe_584x480/img/recipe/ras/Assets/5802fab5-fdce-468a-a830-43e8001f5a72/Derivates/c00dc34a-e73d-42f0-a86e-e2fd967d33fe.jpg",
         ingredients: [
           {
             ingredient: ingredients.find((i) => i.name === "Bột mì")._id,
@@ -377,6 +382,7 @@ const seedDatabase = async () => {
         description: "Mì Ý sốt kem với thịt xông khói",
         category: "Món chính",
         price: 180000,
+        image: "https://www.simplyrecipes.com/thmb/0UeN5LhKq-ze3BcZJ7_Yp803T24=/1500x0/filters:no_upscale():max_bytes(150000):strip_icc()/Simply-Pasta-Carbonara-LEAD-1-c477cc25c7294cd9a3fc51ece176481f.jpg",
         ingredients: [
           {
             ingredient: ingredients.find((i) => i.name === "Bột mì")._id,
@@ -397,6 +403,7 @@ const seedDatabase = async () => {
         description: "Gà nướng với sốt mật ong và rau củ",
         category: "Món chính",
         price: 220000,
+        image: "https://nhahangphuongnguyen.com.vn/images/upload/mon-dac-biet/ga-nuong-mat-ong.jpg",
         ingredients: [
           {
             ingredient: ingredients.find((i) => i.name === "Thịt gà")._id,
@@ -417,6 +424,7 @@ const seedDatabase = async () => {
         description: "Lẩu tôm, cá, mực với rau tươi",
         category: "Món chính",
         price: 350000,
+        image: "https://cdn.dealtoday.vn/img/s630x0/440956a3cf2042ceb23cf517261ac4ca.jpg?sign=-pdHmcfb6n59cqEo5BaHkA",
         ingredients: [
           {
             ingredient: ingredients.find((i) => i.name === "Tôm tươi")._id,
@@ -441,6 +449,7 @@ const seedDatabase = async () => {
         description: "Bún bò cay với thịt bò và chả",
         category: "Món chính",
         price: 120000,
+        image: "https://tourhue.vn/wp-content/uploads/2024/08/quan-bun-bo-hue-1.png",
         ingredients: [
           {
             ingredient: ingredients.find((i) => i.name === "Bún tươi")._id,
@@ -461,6 +470,7 @@ const seedDatabase = async () => {
         description: "Phở truyền thống với thịt bò tái",
         category: "Món chính",
         price: 100000,
+        image: "https://media-cdn-v2.laodong.vn/Storage/NewsPortal/2023/2/25/1151612/5.jpg",
         ingredients: [
           {
             ingredient: ingredients.find((i) => i.name === "Phở tươi")._id,
@@ -481,6 +491,7 @@ const seedDatabase = async () => {
         description: "Cơm tấm với sườn nướng và chả",
         category: "Món chính",
         price: 80000,
+        image: "https://media-cdn-v2.laodong.vn/storage/newsportal/2023/11/29/1273358/Com-Tam-2-01.jpeg",
         ingredients: [
           {
             ingredient: ingredients.find((i) => i.name === "Gạo")._id,
@@ -501,6 +512,7 @@ const seedDatabase = async () => {
         description: "Cá basa kho tộ với nước dừa",
         category: "Món chính",
         price: 150000,
+        image: "https://www.huongnghiepaau.com/wp-content/uploads/2016/05/ca-loc-kho-to-tham-dam-gia-vi.jpg",
         ingredients: [
           {
             ingredient: ingredients.find((i) => i.name === "Cá basa")._id,
@@ -522,6 +534,7 @@ const seedDatabase = async () => {
         description: "Súp gà với nấm hương và rau củ",
         category: "Khai vị",
         price: 60000,
+        image: "https://file.hstatic.net/200000385717/article/khoi-benh-ngay-voi-nhung-meo-tri-cam-cum-sieu-hieu-qua2_1737be89b9694e4c80e14844d3ff455e.jpg",
         ingredients: [
           {
             ingredient: ingredients.find((i) => i.name === "Thịt gà")._id,
@@ -542,6 +555,7 @@ const seedDatabase = async () => {
         description: "Salad cá ngừ với rau xanh",
         category: "Khai vị",
         price: 90000,
+        image: "https://cdn.zsoft.solutions/poseidon-web/app/media/Nau-an/7.2024/salad-ca-ngu-lua-chon-bo-duong-thumb.jpg",
         ingredients: [
           {
             ingredient: ingredients.find((i) => i.name === "Cá hồi")._id,
@@ -562,6 +576,7 @@ const seedDatabase = async () => {
         description: "Gỏi cuốn tôm thịt với rau sống",
         category: "Khai vị",
         price: 80000,
+        image: "https://saithanhfoods.vn/wp-content/uploads/2021/11/Goi-cuon-tom-thit-5.jpg",
         ingredients: [
           {
             ingredient: ingredients.find((i) => i.name === "Tôm tươi")._id,
@@ -582,6 +597,7 @@ const seedDatabase = async () => {
         description: "Nem nướng đặc sản Nha Trang",
         category: "Khai vị",
         price: 120000,
+        image: "https://cdn.tgdd.vn/2021/09/CookDish/cach-lam-nem-nuong-nha-trang-bang-noi-chien-khong-dau-thom-avt-1200x676.jpg",
         ingredients: [
           {
             ingredient: ingredients.find((i) => i.name === "Thịt heo")._id,
@@ -603,6 +619,7 @@ const seedDatabase = async () => {
         description: "Nước ngọt có ga",
         category: "Đồ uống",
         price: 25000,
+        image: "https://product.hstatic.net/200000534989/product/dsc08341-enhanced-nr_1_e6d5d0a13c8f42c2bd7cea59e03ce199_master.jpg",
         ingredients: [
           {
             ingredient: ingredients.find((i) => i.name === "Coca Cola")._id,
@@ -615,6 +632,7 @@ const seedDatabase = async () => {
         description: "Nước ngọt có ga",
         category: "Đồ uống",
         price: 25000,
+        image: "https://product.hstatic.net/200000534989/product/dsc08410-enhanced-nr_1_81edadf400df40fcbdcca8749abcbb90_master.jpg",
         ingredients: [
           {
             ingredient: ingredients.find((i) => i.name === "Pepsi")._id,
@@ -627,6 +645,7 @@ const seedDatabase = async () => {
         description: "Nước suối tinh khiết",
         category: "Đồ uống",
         price: 15000,
+        image: "https://dailynuockhoang.vn/wp-content/uploads/2018/07/aquafina-355ml-new-2023.jpg",
         ingredients: [
           {
             ingredient: ingredients.find((i) => i.name === "Nước suối")._id,
@@ -639,6 +658,7 @@ const seedDatabase = async () => {
         description: "Trà đá truyền thống",
         category: "Đồ uống",
         price: 10000,
+        image: "https://static-images.vnncdn.net/files/publish/2023/11/27/so-sanh-tac-dung-cua-tra-da-va-tra-nong-1486.jpg?width=0&s=aVlyLGr05-5PFiESLiAmLQ",
         ingredients: [
           {
             ingredient: ingredients.find((i) => i.name === "Trà đá")._id,
@@ -651,6 +671,7 @@ const seedDatabase = async () => {
         description: "Cà phê đen đậm đà",
         category: "Đồ uống",
         price: 20000,
+        image: "https://cdn.nhathuoclongchau.com.vn/unsafe/800x0/https://cms-prod.s3-sgn09.fptcloud.com/bai_vietca_phe_den_bao_nhieu_calo_uong_nhieu_co_tot_khong_html_1_ebb28c9c42.png",
         ingredients: [
           {
             ingredient: ingredients.find((i) => i.name === "Cà phê đen")._id,
@@ -663,6 +684,7 @@ const seedDatabase = async () => {
         description: "Sinh tố dâu tươi với sữa",
         category: "Đồ uống",
         price: 35000,
+        image: "https://file.hstatic.net/200000031322/file/dau_33be0f21aa3441c398c752a921e84a50_grande.png",
         ingredients: [
           {
             ingredient: ingredients.find((i) => i.name === "Sữa tươi")._id,
@@ -679,6 +701,7 @@ const seedDatabase = async () => {
         description: "Nước cam tươi ép",
         category: "Đồ uống",
         price: 30000,
+        image: "https://suckhoedoisong.qltns.mediacdn.vn/324455921873985536/2023/11/7/uong-nuoc-cam-16993504421751885406385.jpg",
         ingredients: [
           {
             ingredient: ingredients.find((i) => i.name === "Chanh")._id,
@@ -691,6 +714,7 @@ const seedDatabase = async () => {
         description: "Trà sữa với trân châu đen",
         category: "Đồ uống",
         price: 40000,
+        image: "https://www.huongnghiepaau.com/wp-content/uploads/2019/10/tra-sua-chocolate.jpg",
         ingredients: [
           {
             ingredient: ingredients.find((i) => i.name === "Sữa tươi")._id,
@@ -708,6 +732,7 @@ const seedDatabase = async () => {
         description: "Kem vani mát lạnh",
         category: "Tráng miệng",
         price: 25000,
+        image: "https://luckyhotelhanoi.com/uploads/images/2021/12/image_1200_61aecbe63bcc1.jpg",
         ingredients: [
           {
             ingredient: ingredients.find((i) => i.name === "Kem vani")._id,
@@ -720,6 +745,7 @@ const seedDatabase = async () => {
         description: "Bánh flan caramel",
         category: "Tráng miệng",
         price: 30000,
+        image: "https://superfoods.vn/wp-content/uploads/2023/08/banh-flan-1.jpg",
         ingredients: [
           {
             ingredient: ingredients.find((i) => i.name === "Trứng gà")._id,
@@ -740,6 +766,7 @@ const seedDatabase = async () => {
         description: "Chè đậu đỏ ngọt ngào",
         category: "Tráng miệng",
         price: 20000,
+        image: "https://cdn2.fptshop.com.vn/unsafe/1920x0/filters:format(webp):quality(75)/cach_nau_che_dau_do_nhanh_mem_166945_2_c470d072e4.jpg",
         ingredients: [
           {
             ingredient: ingredients.find((i) => i.name === "Đường")._id,
@@ -756,6 +783,7 @@ const seedDatabase = async () => {
         description: "Bánh tiramisu Ý",
         category: "Tráng miệng",
         price: 45000,
+        image: "https://cdn.tgdd.vn/Files/2021/08/08/1373908/tiramisu-la-gi-y-nghia-cua-banh-tiramisu-202108082258460504.jpg",
         ingredients: [
           {
             ingredient: ingredients.find((i) => i.name === "Bánh ngọt")._id,
@@ -776,6 +804,7 @@ const seedDatabase = async () => {
         description: "Đĩa trái cây tươi theo mùa",
         category: "Tráng miệng",
         price: 35000,
+        image: "https://cdn.nguyenkimmall.com/images/companies/_1/Content/dien-lanh/tu-lanh/trai-cay-tu-lanh.jpg",
         ingredients: [],
       },
     ]);
@@ -791,6 +820,7 @@ const seedDatabase = async () => {
           items.find((i) => i.name === "Salad Rau Củ")._id,
         ],
         price: 300000,
+        image: "https://amp.sieuthithitbo.net/uploads/files/2024/05/10/loi-vai-bo-my-steak-house.png",
         type: "combo",
         isAvailable: true,
       },
@@ -803,6 +833,7 @@ const seedDatabase = async () => {
           items.find((i) => i.name === "Salad Rau Củ")._id,
         ],
         price: 450000,
+        image: "https://static.hotdeal.vn/images/1587/1586927/60x60/355615-1-trong-3-combo-hai-san-dac-biet-danh-cho-4-6-nguoi-tai-3f-ampbeer.jpg",
         type: "combo",
         isAvailable: true,
       },
@@ -813,6 +844,7 @@ const seedDatabase = async () => {
           .filter((i) => i.category === "Món chính")
           .map((item) => item._id),
         price: 600000,
+        image: "https://lh7-us.googleusercontent.com/2pWKOz9VESI0Oa2Pc4K8nECPCvYXwfx2T-xeIV23jk1NtbgvWc4eum96bjELDWMMLyE2yluKhxkS5bVfe00LghPc_RA6PgqNGHVQvM1pD3HoH7kihI_0DsdoZzCdIpIZa26ZzUoOSoOWZSczklFD8i8",
         type: "combo",
         isAvailable: true,
       },
@@ -826,6 +858,7 @@ const seedDatabase = async () => {
           items.find((i) => i.name === "Trà Đá")._id,
         ],
         price: 120000,
+        image: "https://mms.img.susercontent.com/vn-11134513-7r98o-lxxzpe5juj15ce@resize_ss1242x600!@crop_w1242_h600_cT",
         type: "combo",
         isAvailable: true,
       },
@@ -839,6 +872,7 @@ const seedDatabase = async () => {
           items.find((i) => i.name === "Coca Cola")._id,
         ],
         price: 500000,
+        image: "https://www.shutterstock.com/image-photo/top-view-food-platter-combo-600nw-2348142025.jpg",
         type: "combo",
         isAvailable: true,
       },
@@ -851,6 +885,7 @@ const seedDatabase = async () => {
           items.find((i) => i.name === "Trà Sữa Trân Châu")._id,
         ],
         price: 550000,
+        image: "https://haisantuoisongnguyenanh.vn/wp-content/uploads/2021/12/lau-hai-san-6-nguoi-an-1.jpg",
         type: "combo",
         isAvailable: true,
       },
@@ -865,6 +900,7 @@ const seedDatabase = async () => {
           items.find((i) => i.name === "Kem Vani")._id,
         ],
         price: 800000,
+        image: "https://namanhcatering.com/wp-content/uploads/2023/06/thuc-don-set-menu-2-min.jpg",
         type: "combo",
         isAvailable: false, // Test unavailable menu
       },
@@ -878,6 +914,7 @@ const seedDatabase = async () => {
           items.find((i) => i.name === "Nước Cam Ép")._id,
         ],
         price: 350000,
+        image: "https://statics.vinpearl.com/Vietnamese-bun-07_1686412378.jpg",
         type: "combo",
         isAvailable: true,
       },
@@ -888,6 +925,7 @@ const seedDatabase = async () => {
           .filter((i) => i.category === "Tráng miệng")
           .map((item) => item._id),
         price: 200000,
+        image: "https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcSZ4FMWRnVqMMVw07jpCwQog-lCryZ3dMeWnA&s",
         type: "combo",
         isAvailable: true,
       },
