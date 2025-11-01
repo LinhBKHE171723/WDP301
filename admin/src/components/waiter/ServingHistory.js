@@ -39,7 +39,7 @@ export default function ServingHistory() {
 
       <Container className="flex-grow-1 mt-4 pb-5">
         <div className="d-flex justify-content-between align-items-center mb-3">
-          <h4 className="fw-bold">🕒 Lịch sử phục vụ</h4>
+          <h4 className="fw-bold">Lịch sử phục vụ của bạn</h4>
           <NotificationBell />
         </div>
 
@@ -64,9 +64,10 @@ export default function ServingHistory() {
                     <h5 className="fw-bold">Đơn #{order._id.slice(-6)}</h5>
                     <p className="mb-1">🍽 Bàn: <b>{order.tableId?.tableNumber || "-"}</b></p>
                     <p className="mb-1">👤 Khách: {order.userId?.name || "Không rõ"}</p>
-                    <p className="mb-1 text-muted small">
+                    {/* <p className="mb-1 text-muted small">
                       Đã phục vụ lúc: {order.servedAt ? new Date(order.servedAt).toLocaleString() : "-"}
-                    </p>
+                    </p> */}
+                    <p className="mb-0 text-muted small"> Phục vụ bởi: {order.servedBy?.name || "Bạn"}</p>
                   </Card.Body>
                 </Card>
               </Col>

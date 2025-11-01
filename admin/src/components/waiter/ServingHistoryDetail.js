@@ -41,8 +41,6 @@ export default function ServingHistoryDetail() {
             <h4 className="fw-bold mb-3">Chi tiết đơn #{order._id.slice(-6)}</h4>
             <p>🍽 Bàn: {order.tableId?.tableNumber}</p>
             <p>👤 Khách: {order.userId?.name}</p>
-            <p className="mb-3">🕒 Phục vụ lúc: {new Date(order.servedAt).toLocaleString()}</p>
-
             <h5 className="fw-bold mt-4">Danh sách món</h5>
             {order.orderItems.map((item) => (
               <div key={item._id} className="border-bottom py-2">

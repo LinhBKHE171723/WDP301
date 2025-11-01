@@ -284,12 +284,11 @@ exports.getServingHistory = async (req, res) => {
   try {
     const waiterId = req.user.id;
     const page = parseInt(req.query.page) || 1;
-    const limit = 10;
+    const limit = 9;
     const skip = (page - 1) * limit;
 
     const orders = await Order.find({
-      servedBy: waiterId,
-      status: "served" // hoặc nếu bạn muốn xem tất cả phục vụ thì bỏ điều kiện này
+      servedBy: waiterId
     })
       .populate('tableId', 'tableNumber')
       .populate('orderItems')
@@ -304,7 +303,7 @@ exports.getServingHistory = async (req, res) => {
       await populateOrderItemDetails(order.orderItems);
     }
 
-    const total = await Order.countDocuments({ servedBy: waiterId, status: "served" });
+    const total = await Order.countDocuments({ servedBy: waiterId });
 
     res.status(200).json({
       success: true,
