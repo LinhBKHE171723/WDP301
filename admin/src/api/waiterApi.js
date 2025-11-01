@@ -35,10 +35,17 @@ const waiterApi = {
     Client.patch(`/waiter/orders/${orderId}/fully-served`),
 
   // Lấy order history đã phục vụ
-  getServingHistory:  (page = 1) => Client.get(`/waiter/orders/history?page=${page}`),
+  getServingHistory(page, search, table, fromDate, toDate) {
+    return Client.get(`/waiter/orders/history`, {
+      params: { page, search, table, fromDate, toDate }
+    });
+  },
+
 
   // Lấy chi tiết lịch sử phục vụ của một order
   getServingHistoryDetails: (orderId) => Client.get(`/waiter/orders/history/${orderId}`),
+
+
 
   // ==========================
   // 🔸 TABLE MANAGEMENT

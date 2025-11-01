@@ -4,7 +4,7 @@ const Table = require("../models/Table");
 const User = require("../models/User");
 const mongoose = require("mongoose");
 const { populateOrderItemDetails } = require("../utils/customerHelpers");
-
+const ExcelJS = require("exceljs");
 // Lấy danh sách đơn hàng cần xác nhận từ waiter
 exports.getPendingOrders = async (req, res) => {
   try {
@@ -279,44 +279,65 @@ exports.updateOrderStatus = async (req, res) => {
 };
 
 
-// Lịch sử phục vụ của chính waiter
-exports.getServingHistory = async (req, res) => {
+// GET /waiter/orders/history
+exports.getServingHistory = async (req, res, next) => {
   try {
     const waiterId = req.user.id;
+
     const page = parseInt(req.query.page) || 1;
     const limit = 9;
     const skip = (page - 1) * limit;
 
-    const orders = await Order.find({
-      servedBy: waiterId
-    })
-      .populate('tableId', 'tableNumber')
-      .populate('orderItems')
-      .populate('userId', 'name phone')
-      .populate('servedBy', 'name email')
-      .sort({ servedAt: -1 })
-      .skip(skip)
-      .limit(limit);
+    const { search, table, fromDate, toDate } = req.query;
 
-    // ✅ Populate thêm chi tiết menu cho từng orderItem
-    for (const order of orders) {
-      await populateOrderItemDetails(order.orderItems);
+    const query = { servedBy: waiterId };
+
+    // 🔍 Search theo tên khách
+    if (search && search.trim() !== "") {
+      const users = await User.find({
+        name: { $regex: search.trim(), $options: "i" }
+      }).select("_id");
+
+      if (users.length > 0) {
+        query.userId = { $in: users.map(u => u._id) };
+      } else {
+        query.userId = null; // đảm bảo trả về rỗng nếu không có ai match
+      }
     }
 
-    const total = await Order.countDocuments({ servedBy: waiterId });
 
-    res.status(200).json({
+    // 🍽 Filter theo bàn
+    if (table && table !== "all") {
+      const tableDoc = await Table.findOne({ tableNumber: table });
+      if (tableDoc) query.tableId = tableDoc._id;
+    }
+
+    // 📅 Filter theo ngày
+    if (fromDate || toDate) {
+      query.createdAt = {};
+      if (fromDate) query.createdAt.$gte = new Date(fromDate);
+      if (toDate) query.createdAt.$lte = new Date(new Date(toDate).setHours(23, 59, 59));
+    }
+
+    const [orders, total] = await Promise.all([
+      Order.find(query)
+        .sort({ createdAt: -1 })
+        .skip(skip)
+        .limit(limit)
+        .populate("tableId", "tableNumber")
+        .populate("userId", "name phone"),
+      Order.countDocuments(query)
+    ]);
+
+    return res.json({
       success: true,
       page,
       totalPages: Math.ceil(total / limit),
       totalOrders: total,
       orders
     });
-  } catch (error) {
-    res.status(500).json({
-      success: false,
-      message: error.message
-    });
+  } catch (err) {
+    next(err);
   }
 };
 
@@ -358,3 +379,4 @@ exports.getServingHistoryDetails = async (req, res) => {
     });
   }
 };
+
