@@ -18,7 +18,7 @@ export default function LoginPage() {
     try {
       const res = await Client.post("auth/login", form);
       login(res.user, res.token);
-      
+
       // Redirect dựa trên role
       if (res.user.role === "admin") {
         navigate("/admin");
@@ -65,6 +65,11 @@ export default function LoginPage() {
           required
           className="w-full border px-3 py-2 mb-4 rounded"
         />
+        <p className="text-right text-sm mt-2">
+          <a href="/forgot-password" className="text-blue-600 hover:underline">
+            Quên mật khẩu?
+          </a>
+        </p>
         <button
           type="submit"
           className="w-full bg-orange-500 text-white py-2 rounded hover:bg-orange-600"

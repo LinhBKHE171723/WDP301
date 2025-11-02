@@ -23,6 +23,9 @@ import CustomerReportPage from "../pages/admin/CustomerReportPage";
 import PerformancePage from "../pages/admin/PerformancePage";
 import PerformanceDetailPage from "../pages/admin/PerformancePageDetail";
 
+// auth 
+import ForgotPassword from "../pages/ForgotPassword";
+import ResetPassword from "../pages/ResetPassword";
 export default function AppRouter() {
   const { user, token, isLoggedIn, loading } = useAuth();
 
@@ -49,6 +52,28 @@ export default function AppRouter() {
     <Routes>
       {/* Route login luôn có sẵn (không cần điều kiện) */}
       <Route path="/auth/login" element={<LoginPage />} />
+      {/* Nếu đã đăng nhập rồi thì không cho vào trang quên mật khẩu / đặt lại mật khẩu */}
+      <Route
+        path="forgot-password"
+        element={
+          isLoggedIn && token ? (
+            <Navigate to="/" replace />
+          ) : (
+            <ForgotPassword />
+          )
+        }
+      />
+
+      <Route
+        path="/reset-password"
+        element={
+          isLoggedIn && token ? (
+            <Navigate to="/" replace />
+          ) : (
+            <ResetPassword />
+          )
+        }
+      />
 
       {/* Redirect root path về login nếu chưa đăng nhập */}
       <Route
@@ -120,22 +145,7 @@ export default function AppRouter() {
       )}
 
       {/* Nếu user điền URL linh tinh hoặc cố tình điền url ko thuộc role của mình */}
-      <Route
-        path="*"
-        element={
-          !isLoggedIn || !token ? (
-            <Navigate to="/auth/login" replace />
-          ) : user?.role === "admin" ? (
-            <Navigate to="/admin" replace />
-          ) : user?.role === "kitchen_manager" ? (
-            <Navigate to="/kitchen/dashboard" replace />
-          ) : user?.role === "waiter" ? (
-            <Navigate to="/waiter/dashboard" replace />
-          ) : (
-            <Navigate to="/auth/login" replace />
-          )
-        }
-      />
+      <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>
   );
 }
