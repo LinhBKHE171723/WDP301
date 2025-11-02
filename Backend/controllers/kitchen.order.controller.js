@@ -436,10 +436,27 @@ exports.markItemReady = async (req, res) => {
           }
         })
         .populate("tableId")
-        .populate("paymentId");
+        .populate("paymentId")
+        .populate("servedBy", "name");
       
       if (fullOrder) {
         webSocketService.broadcastToOrder(orderItem.orderId, "order:updated", fullOrder);
+        
+        // Thông báo cho waiter được gán order (servedBy) khi món ready
+        if (fullOrder.servedBy && fullOrder.servedBy._id) {
+          const itemName = populatedItem.itemName || (populatedItem.itemId?.name || "Món ăn");
+          webSocketService.broadcastToWaiter(
+            fullOrder.servedBy._id,
+            "item:ready",
+            {
+              orderId: fullOrder._id.toString(),
+              orderItemId: orderItem._id.toString(),
+              tableNumber: fullOrder.tableId?.tableNumber || fullOrder.tableId?.number || "N/A",
+              itemName: itemName,
+              quantity: orderItem.quantity
+            }
+          );
+        }
       }
     }
 
@@ -541,7 +558,8 @@ exports.updateComboItemStatus = async (req, res) => {
           }
         })
         .populate("tableId")
-        .populate("paymentId");
+        .populate("paymentId")
+        .populate("servedBy", "name");
       
       // Populate assignedChef cho comboItems
       if (fullOrder && fullOrder.orderItems) {
@@ -550,6 +568,22 @@ exports.updateComboItemStatus = async (req, res) => {
       
       if (fullOrder) {
         webSocketService.broadcastToOrder(orderItem.orderId, "order:updated", fullOrder);
+        
+        // Thông báo cho waiter được gán order (servedBy) khi combo item ready
+        if (status === 'ready' && fullOrder.servedBy && fullOrder.servedBy._id) {
+          const comboItemName = orderItem.comboItems[index].itemName || "Món ăn";
+          webSocketService.broadcastToWaiter(
+            fullOrder.servedBy._id,
+            "comboItem:ready",
+            {
+              orderId: fullOrder._id.toString(),
+              orderItemId: orderItem._id.toString(),
+              comboItemIndex: index,
+              tableNumber: fullOrder.tableId?.tableNumber || fullOrder.tableId?.number || "N/A",
+              comboItemName: comboItemName
+            }
+          );
+        }
       }
     }
 

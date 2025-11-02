@@ -6,8 +6,9 @@ import { useEffect, useRef, useState } from 'react';
  *  - Kết nối tới WebSocket server trung gian (wss)
  *  - Nhận message real-time (đơn mới, cập nhật trạng thái)
  *  - Gửi message (subscribe order, phản hồi khách,...)
+ * @param {string} userId - ID của waiter (optional, để server biết waiter nào đang kết nối)
  */
-const useWaiterWebSocket = () => {
+const useWaiterWebSocket = (userId = null) => {
   // -------------------------------
   // 🧠 State lưu trạng thái kết nối & message
   // -------------------------------
@@ -44,7 +45,8 @@ const useWaiterWebSocket = () => {
         // Gửi message xác thực để server biết đây là waiter
         ws.send(JSON.stringify({
           type: 'auth',
-          role: 'waiter'
+          role: 'waiter',
+          userId: userId // Gửi userId để server có thể broadcast cho waiter cụ thể
         }));
       };
 

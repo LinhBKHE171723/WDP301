@@ -26,5 +26,9 @@ router.get("/orders/history", authRequired, waiterOrderController.getServingHist
 // Lấy chi tiết một order cụ thể trong lịch sử phục vụ
 router.get("/orders/history/:orderId", authRequired, waiterOrderController.getServingHistoryDetails);
 
+// Đánh dấu món đã phục vụ
+router.patch("/order-items/:orderItemId/served", authRequired, waiterOrderController.markOrderItemServed);
+router.patch("/order-items/:orderItemId/combo-items/:comboItemIndex/served", authRequired, waiterOrderController.markComboItemServed);
+
 
 module.exports = router;

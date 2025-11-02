@@ -30,6 +30,10 @@ const waiterApi = {
   markOrderItemServed: (orderItemId) =>
     Client.patch(`/waiter/order-items/${orderItemId}/served`),
 
+  // ✅ Waiter đánh dấu MÓN TRONG COMBO đã được phục vụ
+  markComboItemServed: (orderItemId, comboItemIndex) =>
+    Client.patch(`/waiter/order-items/${orderItemId}/combo-items/${comboItemIndex}/served`),
+
   // ✅ Nếu tất cả món trong order đã được phục vụ → cập nhật trạng thái order
   markOrderFullyServed: (orderId) =>
     Client.patch(`/waiter/orders/${orderId}/fully-served`),

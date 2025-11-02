@@ -23,7 +23,8 @@ export default function WaiterDashboard() {
 
     // trả về các hàm từ hook WebSocket và chạy hook này ở đây
     // hook này thay đổi state mỗi khi có tin nhắn từ server và sẽ làm component cha WaiterDashboard re-render
-    const { connectionState, lastMessage, subscribeToOrders, subscribeToOrder, unsubscribeFromAllOrders } = useWaiterWebSocket();
+    // Truyền userId để server biết waiter nào đang kết nối và chỉ gửi thông báo cho waiter đó
+    const { connectionState, lastMessage, subscribeToOrders, subscribeToOrder, unsubscribeFromAllOrders } = useWaiterWebSocket(user?.id);
 
     const [availableTables, setAvailableTables] = useState([]);
 
@@ -43,7 +44,9 @@ export default function WaiterDashboard() {
     const fetchOrders = async () => {
         try {
             const res = await waiterApi.getActiveOrders();
-            const ordersData = res.data || [];
+            // API trả về { success: true, data: orders } hoặc { success: true, orders: orders }
+            const ordersData = res.data || res.orders || [];
+            console.log('📦 Active orders loaded:', ordersData.length, ordersData);
             setOrders(ordersData);
 
             // Subscribe to all active orders for real-time updates
@@ -222,6 +225,28 @@ WaiterDashboard có một useEffect lắng nghe lastMessage → xử lý cập n
                     }
                     break;
 
+                case 'item:ready':
+                    // Món đơn đã ready, cần đi phục vụ
+                    console.log('🍽️ Item ready:', lastMessage.data);
+                    const itemData = lastMessage.data;
+                    toast.info(`🔔 ${itemData.itemName} đã sẵn sàng phục vụ tại bàn ${itemData.tableNumber}!`, {
+                        autoClose: 5000
+                    });
+                    // Refresh orders để cập nhật trạng thái
+                    fetchOrders();
+                    break;
+
+                case 'comboItem:ready':
+                    // Món trong combo đã ready, cần đi phục vụ
+                    console.log('🍽️ Combo item ready:', lastMessage.data);
+                    const comboItemData = lastMessage.data;
+                    toast.info(`🔔 ${comboItemData.comboItemName} (trong combo) đã sẵn sàng phục vụ tại bàn ${comboItemData.tableNumber}!`, {
+                        autoClose: 5000
+                    });
+                    // Refresh orders để cập nhật trạng thái
+                    fetchOrders();
+                    break;
+
                 default:
                     console.log('📨 Unknown message type:', lastMessage.type);
             }
@@ -321,7 +346,9 @@ WaiterDashboard có một useEffect lắng nghe lastMessage → xử lý cập n
                                         <OrderCard
                                             order={order}
                                             onUpdateStatus={handleUpdateStatus}
+                                            onWaiterResponse={handleWaiterResponse}
                                             isPending={false}
+                                            onOrderUpdate={fetchOrders} // Refresh orders sau khi đánh dấu đã phục vụ
                                         />
                                     </Col>
                                 ))}
