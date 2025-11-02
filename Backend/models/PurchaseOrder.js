@@ -11,6 +11,13 @@ const purchaseOrderSchema = new Schema({
   unit: { type: String, required: true },
   price: { type: Number, required: true },
   time: { type: Date, default: Date.now },
+  expiryDate: { type: Date }, // Ngày hết hạn của lô nhập
+  usedQuantity: { type: Number, default: 0 }, // Số lượng đã sử dụng từ lô này
+  status: { 
+    type: String, 
+    enum: ['valid', 'expired'], 
+    default: 'valid' 
+  }, // Trạng thái: valid (còn hạn) hoặc expired (đã hết hạn)
 });
 
 // ✅ Sau khi lưu PurchaseOrder → cập nhật lại Ingredient

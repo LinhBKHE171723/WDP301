@@ -13,7 +13,7 @@ exports.getAllIngredients = async (req, res) => {
 // ✅ Tạo đơn nhập kho
 exports.createPurchaseOrder = async (req, res) => {
   try {
-    let { ingredientId, quantity, unit, price, supplier, note } = req.body;
+    let { ingredientId, quantity, unit, price, supplier, note, expiryDate } = req.body;
 
     if (!ingredientId || !quantity || quantity <= 0) {
       return res.status(400).json({
@@ -38,6 +38,9 @@ exports.createPurchaseOrder = async (req, res) => {
       price,
       supplier: supplier || "Nhập trực tiếp",
       note: note || "",
+      expiryDate: expiryDate ? new Date(expiryDate) : null, // Ngày hết hạn (nếu có)
+      usedQuantity: 0, // Mặc định chưa dùng gì
+      status: 'valid' // Mặc định còn hạn
     });
 
     // ✅ Tính giá trung bình mới (Weighted Average)
