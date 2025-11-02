@@ -1208,6 +1208,16 @@ exports.updateComboItemStatus = async (req, res) => {
 
     // Update combo item status
     orderItem.comboItems[index].status = status;
+    
+    // Tự động cập nhật status của combo dựa trên comboItems
+    const { updateComboStatusBasedOnComboItems } = require("../utils/customerHelpers");
+    const oldComboStatus = orderItem.status;
+    const newComboStatus = updateComboStatusBasedOnComboItems(orderItem);
+    if (newComboStatus && newComboStatus !== oldComboStatus) {
+      orderItem.status = newComboStatus;
+      console.log(`🔄 Tự động cập nhật combo status từ '${oldComboStatus}' sang '${newComboStatus}' dựa trên comboItems`);
+    }
+    
     await orderItem.save();
 
     // Find and populate order

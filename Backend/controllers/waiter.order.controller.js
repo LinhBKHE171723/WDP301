@@ -589,20 +589,20 @@ exports.markComboItemServed = async (req, res) => {
 
     // Update combo item status
     orderItem.comboItems[index].status = "served";
+    
+    // Tự động cập nhật status của combo dựa trên comboItems
+    const { updateComboStatusBasedOnComboItems } = require("../utils/customerHelpers");
+    const oldComboStatus = orderItem.status;
+    const newComboStatus = updateComboStatusBasedOnComboItems(orderItem);
+    if (newComboStatus && newComboStatus !== oldComboStatus) {
+      orderItem.status = newComboStatus;
+      console.log(`🔄 Tự động cập nhật combo status từ '${oldComboStatus}' sang '${newComboStatus}' sau khi mark comboItem served`);
+    }
+    
     await orderItem.save();
 
     // Reload orderItem để có dữ liệu mới nhất sau khi save
     const updatedOrderItem = await OrderItem.findById(orderItemId);
-    
-    // Kiểm tra: Nếu tất cả comboItems trong OrderItem đều served, update OrderItem.status = served
-    const allComboItemsServed = updatedOrderItem.comboItems.every(
-      (item) => item.status === "served"
-    );
-
-    if (allComboItemsServed && updatedOrderItem.status !== "served") {
-      updatedOrderItem.status = "served";
-      await updatedOrderItem.save();
-    }
 
     // Kiểm tra: Nếu tất cả OrderItems và comboItems đều served, có thể update Order.status
     // Reload Order sau khi update OrderItem để có dữ liệu mới nhất

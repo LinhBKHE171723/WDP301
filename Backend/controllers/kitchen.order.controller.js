@@ -520,18 +520,17 @@ exports.updateComboItemStatus = async (req, res) => {
 
     // Update combo item status
     orderItem.comboItems[index].status = status;
-    await orderItem.save();
-
-    // Check if all combo items are ready and update parent orderItem status if needed
-    const allComboItemsReady = orderItem.comboItems.every(
-      (item) => item.status === "ready" || item.status === "served"
-    );
-
-    // If all combo items are ready and orderItem is preparing, update to ready
-    if (allComboItemsReady && orderItem.status === "preparing") {
-      orderItem.status = "ready";
-      await orderItem.save();
+    
+    // Tự động cập nhật status của combo dựa trên comboItems
+    const { updateComboStatusBasedOnComboItems } = require("../utils/customerHelpers");
+    const oldComboStatus = orderItem.status;
+    const newComboStatus = updateComboStatusBasedOnComboItems(orderItem);
+    if (newComboStatus && newComboStatus !== oldComboStatus) {
+      orderItem.status = newComboStatus;
+      console.log(`🔄 Tự động cập nhật combo status từ '${oldComboStatus}' sang '${newComboStatus}' dựa trên comboItems`);
     }
+    
+    await orderItem.save();
 
     // Check and update order status
     const order = await Order.findById(orderItem.orderId).populate("orderItems");
@@ -658,6 +657,16 @@ exports.assignChefToComboItem = async (req, res) => {
     if (orderItem.comboItems[index].status === "pending") {
       orderItem.comboItems[index].status = "preparing";
     }
+    
+    // Tự động cập nhật status của combo dựa trên comboItems
+    const { updateComboStatusBasedOnComboItems } = require("../utils/customerHelpers");
+    const oldComboStatus = orderItem.status;
+    const newComboStatus = updateComboStatusBasedOnComboItems(orderItem);
+    if (newComboStatus && newComboStatus !== oldComboStatus) {
+      orderItem.status = newComboStatus;
+      console.log(`🔄 Tự động cập nhật combo status từ '${oldComboStatus}' sang '${newComboStatus}' sau khi assign chef`);
+    }
+    
     await orderItem.save();
 
     // 7. Emit WebSocket event với full order data
