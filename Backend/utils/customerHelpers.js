@@ -213,7 +213,7 @@ const createOrderItemsFromCart = async (orderItems) => {
 };
 
 /**
- * Trừ nguyên liệu từ kho khi đặt món
+ * Trừ nguyên liệu từ kho khi đặt món (theo FIFO - First In First Out)
  * @param {Object} item - Item object đã populate ingredients.ingredient
  * @param {Number} quantity - Số lượng món được đặt
  */
@@ -231,22 +231,119 @@ const deductIngredientsFromStock = async (item, quantity) => {
     }
   }
 
+  const PurchaseOrder = require("../models/PurchaseOrder");
+  const now = new Date();
+
   for (const ing of ingredients) {
     const ingDoc = ing.ingredient;
     if (ingDoc && ingDoc._id) {
       const ingredientId = typeof ingDoc === 'object' ? ingDoc._id : ingDoc;
       const ingredient = await Ingredient.findById(ingredientId);
       
-      if (ingredient) {
-        const quantityToDeduct = quantity * ing.quantity;
-        ingredient.stockQuantity = Math.max(0, ingredient.stockQuantity - quantityToDeduct);
-        await ingredient.save();
-        console.log(`📦 Đã trừ ${quantityToDeduct} ${ingredient.unit} của ${ingredient.name} (còn lại: ${ingredient.stockQuantity})`);
-      } else {
+      if (!ingredient) {
         console.warn(`⚠️ Không tìm thấy nguyên liệu với ID: ${ingredientId}`);
+        continue;
+      }
+
+      const quantityToDeduct = quantity * ing.quantity;
+      let remainingToDeduct = quantityToDeduct;
+
+      // Tìm tất cả các lô nhập còn valid - sắp xếp theo FIFO (cũ nhất trước)
+      const allBatches = await PurchaseOrder.find({
+        ingredientId: ingredientId,
+        status: 'valid'
+      })
+      .sort({ time: 1 }) // Sắp xếp theo thời gian nhập (cũ nhất trước - FIFO)
+      .lean();
+
+      // Trừ từ lô cũ nhất trước, ưu tiên lô chưa hết hạn
+      for (const batch of allBatches) {
+        if (remainingToDeduct <= 0) break;
+
+        // Kiểm tra lô còn hạn không (nếu có expiryDate thì phải chưa hết hạn)
+        const isStillValid = !batch.expiryDate || new Date(batch.expiryDate) > now;
+        if (!isStillValid) {
+          continue; // Bỏ qua lô đã hết hạn
+        }
+
+        // Số lượng còn lại trong lô này
+        const availableInBatch = batch.quantity - batch.usedQuantity;
+        
+        if (availableInBatch > 0) {
+          // Số lượng sẽ trừ từ lô này
+          const deductFromBatch = Math.min(remainingToDeduct, availableInBatch);
+          
+          // Cập nhật usedQuantity của lô
+          await PurchaseOrder.findByIdAndUpdate(batch._id, {
+            $inc: { usedQuantity: deductFromBatch }
+          });
+          
+          remainingToDeduct -= deductFromBatch;
+          
+          const batchInfo = batch.expiryDate 
+            ? `lô nhập ${new Date(batch.time).toLocaleDateString()} (hết hạn: ${new Date(batch.expiryDate).toLocaleDateString()})`
+            : `lô nhập ${new Date(batch.time).toLocaleDateString()} (không có ngày hết hạn)`;
+          
+          console.log(`📦 Đã trừ ${deductFromBatch} ${ingredient.unit} từ ${batchInfo} (còn lại trong lô: ${availableInBatch - deductFromBatch})`);
+        }
+      }
+
+      // Cập nhật stockQuantity tổng của ingredient
+      ingredient.stockQuantity = Math.max(0, ingredient.stockQuantity - quantityToDeduct);
+      await ingredient.save();
+      
+      console.log(`📦 Đã trừ tổng ${quantityToDeduct} ${ingredient.unit} của ${ingredient.name} (còn lại trong kho: ${ingredient.stockQuantity})`);
+      
+      if (remainingToDeduct > 0) {
+        console.warn(`⚠️ Cảnh báo: Không đủ nguyên liệu trong các lô còn hạn để trừ ${remainingToDeduct} ${ingredient.unit} của ${ingredient.name}`);
       }
     }
   }
+};
+
+/**
+ * Hoàn nguyên liệu vào lô theo LIFO (Last In First Out) - hoàn vào lô mới nhất trước
+ * @param {String} ingredientId - ID của nguyên liệu
+ * @param {Number} quantityToReturn - Số lượng cần hoàn lại
+ */
+const returnIngredientsToBatches = async (ingredientId, quantityToReturn) => {
+  const PurchaseOrder = require("../models/PurchaseOrder");
+  let remainingToReturn = quantityToReturn;
+
+  // Tìm các lô đã dùng (usedQuantity > 0) - sắp xếp theo LIFO (mới nhất trước)
+  const usedBatches = await PurchaseOrder.find({
+    ingredientId: ingredientId,
+    status: 'valid',
+    usedQuantity: { $gt: 0 } // Chỉ lấy lô đã dùng
+  })
+  .sort({ time: -1 }) // Sắp xếp theo thời gian nhập (mới nhất trước - LIFO)
+  .lean();
+
+  // Hoàn lại vào lô mới nhất trước
+  for (const batch of usedBatches) {
+    if (remainingToReturn <= 0) break;
+
+    // Số lượng có thể hoàn lại vào lô này (không được vượt quá usedQuantity)
+    const canReturnToBatch = Math.min(remainingToReturn, batch.usedQuantity);
+    
+    if (canReturnToBatch > 0) {
+      // Giảm usedQuantity của lô
+      await PurchaseOrder.findByIdAndUpdate(batch._id, {
+        $inc: { usedQuantity: -canReturnToBatch }
+      });
+      
+      remainingToReturn -= canReturnToBatch;
+      
+      console.log(`✅ Đã hoàn ${canReturnToBatch} vào lô nhập ${new Date(batch.time).toLocaleDateString()} (usedQuantity giảm từ ${batch.usedQuantity} xuống ${batch.usedQuantity - canReturnToBatch})`);
+    }
+  }
+
+  // Nếu còn dư, có thể tạo một lô ảo hoặc log warning
+  if (remainingToReturn > 0) {
+    console.warn(`⚠️ Không tìm thấy lô đã dùng để hoàn lại ${remainingToReturn} nguyên liệu. Có thể đã hết hạn hoặc bị xóa.`);
+  }
+
+  return remainingToReturn;
 };
 
 /**
@@ -283,6 +380,11 @@ const returnIngredientsToStock = async (orderItem) => {
             
             if (ingredient) {
               const quantityToReturn = populatedOrderItem.quantity * ing.quantity;
+              
+              // Hoàn nguyên liệu vào các lô theo LIFO
+              await returnIngredientsToBatches(ingredientId, quantityToReturn);
+              
+              // Cập nhật stockQuantity tổng
               ingredient.stockQuantity = (ingredient.stockQuantity || 0) + quantityToReturn;
               await ingredient.save();
               console.log(`✅ Đã hoàn ${quantityToReturn} ${ingredient.unit} của ${ingredient.name} (tổng kho: ${ingredient.stockQuantity})`);
@@ -313,6 +415,11 @@ const returnIngredientsToStock = async (orderItem) => {
                 
                 if (ingredient) {
                   const quantityToReturn = comboItemQuantity * ing.quantity;
+                  
+                  // Hoàn nguyên liệu vào các lô theo LIFO
+                  await returnIngredientsToBatches(ingredientId, quantityToReturn);
+                  
+                  // Cập nhật stockQuantity tổng
                   ingredient.stockQuantity = (ingredient.stockQuantity || 0) + quantityToReturn;
                   await ingredient.save();
                   console.log(`✅ Đã hoàn ${quantityToReturn} ${ingredient.unit} của ${ingredient.name} từ comboItem ${comboItem.itemName} (pending, tổng kho: ${ingredient.stockQuantity})`);
@@ -425,6 +532,11 @@ const returnIngredientsForUnservedItems = async (order) => {
                     
                     if (ingredient) {
                       const quantityToReturn = comboItemQuantity * ing.quantity;
+                      
+                      // Hoàn nguyên liệu vào các lô theo LIFO
+                      await returnIngredientsToBatches(ingredientId, quantityToReturn);
+                      
+                      // Cập nhật stockQuantity tổng
                       ingredient.stockQuantity = (ingredient.stockQuantity || 0) + quantityToReturn;
                       await ingredient.save();
                       console.log(`✅ Đã hoàn ${quantityToReturn} ${ingredient.unit} của ${ingredient.name} từ comboItem ${comboItem.itemName || comboItem.itemId} (pending)`);

@@ -1494,104 +1494,185 @@ const seedDatabase = async () => {
       console.log(`✅ Bàn ${table.tableNumber} có ${table.orderNow.length} orders đang hoạt động`);
     }
 
-    // 7️⃣ Purchase Orders
-    const purchaseOrders = await PurchaseOrder.insertMany([
-      {
-        ingredientId: ingredients.find((i) => i.name === "Thịt bò")._id,
-        quantity: 20,
-        unit: "kg",
-        price: 2000000,
-        expiryDate: new Date(Date.now() + 1000 * 60 * 60 * 24 * 90),
-      },
-      {
-        ingredientId: ingredients.find((i) => i.name === "Cá hồi")._id,
-        quantity: 15,
-        unit: "kg",
-        price: 1500000,
-        expiryDate: new Date(Date.now() + 1000 * 60 * 60 * 24 * 45),
-      },
-      {
-        ingredientId: ingredients.find((i) => i.name === "Rau xà lách")._id,
-        quantity: 50,
-        unit: "bó",
-        price: 500000,
-        expiryDate: new Date(Date.now() - 1000 * 60 * 60 * 24 * 10),
-      },
-      // Thêm purchase orders mới
-      {
-        ingredientId: ingredients.find((i) => i.name === "Thịt heo")._id,
-        quantity: 25,
-        unit: "kg",
-        price: 1800000,
-        expiryDate: new Date(Date.now() + 1000 * 60 * 60 * 24 * 60), // +60 ngày
-        status: "valid",
-      },
-      {
-        ingredientId: ingredients.find((i) => i.name === "Cá basa")._id,
-        quantity: 30,
-        unit: "kg",
-        price: 1200000,
-        expiryDate: new Date(Date.now() + 1000 * 60 * 60 * 24 * 30), // +30 ngày
-        status: "valid",
-      },
-      {
-        ingredientId: ingredients.find((i) => i.name === "Tôm tươi")._id,
-        quantity: 20,
-        unit: "kg",
-        price: 2000000,
-        expiryDate: new Date(Date.now() + 1000 * 60 * 60 * 24 * 5), // +5 ngày (gần hết hạn)
-        status: "valid",
-      },
-      {
-        ingredientId: ingredients.find((i) => i.name === "Mực tươi")._id,
-        quantity: 15,
-        unit: "kg",
-        price: 1500000,
-        expiryDate: new Date(Date.now() + 1000 * 60 * 60 * 24 * 3), // +3 ngày (gần hết hạn)
-        status: "valid",
-      },
-      {
-        ingredientId: ingredients.find((i) => i.name === "Phô mai")._id,
-        quantity: 10,
-        unit: "kg",
-        price: 800000,
-        expiryDate: new Date(Date.now() - 1000 * 60 * 60 * 24 * 5), // hết hạn 5 ngày trước
-        status: "expired",
-      },
-      {
-        ingredientId: ingredients.find((i) => i.name === "Bột mì")._id,
-        quantity: 50,
-        unit: "kg",
-        price: 600000,
-        expiryDate: new Date(Date.now() + 1000 * 60 * 60 * 24 * 120), // +120 ngày
-        status: "valid",
-      },
-      {
-        ingredientId: ingredients.find((i) => i.name === "Gạo")._id,
-        quantity: 100,
-        unit: "kg",
-        price: 1000000,
-        expiryDate: new Date(Date.now() + 1000 * 60 * 60 * 24 * 180), // +180 ngày
-        status: "valid",
-      },
-      {
-        ingredientId: ingredients.find((i) => i.name === "Coca Cola")._id,
-        quantity: 200,
-        unit: "lon",
-        price: 500000,
-        expiryDate: new Date(Date.now() + 1000 * 60 * 60 * 24 * 365), // +365 ngày
-        status: "valid",
-      },
-      {
-        ingredientId: ingredients.find((i) => i.name === "Sữa tươi")._id,
-        quantity: 30,
-        unit: "hộp",
-        price: 400000,
-        expiryDate: new Date(Date.now() + 1000 * 60 * 60 * 24 * 7), // +7 ngày
-        status: "valid",
-      },
-    ]);
-    console.log("📦 Đã tạo các PurchaseOrder mẫu.");
+    // 7️⃣ Purchase Orders - Tạo lô nhập khớp với stockQuantity của từng ingredient
+    // Chia thành nhiều lô với expiryDate khác nhau để test FIFO
+    const purchaseOrders = [];
+    const now = Date.now();
+    
+    // Helper function để tạo PurchaseOrder cho một ingredient
+    const createPurchaseOrdersForIngredient = (ingredient, batches) => {
+      // batches = [{ quantity, daysFromNow, price }]
+      let totalQuantity = 0;
+      batches.forEach((batch, index) => {
+        const daysAgo = batch.daysAgo || 0; // Nếu không có daysAgo, mặc định là 0 (hôm nay)
+        const time = new Date(now - daysAgo * 24 * 60 * 60 * 1000);
+        const expiryDate = batch.daysFromNow 
+          ? new Date(now + batch.daysFromNow * 24 * 60 * 60 * 1000)
+          : null;
+        
+        purchaseOrders.push({
+          ingredientId: ingredient._id,
+          quantity: batch.quantity,
+          unit: ingredient.unit,
+          price: batch.price || ingredient.priceNow,
+          time: time,
+          expiryDate: expiryDate,
+          usedQuantity: 0,
+          status: expiryDate && expiryDate < new Date() ? 'expired' : 'valid'
+        });
+        totalQuantity += batch.quantity;
+      });
+      
+      // Kiểm tra xem tổng có khớp với stockQuantity không
+      if (Math.abs(totalQuantity - ingredient.stockQuantity) > 0.01) {
+        console.warn(`⚠️ Cảnh báo: Tổng quantity của PurchaseOrders (${totalQuantity}) không khớp với stockQuantity (${ingredient.stockQuantity}) của ${ingredient.name}`);
+      }
+    };
+
+    // Tạo PurchaseOrders cho từng ingredient, chia thành nhiều lô để test FIFO
+    // Ví dụ: Thịt bò có 50kg -> chia thành 2 lô: 20kg (cũ, hết hạn sớm) và 30kg (mới, hết hạn muộn)
+    
+    // Thịt bò: 50kg
+    createPurchaseOrdersForIngredient(
+      ingredients.find((i) => i.name === "Thịt bò"),
+      [
+        { quantity: 20, daysAgo: 10, daysFromNow: 15, price: 95000 }, // Lô cũ, hết hạn sau 15 ngày
+        { quantity: 30, daysAgo: 2, daysFromNow: 30, price: 105000 }  // Lô mới, hết hạn sau 30 ngày
+      ]
+    );
+
+    // Cá hồi: 30kg
+    createPurchaseOrdersForIngredient(
+      ingredients.find((i) => i.name === "Cá hồi"),
+      [
+        { quantity: 15, daysAgo: 8, daysFromNow: 7, price: 95000 },   // Lô cũ, hết hạn sau 7 ngày
+        { quantity: 15, daysAgo: 1, daysFromNow: 20, price: 105000 } // Lô mới, hết hạn sau 20 ngày
+      ]
+    );
+
+    // Khoai tây: 40kg
+    createPurchaseOrdersForIngredient(
+      ingredients.find((i) => i.name === "Khoai tây"),
+      [
+        { quantity: 20, daysAgo: 15, daysFromNow: 45, price: 19000 },
+        { quantity: 20, daysAgo: 3, daysFromNow: 60, price: 21000 }
+      ]
+    );
+
+    // Rau xà lách: 60 bó
+    createPurchaseOrdersForIngredient(
+      ingredients.find((i) => i.name === "Rau xà lách"),
+      [
+        { quantity: 30, daysAgo: 5, daysFromNow: 3, price: 9500 },  // Lô cũ, hết hạn sau 3 ngày
+        { quantity: 30, daysAgo: 1, daysFromNow: 7, price: 10500 } // Lô mới, hết hạn sau 7 ngày
+      ]
+    );
+
+    // Trứng gà: 100 quả
+    createPurchaseOrdersForIngredient(
+      ingredients.find((i) => i.name === "Trứng gà"),
+      [
+        { quantity: 50, daysAgo: 7, daysFromNow: 14, price: 2900 },
+        { quantity: 50, daysAgo: 2, daysFromNow: 21, price: 3100 }
+      ]
+    );
+
+    // Tôm tươi: 45kg
+    createPurchaseOrdersForIngredient(
+      ingredients.find((i) => i.name === "Tôm tươi"),
+      [
+        { quantity: 20, daysAgo: 6, daysFromNow: 4, price: 95000 },   // Lô cũ, hết hạn sau 4 ngày
+        { quantity: 25, daysAgo: 1, daysFromNow: 15, price: 105000 }  // Lô mới, hết hạn sau 15 ngày
+      ]
+    );
+
+    // Phô mai: 25kg
+    createPurchaseOrdersForIngredient(
+      ingredients.find((i) => i.name === "Phô mai"),
+      [
+        { quantity: 10, daysAgo: 12, daysFromNow: 18, price: 75000 },
+        { quantity: 15, daysAgo: 3, daysFromNow: 30, price: 85000 }
+      ]
+    );
+
+    // Bột mì: 30kg
+    createPurchaseOrdersForIngredient(
+      ingredients.find((i) => i.name === "Bột mì"),
+      [
+        { quantity: 15, daysAgo: 20, daysFromNow: 100, price: 11500 },
+        { quantity: 15, daysAgo: 5, daysFromNow: 120, price: 12500 }
+      ]
+    );
+
+    // Thịt gà: 35kg
+    createPurchaseOrdersForIngredient(
+      ingredients.find((i) => i.name === "Thịt gà"),
+      [
+        { quantity: 15, daysAgo: 10, daysFromNow: 10, price: 68000 },
+        { quantity: 20, daysAgo: 2, daysFromNow: 25, price: 72000 }
+      ]
+    );
+
+    // Thịt heo: 8kg (stock thấp để test)
+    createPurchaseOrdersForIngredient(
+      ingredients.find((i) => i.name === "Thịt heo"),
+      [
+        { quantity: 8, daysAgo: 3, daysFromNow: 5, price: 70000 }
+      ]
+    );
+
+    // Tạo PurchaseOrders cho các nguyên liệu còn lại (đơn giản hóa: 1 lô mỗi ingredient)
+    const remainingIngredients = ingredients.filter(ing => 
+      !['Thịt bò', 'Cá hồi', 'Khoai tây', 'Rau xà lách', 'Trứng gà', 'Tôm tươi', 
+        'Phô mai', 'Bột mì', 'Thịt gà', 'Thịt heo'].includes(ing.name)
+    );
+
+    remainingIngredients.forEach(ingredient => {
+      // Tạo 1-2 lô tùy theo số lượng
+      if (ingredient.stockQuantity > 50) {
+        // Chia thành 2 lô nếu số lượng lớn
+        const qty1 = Math.floor(ingredient.stockQuantity / 2);
+        const qty2 = ingredient.stockQuantity - qty1;
+        createPurchaseOrdersForIngredient(ingredient, [
+          { quantity: qty1, daysAgo: 5, daysFromNow: 30, price: ingredient.priceNow * 0.95 },
+          { quantity: qty2, daysAgo: 1, daysFromNow: 60, price: ingredient.priceNow * 1.05 }
+        ]);
+      } else {
+        // 1 lô nếu số lượng nhỏ
+        createPurchaseOrdersForIngredient(ingredient, [
+          { quantity: ingredient.stockQuantity, daysAgo: 3, daysFromNow: 30, price: ingredient.priceNow }
+        ]);
+      }
+    });
+
+    // Insert tất cả PurchaseOrders
+    // LƯU Ý: Post-save hook của PurchaseOrder sẽ tự động cộng quantity vào stockQuantity
+    // Nhưng vì Ingredient đã có stockQuantity từ trước, nên cần tính lại từ các PurchaseOrders
+    const createdPurchaseOrders = await PurchaseOrder.insertMany(purchaseOrders);
+    console.log(`📦 Đã tạo ${createdPurchaseOrders.length} PurchaseOrders cho ${ingredients.length} nguyên liệu.`);
+    
+    // Tính lại stockQuantity và priceNow cho mỗi ingredient từ các PurchaseOrders
+    for (const ingredient of ingredients) {
+      const ingredientPurchaseOrders = createdPurchaseOrders.filter(
+        po => po.ingredientId.toString() === ingredient._id.toString()
+      );
+      
+      // Tính tổng quantity và giá trung bình có trọng số
+      let totalQuantity = 0;
+      let totalValue = 0;
+      
+      ingredientPurchaseOrders.forEach(po => {
+        totalQuantity += po.quantity;
+        totalValue += po.quantity * po.price;
+      });
+      
+      // Cập nhật lại stockQuantity và priceNow
+      ingredient.stockQuantity = totalQuantity;
+      ingredient.priceNow = totalQuantity > 0 ? totalValue / totalQuantity : ingredient.priceNow;
+      await ingredient.save();
+      
+      console.log(`✅ Đã cập nhật lại ${ingredient.name}: stockQuantity = ${ingredient.stockQuantity}, priceNow = ${ingredient.priceNow.toFixed(2)}`);
+    }
 
     // 8️⃣ Feedbacks
     await Feedback.insertMany([
