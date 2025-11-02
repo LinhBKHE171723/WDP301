@@ -21,7 +21,6 @@ import {
 import { Label } from "../ui/admin/label";
 import axios from "axios";
 
-// Hàm format ngày từ ISO sang dd/mm/yyyy
 const formatDate = (isoDate) => {
   const date = new Date(isoDate);
   return date.toLocaleDateString("vi-VN");
@@ -29,13 +28,18 @@ const formatDate = (isoDate) => {
 
 export function AccountsTable() {
   const [filterStatus, setFilterStatus] = useState("all");
-
+  const [filterRole, setFilterRole] = useState("all"); // 🔹 thêm filter theo role
   const [editData, setEditData] = useState(null);
   const [openEdit, setOpenEdit] = useState(false);
 
   const [search, setSearch] = useState("");
   const [accounts, setAccounts] = useState([]);
   const [openRow, setOpenRow] = useState(null);
+
+  // 🔹 State phân trang
+  const [page, setPage] = useState(1);
+  const [limit] = useState(10);
+  const [total, setTotal] = useState(0);
 
   const toggleDropdown = (id) => setOpenRow(openRow === id ? null : id);
   const handleEdit = (user) => {
@@ -48,7 +52,6 @@ export function AccountsTable() {
         role: editData.role,
         accountStatus: editData.accountStatus,
       });
-
       setAccounts((prev) =>
         prev.map((u) => (u._id === editData._id ? editData : u))
       );
@@ -58,7 +61,6 @@ export function AccountsTable() {
     }
   };
 
-  // STATE FORM & THÔNG BÁO
   const [formData, setFormData] = useState({
     name: "",
     email: "",
@@ -69,26 +71,27 @@ export function AccountsTable() {
   const [successMessage, setSuccessMessage] = useState("");
   const [submitting, setSubmitting] = useState(false);
 
-  // Gọi API lấy danh sách
+  // 🔹 Gọi API có phân trang + filter role + status
   useEffect(() => {
     axios
-      .get("http://localhost:5000/api/admin/users")
-      .then((res) => setAccounts(res.data.data.items))
+      .get("http://localhost:5000/api/admin/users", {
+        params: {
+          page,
+          limit,
+          q: search || undefined,
+          role: filterRole === "all" ? undefined : filterRole,
+          status: filterStatus === "all" ? undefined : filterStatus,
+        },
+      })
+      .then((res) => {
+        const data = res.data.data;
+        setAccounts(Array.isArray(data.items) ? data.items : []);
+        setTotal(data.total || 0);
+      })
       .catch((err) => console.error("Lỗi khi load users:", err));
-  }, []);
+  }, [page, limit, search, filterStatus, filterRole]);
 
-  // Lọc tìm kiếm
-  const filtered = accounts.filter((a) => {
-    const matchSearch =
-      a.name.toLowerCase().includes(search.toLowerCase()) ||
-      a.email.toLowerCase().includes(search.toLowerCase());
-
-    const matchStatus = filterStatus === "all" || a.status === filterStatus;
-
-    return matchSearch && matchStatus;
-  });
-
-  // Validate FE
+  // Validate
   const validate = () => {
     const { name, email, phone, role } = formData;
     if (!name.trim() || !email.trim() || !phone.trim() || !role.trim()) {
@@ -108,14 +111,12 @@ export function AccountsTable() {
     return true;
   };
 
-  // Reset form
   const resetForm = () => {
     setFormData({ name: "", email: "", phone: "", role: "waiter" });
     setErrorMessage("");
     setSuccessMessage("");
   };
 
-  // Create Account
   const handleCreateAccount = async (closeDialog) => {
     setErrorMessage("");
     setSuccessMessage("");
@@ -152,7 +153,7 @@ export function AccountsTable() {
       <div className="flex items-center justify-between">
         <div className="text-2xl font-semibold">Quản lý tài khoản</div>
 
-        {/* OPEN DIALOG */}
+        {/* Thêm tài khoản */}
         <Dialog>
           <DialogTrigger asChild>
             <Button>Thêm tài khoản</Button>
@@ -258,24 +259,49 @@ export function AccountsTable() {
 
       {/* TABLE */}
       <Card>
+        {/* 🔹 Bộ lọc */}
         <div className="flex items-center gap-3">
           <Input
             placeholder="Tìm theo tên hoặc email..."
             value={search}
-            onChange={(e) => setSearch(e.target.value)}
+            onChange={(e) => {
+              setSearch(e.target.value);
+              setPage(1);
+            }}
           />
 
+          {/* Filter theo trạng thái */}
           <select
             value={filterStatus}
-            onChange={(e) => setFilterStatus(e.target.value)}
+            onChange={(e) => {
+              setFilterStatus(e.target.value);
+              setPage(1);
+            }}
             className="border rounded px-3 py-2"
           >
             <option value="all">Tất cả</option>
             <option value="active">Hoạt động</option>
             <option value="inactive">Không hoạt động</option>
           </select>
+
+          {/* 🔹 Filter theo vai trò */}
+          <select
+            value={filterRole}
+            onChange={(e) => {
+              setFilterRole(e.target.value);
+              setPage(1);
+            }}
+            className="border rounded px-3 py-2"
+          >
+            <option value="all">Tất cả vai trò</option>
+            <option value="waiter">Phục vụ</option>
+            <option value="chef">Bếp trưởng</option>
+            <option value="cashier">Thu ngân</option>
+            <option value="admin">Quản trị</option>
+          </select>
         </div>
 
+        {/* Bảng danh sách */}
         <div className="mt-4 overflow-x-auto">
           <table className="w-full">
             <thead>
@@ -290,7 +316,7 @@ export function AccountsTable() {
               </tr>
             </thead>
             <tbody>
-              {filtered.map((u) => (
+              {accounts.map((u) => (
                 <tr
                   key={u._id}
                   className="border-b last:border-0 hover:bg-gray-50"
@@ -319,7 +345,7 @@ export function AccountsTable() {
                         <Button
                           variant="ghost"
                           size="sm"
-                          onClick={() => handleEdit(u)} // Mở form sửa
+                          onClick={() => handleEdit(u)}
                         >
                           Edit
                         </Button>
@@ -338,6 +364,30 @@ export function AccountsTable() {
             </tbody>
           </table>
 
+          {/* 🔹 Thanh phân trang */}
+          <div className="flex justify-between items-center p-3 text-sm text-gray-600">
+            <span>
+              Trang {page} / {Math.ceil(total / limit)} — Tổng {total} tài khoản
+            </span>
+            <div className="space-x-2">
+              <Button
+                variant="outline"
+                disabled={page <= 1}
+                onClick={() => setPage((p) => Math.max(1, p - 1))}
+              >
+                Trang trước
+              </Button>
+              <Button
+                variant="outline"
+                disabled={page >= Math.ceil(total / limit)}
+                onClick={() => setPage((p) => p + 1)}
+              >
+                Trang sau
+              </Button>
+            </div>
+          </div>
+
+          {/* Giữ nguyên Dialog chỉnh sửa */}
           {openEdit && editData && (
             <Dialog open={openEdit} onOpenChange={setOpenEdit}>
               <DialogContent className="border-2 border-orange-400 bg-orange-50 shadow-xl ">
