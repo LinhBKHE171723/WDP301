@@ -24,6 +24,7 @@ const {
   getItemById,
   markItemAvailable,
   markItemUnavailable,
+  getItemsWithAvailability,
 } = require("../controllers/kitchen.item.controller");
 
 const {
@@ -89,6 +90,9 @@ router.patch("/items/:itemId/available", markItemAvailable);
 
 // 7. Đánh dấu Món ăn là không có sẵn (Unavailable)
 router.patch("/items/:itemId/unavailable", markItemUnavailable);
+
+// 8. Lấy danh sách món ăn kèm trạng thái có sẵn
+router.get("/items-with-availability", getItemsWithAvailability);
 
 //--- CRUD Menu ---
 

@@ -28,6 +28,9 @@ const kitchenApi = {
     Client.patch(`/kitchen/items/${itemId}/available`),
   markItemUnavailable: (itemId) =>
     Client.patch(`/kitchen/items/${itemId}/unavailable`),
+  getItemsWithAvailability: () =>
+    Client.get("/kitchen/items-with-availability"),
+  getItemById: (itemId) => Client.get(`/kitchen/items/${itemId}`),
 
   /* =========================
      MENU (Combo / Thực đơn)

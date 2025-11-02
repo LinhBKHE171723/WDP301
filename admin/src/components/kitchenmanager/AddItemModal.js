@@ -33,32 +33,59 @@ export default function AddItemModal({ show, onClose, setItems, editItem }) {
     }
   }, [show]);
 
-  // ✅ Load dữ liệu khi edit
+  // ✅ Khi sửa món ăn → tự fetch chi tiết
   useEffect(() => {
-    if (isEdit && editItem) {
-      setFormData({
-        name: editItem.name || "",
-        description: editItem.description || "",
-        category: editItem.category || "",
-        price: editItem.price || "",
-        image: editItem.image || "",
-        isAvailable: editItem.isAvailable ?? true,
-      });
-      setPreview(editItem.image || null);
-      setSelectedIngredients(editItem.ingredients || []);
-    } else {
-      setFormData({
-        name: "",
-        description: "",
-        category: "",
-        price: "",
-        image: "",
-        isAvailable: true,
-      });
-      setSelectedIngredients([]);
-      setPreview(null);
-    }
-  }, [editItem, isEdit, show]);
+    const fetchItemDetails = async () => {
+      if (isEdit && editItem?._id) {
+        try {
+          setLoading(true);
+          const res = await kitchenApi.getItemById(editItem._id);
+          const item = res;
+          setFormData({
+            name: item.name || "",
+            description: item.description || "",
+            category: item.category || "",
+            price: item.price || "",
+            image: item.image || "",
+            isAvailable: item.isAvailable ?? true,
+          });
+          setPreview(item.image || null);
+
+          // ✅ Chuẩn hóa mảng ingredients: { ingredient: _id, quantity }
+          if (item.ingredients && Array.isArray(item.ingredients)) {
+            const normalized = item.ingredients.map((i) => ({
+              ingredient:
+                typeof i.ingredient === "object"
+                  ? i.ingredient._id
+                  : i.ingredient,
+              quantity: i.quantity || 1,
+            }));
+            setSelectedIngredients(normalized);
+          } else {
+            setSelectedIngredients([]);
+          }
+        } catch (err) {
+          console.error("❌ Lỗi khi tải chi tiết món ăn:", err);
+        } finally {
+          setLoading(false);
+        }
+      } else {
+        // Nếu là thêm mới
+        setFormData({
+          name: "",
+          description: "",
+          category: "",
+          price: "",
+          image: "",
+          isAvailable: true,
+        });
+        setSelectedIngredients([]);
+        setPreview(null);
+      }
+    };
+
+    if (show) fetchItemDetails();
+  }, [show, isEdit, editItem]);
 
   if (!show) return null;
 
@@ -310,7 +337,9 @@ export default function AddItemModal({ show, onClose, setItems, editItem }) {
                             placeholder="0"
                             className="w-24 border rounded px-3 py-1.5 text-right text-lg"
                           />
-                          <span className="text-sm text-gray-600">g</span>
+                          <span className="text-sm text-gray-600">
+                            {ing.unit}
+                          </span>
                         </div>
                       )}
                     </div>
