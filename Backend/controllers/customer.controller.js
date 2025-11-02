@@ -533,6 +533,31 @@ exports.addItemsToOrder = async (req, res) => {
       await newOrderItem.save();
       createdOrderItems.push(newOrderItem._id);
       additionalAmount += item.price * orderItem.quantity; // Tính tổng tiền theo số lượng
+
+      // Trừ nguyên liệu từ kho khi thêm món vào order
+      const { deductIngredientsFromStock } = require("../utils/customerHelpers");
+      try {
+        // Xử lý món đơn (itemType === 'item')
+        if (orderItem.type === 'item') {
+          // Item đã được populate ingredients ở trên
+          await deductIngredientsFromStock(item, orderItem.quantity);
+        }
+        
+        // Xử lý combo (itemType === 'menu' và có comboItems)
+        if (orderItem.type === 'menu' && item.type === 'combo' && item.items && item.items.length > 0) {
+          // Trừ nguyên liệu cho từng item trong combo
+          for (const comboItemId of item.items) {
+            const comboItem = await Item.findById(comboItemId).populate('ingredients.ingredient');
+            if (comboItem) {
+              // Số lượng mỗi comboItem = orderItem.quantity (mỗi combo có bao nhiêu phần comboItem)
+              await deductIngredientsFromStock(comboItem, orderItem.quantity);
+            }
+          }
+        }
+      } catch (error) {
+        console.error(`❌ Lỗi khi trừ nguyên liệu cho OrderItem trong addItemsToOrder:`, error);
+        // Không throw error để không làm gián đoạn quá trình thêm món
+      }
     }
 
     // Cập nhật order với orderItems mới và totalAmount
@@ -715,27 +740,52 @@ exports.updateOrderStatus = async (req, res) => {
     }
 
     // Xử lý payment status dựa trên order status
+    let payment = null;
     if (order.paymentId) {
       if (status === 'paid') {
         // Nếu order status là 'paid', tự động cập nhật payment status thành 'paid'
-        await Payment.findByIdAndUpdate(
+        payment = await Payment.findByIdAndUpdate(
           order.paymentId._id,
           { 
             status: 'paid',
             payTime: new Date(),
             amountPaid: order.totalAmount
-          }
+          },
+          { new: true }
         );
       } else {
         // Nếu order status KHÔNG phải 'paid', chuyển payment status về 'unpaid'
-        await Payment.findByIdAndUpdate(
+        payment = await Payment.findByIdAndUpdate(
           order.paymentId._id,
           { 
             status: 'unpaid',
             payTime: null,
             amountPaid: 0
-          }
+          },
+          { new: true }
         );
+      }
+    }
+
+    // Hoàn nguyên liệu cho món chưa phục vụ khi thanh toán hoặc hủy đơn
+    const { returnIngredientsForUnservedItems } = require("../utils/customerHelpers");
+    
+    if (status === 'paid' && payment && payment.status === 'paid') {
+      // Khi thanh toán: hoàn nguyên liệu cho món chưa phục vụ
+      try {
+        await returnIngredientsForUnservedItems(order);
+      } catch (error) {
+        console.error(`❌ Lỗi khi hoàn nguyên liệu cho order ${orderId} khi thanh toán:`, error);
+        // Không throw error để không làm gián đoạn quá trình thanh toán
+      }
+    } else if (status === 'cancelled') {
+      // Khi hủy đơn: hoàn nguyên liệu cho tất cả món chưa phục vụ
+      try {
+        await returnIngredientsForUnservedItems(order);
+        console.log(`✅ Đã hoàn nguyên liệu cho tất cả món chưa phục vụ khi hủy order ${orderId}`);
+      } catch (error) {
+        console.error(`❌ Lỗi khi hoàn nguyên liệu cho order ${orderId} khi hủy:`, error);
+        // Không throw error để không làm gián đoạn quá trình hủy đơn
       }
     }
 

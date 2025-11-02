@@ -12,7 +12,7 @@ const orderItemSchema = new Schema({
   assignedChef: { type: Schema.Types.ObjectId, ref: "User" },
   status: {
     type: String,
-    enum: ["pending", "preparing", "ready", "served"],
+    enum: ["pending", "preparing", "ready", "served", "cancelled"],
     default: "pending",
   },
   note: String,
@@ -22,7 +22,7 @@ const orderItemSchema = new Schema({
     itemName: String,
     status: {
       type: String,
-      enum: ["pending", "preparing", "ready", "served"],
+      enum: ["pending", "preparing", "ready", "served", "cancelled"],
       default: "pending",
     },
     assignedChef: { type: Schema.Types.ObjectId, ref: "User" },

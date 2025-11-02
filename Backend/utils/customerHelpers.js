@@ -179,6 +179,31 @@ const createOrderItemsFromCart = async (orderItems) => {
     await newOrderItem.save();
     createdOrderItems.push(newOrderItem._id);
     totalAmount += item.price * orderItem.quantity; // Tính tổng tiền theo số lượng
+
+    // Trừ nguyên liệu từ kho khi đặt món
+    try {
+      // Xử lý món đơn (itemType === 'item')
+      if (orderItem.type === 'item') {
+        // Item đã được populate ingredients ở trên
+        await deductIngredientsFromStock(item, orderItem.quantity);
+      }
+      
+      // Xử lý combo (itemType === 'menu' và có comboItems)
+      if (orderItem.type === 'menu' && item.type === 'combo' && item.items && item.items.length > 0) {
+        // Trừ nguyên liệu cho từng item trong combo
+        for (const comboItemId of item.items) {
+          const comboItem = await Item.findById(comboItemId).populate('ingredients.ingredient');
+          if (comboItem) {
+            // Số lượng mỗi comboItem = orderItem.quantity (mỗi combo có bao nhiêu phần comboItem)
+            await deductIngredientsFromStock(comboItem, orderItem.quantity);
+          }
+        }
+      }
+    } catch (error) {
+      console.error(`❌ Lỗi khi trừ nguyên liệu cho OrderItem:`, error);
+      // Không throw error để không làm gián đoạn quá trình tạo order
+      // Có thể log và báo admin sau
+    }
   }
 
   return {
@@ -187,10 +212,228 @@ const createOrderItemsFromCart = async (orderItems) => {
   };
 };
 
+/**
+ * Trừ nguyên liệu từ kho khi đặt món
+ * @param {Object} item - Item object đã populate ingredients.ingredient
+ * @param {Number} quantity - Số lượng món được đặt
+ */
+const deductIngredientsFromStock = async (item, quantity) => {
+  if (!item || !item.ingredients || item.ingredients.length === 0) {
+    return;
+  }
+
+  // Đảm bảo ingredients đã được populate
+  let ingredients = item.ingredients;
+  if (ingredients.length > 0 && (!ingredients[0].ingredient || typeof ingredients[0].ingredient === 'string')) {
+    const populatedItem = await Item.findById(item._id).populate('ingredients.ingredient');
+    if (populatedItem && populatedItem.ingredients) {
+      ingredients = populatedItem.ingredients;
+    }
+  }
+
+  for (const ing of ingredients) {
+    const ingDoc = ing.ingredient;
+    if (ingDoc && ingDoc._id) {
+      const ingredientId = typeof ingDoc === 'object' ? ingDoc._id : ingDoc;
+      const ingredient = await Ingredient.findById(ingredientId);
+      
+      if (ingredient) {
+        const quantityToDeduct = quantity * ing.quantity;
+        ingredient.stockQuantity = Math.max(0, ingredient.stockQuantity - quantityToDeduct);
+        await ingredient.save();
+        console.log(`📦 Đã trừ ${quantityToDeduct} ${ingredient.unit} của ${ingredient.name} (còn lại: ${ingredient.stockQuantity})`);
+      } else {
+        console.warn(`⚠️ Không tìm thấy nguyên liệu với ID: ${ingredientId}`);
+      }
+    }
+  }
+};
+
+/**
+ * Hoàn nguyên liệu vào kho cho món chưa phục vụ
+ * @param {Object} orderItem - OrderItem object (có thể chưa populate)
+ */
+const returnIngredientsToStock = async (orderItem) => {
+  if (!orderItem) {
+    return;
+  }
+
+  // Nếu orderItem là ObjectId, cần populate
+  const OrderItem = require("../models/OrderItem");
+  let populatedOrderItem = orderItem;
+  if (typeof orderItem === 'string' || (orderItem._id && !orderItem.itemId)) {
+    populatedOrderItem = await OrderItem.findById(orderItem).populate('itemId');
+  }
+
+  if (!populatedOrderItem) {
+    console.warn(`⚠️ Không tìm thấy OrderItem để hoàn nguyên liệu`);
+    return;
+  }
+
+  try {
+    // Xử lý món đơn (itemType === 'item')
+    if (populatedOrderItem.itemType === 'item') {
+      const item = await Item.findById(populatedOrderItem.itemId).populate('ingredients.ingredient');
+      if (item && item.ingredients) {
+        for (const ing of item.ingredients) {
+          const ingDoc = ing.ingredient;
+          if (ingDoc && ingDoc._id) {
+            const ingredientId = typeof ingDoc === 'object' ? ingDoc._id : ingDoc;
+            const ingredient = await Ingredient.findById(ingredientId);
+            
+            if (ingredient) {
+              const quantityToReturn = populatedOrderItem.quantity * ing.quantity;
+              ingredient.stockQuantity = (ingredient.stockQuantity || 0) + quantityToReturn;
+              await ingredient.save();
+              console.log(`✅ Đã hoàn ${quantityToReturn} ${ingredient.unit} của ${ingredient.name} (tổng kho: ${ingredient.stockQuantity})`);
+            } else {
+              console.warn(`⚠️ Không tìm thấy nguyên liệu với ID: ${ingredientId} để hoàn lại`);
+            }
+          }
+        }
+      }
+    }
+
+    // Xử lý combo (itemType === 'menu' và có comboItems)
+    if (populatedOrderItem.itemType === 'menu' && populatedOrderItem.comboItems && populatedOrderItem.comboItems.length > 0) {
+      // Hoàn nguyên liệu cho từng comboItem chưa phục vụ
+      for (const comboItem of populatedOrderItem.comboItems) {
+        // Chỉ hoàn nguyên liệu cho comboItem chưa được phục vụ
+        if (comboItem.status && comboItem.status !== 'served' && comboItem.status !== 'cancelled') {
+          const item = await Item.findById(comboItem.itemId).populate('ingredients.ingredient');
+          if (item && item.ingredients) {
+            // Số lượng mỗi comboItem = orderItem.quantity (mỗi combo có bao nhiêu phần comboItem)
+            const comboItemQuantity = populatedOrderItem.quantity;
+            
+            for (const ing of item.ingredients) {
+              const ingDoc = ing.ingredient;
+              if (ingDoc && ingDoc._id) {
+                const ingredientId = typeof ingDoc === 'object' ? ingDoc._id : ingDoc;
+                const ingredient = await Ingredient.findById(ingredientId);
+                
+                if (ingredient) {
+                  const quantityToReturn = comboItemQuantity * ing.quantity;
+                  ingredient.stockQuantity = (ingredient.stockQuantity || 0) + quantityToReturn;
+                  await ingredient.save();
+                  console.log(`✅ Đã hoàn ${quantityToReturn} ${ingredient.unit} của ${ingredient.name} từ comboItem ${comboItem.itemName} (tổng kho: ${ingredient.stockQuantity})`);
+                } else {
+                  console.warn(`⚠️ Không tìm thấy nguyên liệu với ID: ${ingredientId} để hoàn lại từ comboItem`);
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  } catch (error) {
+    console.error(`❌ Lỗi khi hoàn nguyên liệu cho OrderItem ${populatedOrderItem._id}:`, error);
+  }
+};
+
+/**
+ * Hoàn nguyên liệu cho tất cả order items chưa phục vụ trong order
+ * @param {Object} order - Order object với orderItems đã populate hoặc array of orderItem IDs
+ */
+const returnIngredientsForUnservedItems = async (order) => {
+  const OrderItem = require("../models/OrderItem");
+  
+  try {
+    // Lấy orderItems
+    let orderItemIds = [];
+    if (Array.isArray(order.orderItems)) {
+      orderItemIds = order.orderItems.map(item => {
+        return typeof item === 'object' && item._id ? item._id : item;
+      });
+    }
+    
+    if (orderItemIds.length === 0) {
+      return;
+    }
+    
+    // Populate orderItems để có đầy đủ thông tin
+    const populatedOrderItems = await OrderItem.find({ _id: { $in: orderItemIds } });
+    
+    for (const orderItem of populatedOrderItems) {
+      // Kiểm tra orderItem chưa được phục vụ
+      if (orderItem.status !== 'served') {
+        // Hoàn nguyên liệu cho orderItem chưa phục vụ (bao gồm cả comboItems nếu có)
+        // Gọi trực tiếp returnIngredientsToStock để tránh circular dependency
+        await returnIngredientsToStock(orderItem);
+        
+        // Đặt status thành cancelled
+        orderItem.status = 'cancelled';
+        
+        // Đặt tất cả comboItems chưa served thành cancelled
+        if (orderItem.comboItems && orderItem.comboItems.length > 0) {
+          for (let i = 0; i < orderItem.comboItems.length; i++) {
+            if (orderItem.comboItems[i].status !== 'served') {
+              orderItem.comboItems[i].status = 'cancelled';
+            }
+          }
+        }
+        
+        await orderItem.save();
+        console.log(`🔄 Đã đặt OrderItem ${orderItem._id} thành cancelled và hoàn nguyên liệu`);
+      } else {
+        // Nếu orderItem đã served nhưng có comboItems chưa served, chỉ xử lý comboItems
+        if (orderItem.comboItems && orderItem.comboItems.length > 0) {
+          let hasUnservedComboItem = false;
+          
+          // Hoàn nguyên liệu cho từng comboItem chưa served
+          for (let i = 0; i < orderItem.comboItems.length; i++) {
+            const comboItem = orderItem.comboItems[i];
+            
+            if (comboItem.status !== 'served' && comboItem.status !== 'cancelled') {
+              hasUnservedComboItem = true;
+              
+              // Hoàn nguyên liệu cho comboItem này
+              const item = await Item.findById(comboItem.itemId).populate('ingredients.ingredient');
+              if (item && item.ingredients) {
+                const comboItemQuantity = orderItem.quantity;
+                
+                for (const ing of item.ingredients) {
+                  const ingDoc = ing.ingredient;
+                  if (ingDoc && ingDoc._id) {
+                    const ingredientId = typeof ingDoc === 'object' ? ingDoc._id : ingDoc;
+                    const ingredient = await Ingredient.findById(ingredientId);
+                    
+                    if (ingredient) {
+                      const quantityToReturn = comboItemQuantity * ing.quantity;
+                      ingredient.stockQuantity = (ingredient.stockQuantity || 0) + quantityToReturn;
+                      await ingredient.save();
+                      console.log(`✅ Đã hoàn ${quantityToReturn} ${ingredient.unit} của ${ingredient.name} từ comboItem ${comboItem.itemName || comboItem.itemId}`);
+                    }
+                  }
+                }
+              }
+              
+              // Đặt status thành cancelled
+              orderItem.comboItems[i].status = 'cancelled';
+            }
+          }
+          
+          if (hasUnservedComboItem) {
+            await orderItem.save();
+            console.log(`🔄 Đã hoàn nguyên liệu và đặt comboItems chưa phục vụ của OrderItem ${orderItem._id} thành cancelled`);
+          }
+        }
+      }
+    }
+    
+    console.log(`✅ Đã hoàn tất việc hoàn nguyên liệu và đặt status cancelled cho các món chưa phục vụ`);
+  } catch (error) {
+    console.error(`❌ Lỗi khi hoàn nguyên liệu cho order:`, error);
+    throw error;
+  }
+};
+
 module.exports = {
   populateOrderItemDetails,
   validateTableAvailability,
   createOrderItemsFromCart,
-  calculateExpense
+  calculateExpense,
+  deductIngredientsFromStock,
+  returnIngredientsToStock,
+  returnIngredientsForUnservedItems
 };
 
