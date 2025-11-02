@@ -12,12 +12,32 @@ exports.createMenu = async (req, res) => {
 
 exports.getAllMenus = async (req, res) => {
   try {
+    // Lấy toàn bộ menu và populate items
     const menus = await Menu.find().populate("items");
+
+    // Duyệt qua từng menu để xác định trạng thái khả dụng
+    const updatedMenus = menus.map((menu) => {
+      // Nếu không có item nào trong menu, xem là không khả dụng
+      if (!menu.items || menu.items.length === 0) {
+        menu.isAvailable = false;
+        return menu;
+      }
+
+      // Nếu có ít nhất 1 item hết hàng thì menu cũng hết hàng
+      const hasUnavailableItem = menu.items.some(
+        (item) => item && item.isAvailable === false
+      );
+
+      menu.isAvailable = !hasUnavailableItem;
+      return menu;
+    });
+
     res.status(200).json({
-      message: "Lấy danh sách thực đơn thành công",
-      data: menus, // ✅ Bọc trong key 'data'
+      message: "✅ Lấy danh sách thực đơn thành công",
+      data: updatedMenus,
     });
   } catch (error) {
+    console.error("❌ Lỗi khi lấy danh sách menu:", error);
     res.status(500).json({ message: error.message });
   }
 };
