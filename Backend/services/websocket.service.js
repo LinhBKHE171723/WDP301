@@ -91,10 +91,12 @@ class WebSocketService {
       case 'auth':
         // client gửi role (vd: waiter, customer, kitchen_manager)
         ws.userRole = message.role;
-        console.log(`🔐 WebSocket authenticated as: ${message.role}`);
+        ws.userId = message.userId; // Lưu userId để có thể broadcast cho user cụ thể
+        console.log(`🔐 WebSocket authenticated as: ${message.role} (userId: ${message.userId})`);
         ws.send(JSON.stringify({
           type: 'auth_success',
           role: message.role,
+          userId: message.userId,
           message: `Authenticated as ${message.role}`
         }));
         break;
@@ -258,6 +260,43 @@ class WebSocketService {
     });
 
     console.log(`📡 Broadcasted ${eventType} to ${sentCount} waiter(s)`, data);
+  }
+
+  // ==================================================
+  // 📢 Gửi broadcast cho waiter cụ thể (theo waiterId)
+  // ==================================================
+  broadcastToWaiter(waiterId, eventType, data) {
+    if (!waiterId) {
+      console.warn('⚠️ broadcastToWaiter: waiterId is required');
+      return;
+    }
+
+    const message = {
+      type: eventType,
+      data,
+      timestamp: new Date().toISOString()
+    };
+
+    const waiterIdStr = waiterId.toString();
+    let sentCount = 0;
+
+    this.wss.clients.forEach(ws => {
+      if (
+        ws.readyState === WebSocket.OPEN &&
+        ws.userRole === 'waiter' &&
+        ws.userId &&
+        ws.userId.toString() === waiterIdStr
+      ) {
+        ws.send(JSON.stringify(message));
+        sentCount++;
+      }
+    });
+
+    if (sentCount > 0) {
+      console.log(`📡 Broadcasted ${eventType} to waiter ${waiterIdStr}`, data);
+    } else {
+      console.log(`📡 Waiter ${waiterIdStr} not connected or not found for event ${eventType}`);
+    }
   }
 
   // ==================================================
