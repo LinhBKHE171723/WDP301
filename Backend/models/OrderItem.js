@@ -16,6 +16,17 @@ const orderItemSchema = new Schema({
     default: "pending",
   },
   note: String,
+  // Mảng các món trong combo (chỉ có khi itemType === 'menu' và menu.type === 'combo')
+  comboItems: [{
+    itemId: { type: Schema.Types.ObjectId, ref: "Item" },
+    itemName: String,
+    status: {
+      type: String,
+      enum: ["pending", "preparing", "ready", "served"],
+      default: "pending",
+    },
+    assignedChef: { type: Schema.Types.ObjectId, ref: "User" },
+  }],
 });
 
 module.exports = mongoose.model("OrderItem", orderItemSchema);

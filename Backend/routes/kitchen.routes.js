@@ -10,8 +10,10 @@ const {
   startPreparingOrder,
   markItemReady,
   assignChefToItem,
+  assignChefToComboItem,
   getMyPreparingItems,
   getOrderDetails,
+  updateComboItemStatus,
 } = require("../controllers/kitchen.order.controller");
 
 const {
@@ -53,8 +55,14 @@ router.patch("/orders/:orderId/start-preparing", startPreparingOrder);
 // 4. Đầu bếp xác nhận món hoàn thành (PATCH)
 router.patch("/order-items/:orderItemId/ready", markItemReady);
 
+// 4.1. Đầu bếp cập nhật trạng thái từng món trong combo (PATCH)
+router.patch("/order-items/:orderItemId/combo-items/:comboItemIndex/status", updateComboItemStatus);
+
 // 5. Phân công món (PATCH)
 router.patch("/order-items/:orderItemId/assign-chef", assignChefToItem);
+
+// 5.1. Phân công đầu bếp cho từng món trong combo (PATCH)
+router.patch("/order-items/:orderItemId/combo-items/:comboItemIndex/assign-chef", assignChefToComboItem);
 
 // 6. Lấy danh sách các order
 router.get("/orders/:orderId", getOrderDetails);

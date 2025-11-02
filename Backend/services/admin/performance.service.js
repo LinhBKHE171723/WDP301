@@ -95,22 +95,65 @@ exports.getChefsPerformance = async ({ from, to }) => {
 
   const chefs = await User.find({ role: 'chef', status: 'active' }).select('name email');
 
+  // Lấy Payment model để filter theo payTime
+  const Payment = require("../../models/Payment");
+
   const performanceData = await Promise.all(
     chefs.map(async (chef) => {
+      // Cách 1: Filter theo Payment.payTime (chính xác nhất - thời gian thanh toán thực tế)
+      const paymentsInRange = await Payment.find({
+        status: 'paid',
+        payTime: { $gte: fromDate, $lte: toDate },
+      }).select('orderId');
+
+      const orderIdsFromPayments = paymentsInRange.map(p => p.orderId).filter(id => id != null);
+
+      // Cách 2: Backup - Nếu không có payTime, filter theo Order.updatedAt khi status = 'paid'
+      // Lấy các orders có status = 'paid' và updatedAt trong khoảng thời gian
+      const paidOrdersByUpdateTime = await Order.find({
+        status: 'paid',
+        updatedAt: { $gte: fromDate, $lte: toDate },
+        _id: { $nin: orderIdsFromPayments }, // Loại bỏ những orders đã có trong payments
+      }).select('_id orderItems');
+
+      // Gộp orderIds từ cả 2 nguồn
+      const allPaidOrderIds = [
+        ...orderIdsFromPayments,
+        ...paidOrdersByUpdateTime.map(o => o._id)
+      ];
+
       // Lấy các đơn hàng đã thanh toán
       const paidOrders = await Order.find({
+        _id: { $in: allPaidOrderIds },
         status: 'paid',
-        createdAt: { $gte: fromDate, $lte: toDate },
       }).select('orderItems');
 
       // Lấy tất cả _id của OrderItem trong đơn hàng
       const allOrderItemIds = paidOrders.flatMap(o => o.orderItems);
 
-      // Đếm số món đã nấu của chef đó
-      const itemsCookedCount = await OrderItem.countDocuments({
-        assignedChef: chef._id,
+      // Lấy tất cả OrderItems để duyệt và đếm
+      const allOrderItems = await OrderItem.find({
         _id: { $in: allOrderItemIds },
-      });
+      }).select('assignedChef comboItems');
+
+      let itemsCookedCount = 0;
+
+      // Đếm số món đã nấu của chef đó
+      for (const orderItem of allOrderItems) {
+        // Đếm món đơn: nếu OrderItem có assignedChef là chef này
+        if (orderItem.assignedChef && orderItem.assignedChef.toString() === chef._id.toString()) {
+          itemsCookedCount += 1;
+        }
+
+        // Đếm món trong combo: nếu có comboItems, đếm các món có assignedChef là chef này
+        if (orderItem.comboItems && Array.isArray(orderItem.comboItems) && orderItem.comboItems.length > 0) {
+          for (const comboItem of orderItem.comboItems) {
+            if (comboItem.assignedChef && comboItem.assignedChef.toString() === chef._id.toString()) {
+              itemsCookedCount += 1;
+            }
+          }
+        }
+      }
 
       // Chấm công
       const shifts = await Shift.find({

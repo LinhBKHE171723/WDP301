@@ -104,14 +104,44 @@ export default function TableDetail() {
                         </tr>
                       </thead>
                       <tbody>
-                        {order.orderItems?.map((oi) => (
-                          <tr key={oi._id}>
-                            <td>{oi.itemId?.name || "N/A"}</td>
-                            <td>{oi.quantity}</td>
-                            <td>{oi.price?.toLocaleString()}₫</td>
-                            <td>{oi.status}</td>
-                          </tr>
-                        ))}
+                        {order.orderItems?.map((oi) => {
+                          const isCombo = oi.itemType === 'menu' && oi.comboItems && oi.comboItems.length > 0;
+                          const itemName = oi.itemName || oi.itemId?.name || "N/A";
+                          return (
+                            <React.Fragment key={oi._id}>
+                              <tr>
+                                <td>
+                                  <div className="fw-semibold">
+                                    {itemName}
+                                    {isCombo && <span className="badge bg-primary ms-2">Combo</span>}
+                                  </div>
+                                </td>
+                                <td>{oi.quantity}</td>
+                                <td>{oi.price?.toLocaleString()}₫</td>
+                                <td>{oi.status}</td>
+                              </tr>
+                              {/* Hiển thị các món trong combo */}
+                              {isCombo && oi.comboItems.map((comboItem, idx) => (
+                                <tr key={`${oi._id}-combo-${idx}`} className="bg-light">
+                                  <td className="ps-4">
+                                    <small className="text-muted">└ {comboItem.itemName}</small>
+                                  </td>
+                                  <td>-</td>
+                                  <td>-</td>
+                                  <td>
+                                    <small className={`badge ${
+                                      comboItem.status === 'ready' ? 'bg-success' :
+                                      comboItem.status === 'preparing' ? 'bg-warning' :
+                                      'bg-secondary'
+                                    }`}>
+                                      {comboItem.status}
+                                    </small>
+                                  </td>
+                                </tr>
+                              ))}
+                            </React.Fragment>
+                          );
+                        })}
                       </tbody>
                     </BSTable>
                   </div>
