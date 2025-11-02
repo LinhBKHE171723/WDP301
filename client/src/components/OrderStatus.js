@@ -951,14 +951,34 @@ const OrderStatus = React.memo(({ orderId, onBack }) => {
                   </div>
                 )}
                 
-                {/* Hiển thị combo items nếu có */}
-                {orderItem.itemType === 'menu' && orderItem.comboItems && orderItem.comboItems.length > 0 ? (
-                  <div className="combo-items-container">
-                    <div className="combo-header">
-                      <span className="combo-status-label">Trạng thái từng món:</span>
+                {/* Hiển thị trạng thái cho món đơn lẻ hoặc trạng thái combo (ở ngoài) */}
+                {orderItem.itemType !== 'menu' || !orderItem.comboItems || orderItem.comboItems.length === 0 ? (
+                  /* Hiển thị status cho món đơn lẻ */
+                  orderItem.status && (
+                    <div className="item-status-single">
+                      <span className="item-status-label">Trạng thái:</span>
                       <span className={`status-badge status-${orderItem.status}`}>
                         {getItemStatusText(orderItem.status)}
                       </span>
+                    </div>
+                  )
+                ) : (
+                  /* Hiển thị trạng thái combo (ở ngoài combo items) */
+                  orderItem.status && (
+                    <div className="item-status-single">
+                      <span className="item-status-label">Trạng thái combo:</span>
+                      <span className={`status-badge status-${orderItem.status}`}>
+                        {getItemStatusText(orderItem.status)}
+                      </span>
+                    </div>
+                  )
+                )}
+                
+                {/* Hiển thị combo items nếu có */}
+                {orderItem.itemType === 'menu' && orderItem.comboItems && orderItem.comboItems.length > 0 && (
+                  <div className="combo-items-container">
+                    <div className="combo-header">
+                      <span className="combo-status-label">Trạng thái từng món:</span>
                     </div>
                     <div className="combo-items-list">
                       {orderItem.comboItems.map((comboItem, index) => (
@@ -971,15 +991,6 @@ const OrderStatus = React.memo(({ orderId, onBack }) => {
                       ))}
                     </div>
                   </div>
-                ) : (
-                  /* Hiển thị status cho món đơn lẻ */
-                  orderItem.status && (
-                    <div className="item-status-single">
-                      <span className={`status-badge status-${orderItem.status}`}>
-                        {getItemStatusText(orderItem.status)}
-                      </span>
-                    </div>
-                  )
                 )}
                 
                 {/* Nút xóa món - chỉ hiển thị khi có thể sửa đổi */}
