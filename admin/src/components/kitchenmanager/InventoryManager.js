@@ -91,10 +91,13 @@ export default function InventoryManager({ ingredients, onRefresh }) {
         quantity: amount,
         unit: selectedIng.unit,
         price,
-        supplier: "Nhập trực tiếp",
-        note: `Nhập thêm ${amount} ${selectedIng.unit} cho ${
-          selectedIng.name
-        } (giá ${price.toLocaleString("vi-VN")}₫)`,
+        expiryDate: selectedIng.expiryDate || null,
+        status: selectedIng.status || "valid",
+        note:
+          selectedIng.note?.trim() ||
+          `Nhập thêm ${amount} ${selectedIng.unit} cho ${
+            selectedIng.name
+          } (giá ${price.toLocaleString("vi-VN")}₫)`,
       });
 
       setMessage(
@@ -273,7 +276,9 @@ export default function InventoryManager({ ingredients, onRefresh }) {
               Hiện tại: {displayQuantity(selectedIng)}
             </p>
 
+            {/* FORM NHẬP HÀNG */}
             <div className="space-y-4">
+              {/* Số lượng thêm */}
               <div>
                 <label className="block font-semibold text-gray-700 mb-1">
                   Số lượng thêm
@@ -287,6 +292,7 @@ export default function InventoryManager({ ingredients, onRefresh }) {
                 />
               </div>
 
+              {/* Giá nhập */}
               <div>
                 <label className="block font-semibold text-gray-700 mb-1">
                   Giá nhập (VNĐ)
@@ -304,8 +310,66 @@ export default function InventoryManager({ ingredients, onRefresh }) {
                   placeholder="Nhập giá nhập mới..."
                 />
               </div>
+
+              {/* Ngày hết hạn */}
+              <div>
+                <label className="block font-semibold text-gray-700 mb-1">
+                  Ngày hết hạn (nếu có)
+                </label>
+                <input
+                  type="date"
+                  value={selectedIng.expiryDate || ""}
+                  onChange={(e) =>
+                    setSelectedIng({
+                      ...selectedIng,
+                      expiryDate: e.target.value,
+                    })
+                  }
+                  className="w-full border rounded-lg px-4 py-2 focus:ring-2 focus:ring-blue-400 outline-none"
+                />
+              </div>
+
+              {/* Trạng thái */}
+              <div>
+                <label className="block font-semibold text-gray-700 mb-1">
+                  Trạng thái lô hàng
+                </label>
+                <select
+                  value={selectedIng.status || "valid"}
+                  onChange={(e) =>
+                    setSelectedIng({
+                      ...selectedIng,
+                      status: e.target.value,
+                    })
+                  }
+                  className="w-full border rounded-lg px-4 py-2 focus:ring-2 focus:ring-blue-400 outline-none"
+                >
+                  <option value="valid">✅ Còn hạn (valid)</option>
+                  <option value="expired">⚠️ Hết hạn (expired)</option>
+                </select>
+              </div>
+
+              {/* Ghi chú */}
+              <div>
+                <label className="block font-semibold text-gray-700 mb-1">
+                  Ghi chú
+                </label>
+                <textarea
+                  rows={2}
+                  value={selectedIng.note || ""}
+                  onChange={(e) =>
+                    setSelectedIng({
+                      ...selectedIng,
+                      note: e.target.value,
+                    })
+                  }
+                  className="w-full border rounded-lg px-4 py-2 focus:ring-2 focus:ring-blue-400 outline-none"
+                  placeholder="Ví dụ: Nhập trực tiếp, nhà cung cấp A, lô mới..."
+                />
+              </div>
             </div>
 
+            {/* Nút hành động */}
             <div className="flex justify-end space-x-3 mt-6">
               <button
                 onClick={() => setSelectedIng(null)}
