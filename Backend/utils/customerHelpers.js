@@ -296,10 +296,10 @@ const returnIngredientsToStock = async (orderItem) => {
 
     // Xử lý combo (itemType === 'menu' và có comboItems)
     if (populatedOrderItem.itemType === 'menu' && populatedOrderItem.comboItems && populatedOrderItem.comboItems.length > 0) {
-      // Hoàn nguyên liệu cho từng comboItem chưa phục vụ
+      // Hoàn nguyên liệu cho từng comboItem còn PENDING (chưa bắt đầu nấu)
       for (const comboItem of populatedOrderItem.comboItems) {
-        // Chỉ hoàn nguyên liệu cho comboItem chưa được phục vụ
-        if (comboItem.status && comboItem.status !== 'served' && comboItem.status !== 'cancelled') {
+        // Chỉ hoàn nguyên liệu cho comboItem còn pending (chưa bắt đầu nấu)
+        if (comboItem.status === 'pending') {
           const item = await Item.findById(comboItem.itemId).populate('ingredients.ingredient');
           if (item && item.ingredients) {
             // Số lượng mỗi comboItem = orderItem.quantity (mỗi combo có bao nhiêu phần comboItem)
@@ -315,7 +315,7 @@ const returnIngredientsToStock = async (orderItem) => {
                   const quantityToReturn = comboItemQuantity * ing.quantity;
                   ingredient.stockQuantity = (ingredient.stockQuantity || 0) + quantityToReturn;
                   await ingredient.save();
-                  console.log(`✅ Đã hoàn ${quantityToReturn} ${ingredient.unit} của ${ingredient.name} từ comboItem ${comboItem.itemName} (tổng kho: ${ingredient.stockQuantity})`);
+                  console.log(`✅ Đã hoàn ${quantityToReturn} ${ingredient.unit} của ${ingredient.name} từ comboItem ${comboItem.itemName} (pending, tổng kho: ${ingredient.stockQuantity})`);
                 } else {
                   console.warn(`⚠️ Không tìm thấy nguyên liệu với ID: ${ingredientId} để hoàn lại từ comboItem`);
                 }
@@ -354,37 +354,63 @@ const returnIngredientsForUnservedItems = async (order) => {
     const populatedOrderItems = await OrderItem.find({ _id: { $in: orderItemIds } });
     
     for (const orderItem of populatedOrderItems) {
-      // Kiểm tra orderItem chưa được phục vụ
-      if (orderItem.status !== 'served') {
-        // Hoàn nguyên liệu cho orderItem chưa phục vụ (bao gồm cả comboItems nếu có)
-        // Gọi trực tiếp returnIngredientsToStock để tránh circular dependency
-        await returnIngredientsToStock(orderItem);
-        
-        // Đặt status thành cancelled
-        orderItem.status = 'cancelled';
-        
-        // Đặt tất cả comboItems chưa served thành cancelled
+      // Chỉ hoàn nguyên liệu cho món còn PENDING (chưa bắt đầu nấu)
+      // Món đã preparing, ready, hoặc served thì không hoàn vì nguyên liệu đã được sử dụng
+      if (orderItem.status === 'pending') {
+        // Kiểm tra nếu là combo và có comboItem đã served
+        let hasServedComboItem = false;
         if (orderItem.comboItems && orderItem.comboItems.length > 0) {
-          for (let i = 0; i < orderItem.comboItems.length; i++) {
-            if (orderItem.comboItems[i].status !== 'served') {
-              orderItem.comboItems[i].status = 'cancelled';
+          for (const comboItem of orderItem.comboItems) {
+            if (comboItem.status === 'served') {
+              hasServedComboItem = true;
+              break;
             }
           }
         }
         
-        await orderItem.save();
-        console.log(`🔄 Đã đặt OrderItem ${orderItem._id} thành cancelled và hoàn nguyên liệu`);
-      } else {
-        // Nếu orderItem đã served nhưng có comboItems chưa served, chỉ xử lý comboItems
-        if (orderItem.comboItems && orderItem.comboItems.length > 0) {
-          let hasUnservedComboItem = false;
+        // Nếu combo có comboItem đã served, combo status phải là served
+        if (hasServedComboItem) {
+          orderItem.status = 'served';
+          console.log(`🔄 Đã đặt combo status thành 'served' vì có comboItem đã được phục vụ (orderItem ban đầu là pending)`);
+        } else {
+          // Hoàn nguyên liệu cho orderItem còn pending (bao gồm cả comboItems nếu có)
+          await returnIngredientsToStock(orderItem);
           
-          // Hoàn nguyên liệu cho từng comboItem chưa served
+          // Đặt status thành cancelled
+          orderItem.status = 'cancelled';
+          
+          // Đặt tất cả comboItems còn pending thành cancelled
+          if (orderItem.comboItems && orderItem.comboItems.length > 0) {
+            for (let i = 0; i < orderItem.comboItems.length; i++) {
+              if (orderItem.comboItems[i].status === 'pending') {
+                orderItem.comboItems[i].status = 'cancelled';
+              }
+            }
+          }
+          console.log(`🔄 Đã đặt OrderItem ${orderItem._id} (pending) thành cancelled và hoàn nguyên liệu`);
+        }
+        
+        await orderItem.save();
+      } else if (orderItem.status !== 'served' && orderItem.status !== 'cancelled') {
+        // Nếu orderItem đã preparing/ready nhưng có comboItems còn pending, chỉ xử lý comboItems pending
+        if (orderItem.comboItems && orderItem.comboItems.length > 0) {
+          let hasPendingComboItem = false;
+          let hasServedComboItem = false;
+          
+          // Kiểm tra xem có comboItem nào đã served không
+          for (const comboItem of orderItem.comboItems) {
+            if (comboItem.status === 'served') {
+              hasServedComboItem = true;
+              break;
+            }
+          }
+          
+          // Hoàn nguyên liệu cho từng comboItem còn pending
           for (let i = 0; i < orderItem.comboItems.length; i++) {
             const comboItem = orderItem.comboItems[i];
             
-            if (comboItem.status !== 'served' && comboItem.status !== 'cancelled') {
-              hasUnservedComboItem = true;
+            if (comboItem.status === 'pending') {
+              hasPendingComboItem = true;
               
               // Hoàn nguyên liệu cho comboItem này
               const item = await Item.findById(comboItem.itemId).populate('ingredients.ingredient');
@@ -401,7 +427,7 @@ const returnIngredientsForUnservedItems = async (order) => {
                       const quantityToReturn = comboItemQuantity * ing.quantity;
                       ingredient.stockQuantity = (ingredient.stockQuantity || 0) + quantityToReturn;
                       await ingredient.save();
-                      console.log(`✅ Đã hoàn ${quantityToReturn} ${ingredient.unit} của ${ingredient.name} từ comboItem ${comboItem.itemName || comboItem.itemId}`);
+                      console.log(`✅ Đã hoàn ${quantityToReturn} ${ingredient.unit} của ${ingredient.name} từ comboItem ${comboItem.itemName || comboItem.itemId} (pending)`);
                     }
                   }
                 }
@@ -412,19 +438,85 @@ const returnIngredientsForUnservedItems = async (order) => {
             }
           }
           
-          if (hasUnservedComboItem) {
+          // Nếu có comboItem đã served, combo status phải là served
+          if (hasServedComboItem && orderItem.status !== 'served') {
+            orderItem.status = 'served';
+            console.log(`🔄 Đã đặt combo status thành 'served' vì có comboItem đã được phục vụ`);
+          }
+          
+          if (hasPendingComboItem || hasServedComboItem) {
             await orderItem.save();
-            console.log(`🔄 Đã hoàn nguyên liệu và đặt comboItems chưa phục vụ của OrderItem ${orderItem._id} thành cancelled`);
+            if (hasPendingComboItem) {
+              console.log(`🔄 Đã hoàn nguyên liệu và đặt comboItems pending của OrderItem ${orderItem._id} thành cancelled`);
+            }
           }
         }
       }
     }
     
-    console.log(`✅ Đã hoàn tất việc hoàn nguyên liệu và đặt status cancelled cho các món chưa phục vụ`);
+    console.log(`✅ Đã hoàn tất việc hoàn nguyên liệu và đặt status cancelled cho các món còn pending`);
   } catch (error) {
     console.error(`❌ Lỗi khi hoàn nguyên liệu cho order:`, error);
     throw error;
   }
+};
+
+/**
+ * Tự động cập nhật status của combo (orderItem) dựa trên status của comboItems
+ * Logic:
+ * - Nếu có comboItem nào = 'preparing', thì combo = 'preparing'
+ * - Nếu có comboItem nào = 'ready' (và không có comboItem nào đang preparing), thì combo = 'ready'
+ * - Nếu tất cả comboItems = 'served', thì combo = 'served'
+ * - Nếu tất cả comboItems = 'pending', thì combo = 'pending'
+ * @param {Object} orderItem - OrderItem object có comboItems
+ * @returns {String|null} - Status mới của orderItem (null nếu không cần update)
+ */
+const updateComboStatusBasedOnComboItems = (orderItem) => {
+  if (!orderItem || !orderItem.comboItems || orderItem.comboItems.length === 0) {
+    return null;
+  }
+
+  // Đếm số lượng comboItems theo từng status
+  const statusCounts = {
+    pending: 0,
+    preparing: 0,
+    ready: 0,
+    served: 0,
+    cancelled: 0
+  };
+
+  for (const comboItem of orderItem.comboItems) {
+    const status = comboItem.status || 'pending';
+    if (statusCounts.hasOwnProperty(status)) {
+      statusCounts[status]++;
+    }
+  }
+
+  const totalComboItems = orderItem.comboItems.length;
+
+  // Nếu tất cả đều served, combo = served
+  if (statusCounts.served === totalComboItems) {
+    return orderItem.status !== 'served' ? 'served' : null;
+  }
+
+  // Nếu có comboItem nào đang preparing, combo = preparing
+  if (statusCounts.preparing > 0) {
+    return orderItem.status !== 'preparing' ? 'preparing' : null;
+  }
+
+  // Nếu có comboItem nào ready (và không có preparing), combo = ready
+  if (statusCounts.ready > 0) {
+    return orderItem.status !== 'ready' ? 'ready' : null;
+  }
+
+  // Nếu tất cả đều pending, combo = pending
+  if (statusCounts.pending === totalComboItems) {
+    return orderItem.status !== 'pending' ? 'pending' : null;
+  }
+
+  // Trường hợp hỗn hợp: có pending và cancelled (nhưng không có preparing/ready/served)
+  // Giữ nguyên status hiện tại hoặc chuyển về pending nếu cần
+  return null;
 };
 
 module.exports = {
@@ -434,6 +526,7 @@ module.exports = {
   calculateExpense,
   deductIngredientsFromStock,
   returnIngredientsToStock,
-  returnIngredientsForUnservedItems
+  returnIngredientsForUnservedItems,
+  updateComboStatusBasedOnComboItems
 };
 
