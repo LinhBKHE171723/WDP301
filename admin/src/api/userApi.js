@@ -9,6 +9,8 @@ const userApi = {
         const res = await Client.put("user/updateProfile", data, config);
         return res; // chứa user và token
     },
+    ForgotPassword: (email) => Client.post("user/forgotPassword", { email }),
+    ResetPassword: (email, tempPassword, newPassword) => Client.post("user/resetPassword", { email, tempPassword, newPassword }),
 };
 
 export default userApi;
