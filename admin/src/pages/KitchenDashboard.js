@@ -112,9 +112,18 @@ export default function KitchenDashboard() {
 
   // ✅ Format order từ WebSocket để match với format từ API
   const formatOrderFromWebSocket = (rawOrder) => {
-    // Nếu order đã được format (có items), return ngay
+    // Nếu order đã được format (có items), đảm bảo items có đầy đủ thông tin
     if (rawOrder.items && Array.isArray(rawOrder.items)) {
-      return rawOrder;
+      // Đảm bảo mỗi item có itemType và comboItems
+      const normalizedItems = rawOrder.items.map((item) => ({
+        ...item,
+        itemType: item.itemType || (item.itemId?.type ? 'menu' : 'item'),
+        comboItems: item.comboItems || [],
+      }));
+      return {
+        ...rawOrder,
+        items: normalizedItems,
+      };
     }
 
     // Nếu là raw order từ WebSocket (có orderItems), format lại
@@ -145,10 +154,18 @@ export default function KitchenDashboard() {
 
         return {
           orderItemId: orderItem._id,
-          itemName: orderItem.itemId?.name || "Món đã xóa",
+          itemName: orderItem.itemName || orderItem.itemId?.name || "Món đã xóa",
           quantity: orderItem.quantity,
           note: orderItem.note,
           status: orderItem.status,
+          itemType: orderItem.itemType, // 'item' hoặc 'menu'
+          comboItems: (orderItem.comboItems || []).map((ci) => ({
+            ...ci,
+            // Xử lý assignedChef cho comboItem - có thể là object hoặc ObjectId
+            assignedChef: ci.assignedChef && typeof ci.assignedChef === 'object' && ci.assignedChef.name 
+              ? ci.assignedChef 
+              : (ci.assignedChef || null),
+          })), // Mảng các món trong combo nếu có
           chef: chefName,
         };
       }),
@@ -167,11 +184,18 @@ export default function KitchenDashboard() {
             // Chỉ update orders có status confirmed
             if (lastMessage.data.status === "confirmed") {
               const formattedOrder = formatOrderFromWebSocket(lastMessage.data);
+              console.log('📦 Formatted order with comboItems:', formattedOrder);
               setOrders((prevOrders) => {
                 if (!Array.isArray(prevOrders)) return [formattedOrder];
-                return prevOrders.map((order) =>
+                const updated = prevOrders.map((order) =>
                   order._id === formattedOrder._id ? formattedOrder : order
                 );
+                // Nếu order không tồn tại trong danh sách, thêm vào
+                const exists = updated.some(o => o._id === formattedOrder._id);
+                if (!exists) {
+                  return [...prevOrders, formattedOrder];
+                }
+                return updated;
               });
               console.log('✅ Updated order in queue:', formattedOrder._id);
             } else {

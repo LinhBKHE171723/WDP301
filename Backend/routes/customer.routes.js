@@ -18,6 +18,7 @@ const {
   canFeedback,
   confirmOrder,
   updateOrderItemStatus,
+  updateComboItemStatus,
   getLatestOrder,
   testUpdateOrderItemStatus,
   startEditOrder
@@ -77,6 +78,9 @@ router.post("/orders/:orderId/feedback", createFeedback);
 
 // 14. Cập nhật trạng thái món ăn trong đơn hàng
 router.put("/order-items/:orderItemId/status", updateOrderItemStatus);
+
+// 14.1. Cập nhật trạng thái từng món trong combo
+router.put("/order-items/:orderItemId/combo-items/:comboItemIndex/status", updateComboItemStatus);
 
 // 15. Test endpoint để update order item status (cho testing)
 router.put("/orders/:orderId/test-update-item-status", testUpdateOrderItemStatus);

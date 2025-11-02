@@ -59,6 +59,24 @@ export default function OrderDetails({
     }
   };
 
+  // Hàm xử lý khi nhấn nút "Hoàn thành" cho từng món trong combo
+  const handleMarkComboItemAsReady = async (orderItemId, comboItemIndex) => {
+    setLoading(true);
+    try {
+      // 1. Gọi API để update status của combo item
+      await kitchenApi.updateComboItemStatus(orderItemId, comboItemIndex, "ready");
+      toast.success("Đã hoàn thành món trong combo!");
+
+      // 2. Refresh order data (sẽ được cập nhật qua WebSocket hoặc refetch)
+      // Tạm thời chỉ thông báo, WebSocket sẽ tự động cập nhật
+    } catch (err) {
+      console.error("Lỗi khi hoàn thành món trong combo:", err);
+      toast.error("Không thể hoàn thành món. Vui lòng thử lại.");
+    } finally {
+      setLoading(false);
+    }
+  };
+
   if (!selectedOrder) {
     return (
       <div className="col-span-7 bg-white rounded-xl shadow-lg p-6 flex flex-col items-center justify-center h-96 text-gray-500">
@@ -122,71 +140,155 @@ export default function OrderDetails({
               quantity: item.quantity,
               note: item.note,
               status: item.status,
+              itemType: item.itemType,
+              comboItems: item.comboItems || [],
               chef: item.chef || (item.assignedChef?.name) || item.assignedChef
             };
+            
+            const isCombo = normalizedItem.itemType === 'menu' && normalizedItem.comboItems.length > 0;
             
             return (
             <div
               key={normalizedItem.orderItemId}
-              className="p-4 border rounded-lg bg-gray-50 flex items-start justify-between space-x-4"
+              className="p-4 border rounded-lg bg-gray-50"
             >
-              {/* Phần thông tin (bên trái) */}
-              <div className="flex-grow">
-                <h4 className="font-semibold text-lg text-gray-900">
-                  {normalizedItem.itemName} (x{normalizedItem.quantity})
-                </h4>
+              {/* Header cho combo hoặc món đơn */}
+              <div className="flex items-start justify-between space-x-4">
+                {/* Phần thông tin (bên trái) */}
+                <div className="flex-grow">
+                  <h4 className="font-semibold text-lg text-gray-900">
+                    {normalizedItem.itemName} {isCombo && <span className="text-sm text-blue-600">(Combo)</span>} (x{normalizedItem.quantity})
+                  </h4>
 
-                {normalizedItem.note && (
-                  <p className="text-sm italic text-red-600 font-medium">
-                    Ghi chú: {normalizedItem.note}
-                  </p>
-                )}
-
-                {/* HIỂN THỊ TÊN CHEF */}
-                {normalizedItem.chef ? (
-                  <p className="text-sm text-blue-600 font-medium mt-1">
-                    👨‍🍳 Bếp phụ trách: {normalizedItem.chef}
-                  </p>
-                ) : (
-                  normalizedItem.status === "pending" && (
-                    <p className="text-sm text-gray-500 italic mt-1">
-                      (Chưa giao bếp)
+                  {normalizedItem.note && (
+                    <p className="text-sm italic text-red-600 font-medium">
+                      Ghi chú: {normalizedItem.note}
                     </p>
-                  )
+                  )}
+
+                  {/* HIỂN THỊ TÊN CHEF */}
+                  {normalizedItem.chef ? (
+                    <p className="text-sm text-blue-600 font-medium mt-1">
+                      👨‍🍳 Bếp phụ trách: {normalizedItem.chef}
+                    </p>
+                  ) : (
+                    normalizedItem.status === "pending" && (
+                      <p className="text-sm text-gray-500 italic mt-1">
+                        (Chưa giao bếp)
+                      </p>
+                    )
+                  )}
+                </div>
+
+                {/* Phần trạng thái/hành động (bên phải) - chỉ cho món đơn lẻ */}
+                {!isCombo && (
+                  <div className="flex-shrink-0 flex flex-col items-end min-w-[100px]">
+                    {normalizedItem.status === "pending" && (
+                      <button
+                        onClick={() => {
+                          setCurrentItem(normalizedItem.orderItemId);
+                          setShowChefModal(true);
+                        }}
+                        className="bg-orange-500 hover:bg-orange-600 text-white px-3 py-1 rounded text-sm font-medium transition-colors"
+                      >
+                        Giao Bếp
+                      </button>
+                    )}
+
+                    {/* NÚT HOÀN THÀNH */}
+                    {normalizedItem.status === "preparing" && (
+                      <button
+                        onClick={() => handleMarkAsReady(normalizedItem.orderItemId)}
+                        disabled={loading}
+                        className="bg-green-500 hover:bg-green-600 text-white px-3 py-1 rounded text-sm font-medium transition-colors disabled:bg-gray-400"
+                      >
+                        {loading ? "..." : "Hoàn thành"}
+                      </button>
+                    )}
+
+                    {normalizedItem.status === "ready" && (
+                      <span className="text-green-700 font-medium text-sm px-3 py-1 bg-green-100 rounded-full">
+                        ✅ Sẵn sàng
+                      </span>
+                    )}
+                  </div>
                 )}
               </div>
 
-              {/* Phần trạng thái/hành động (bên phải) */}
-              <div className="flex-shrink-0 flex flex-col items-end min-w-[100px]">
-                {normalizedItem.status === "pending" && (
-                  <button
-                    onClick={() => {
-                      setCurrentItem(normalizedItem.orderItemId);
-                      setShowChefModal(true);
-                    }}
-                    className="bg-orange-500 hover:bg-orange-600 text-white px-3 py-1 rounded text-sm font-medium transition-colors"
-                  >
-                    Giao Bếp
-                  </button>
-                )}
-
-                {/* NÚT HOÀN THÀNH */}
-                {normalizedItem.status === "preparing" && (
-                  <button
-                    onClick={() => handleMarkAsReady(normalizedItem.orderItemId)}
-                    disabled={loading}
-                    className="bg-green-500 hover:bg-green-600 text-white px-3 py-1 rounded text-sm font-medium transition-colors disabled:bg-gray-400"
-                  >
-                    {loading ? "..." : "Hoàn thành"}
-                  </button>
-                )}
-
-                {normalizedItem.status === "ready" && (
-                  <span className="text-green-700 font-medium text-sm px-3 py-1 bg-green-100 rounded-full">
-                    ✅ Sẵn sàng
-                  </span>
-                )}
-              </div>
+              {/* Hiển thị combo items nếu là combo */}
+              {isCombo && (
+                <div className="mt-4 pt-4 border-t border-gray-300">
+                  <p className="text-sm font-medium text-gray-700 mb-2">Các món trong combo:</p>
+                  <div className="space-y-2">
+                    {normalizedItem.comboItems.map((comboItem, index) => (
+                      <div key={index} className="flex items-center justify-between p-2 bg-white rounded border border-gray-200">
+                        <div className="flex-grow">
+                          <span className="text-sm text-gray-800">{comboItem.itemName}</span>
+                          <span className={`ml-2 text-xs px-2 py-1 rounded ${
+                            comboItem.status === 'ready' ? 'bg-green-100 text-green-700' :
+                            comboItem.status === 'preparing' ? 'bg-yellow-100 text-yellow-700' :
+                            'bg-gray-100 text-gray-600'
+                          }`}>
+                            {comboItem.status === 'ready' ? '✅ Sẵn sàng' :
+                             comboItem.status === 'preparing' ? '🔄 Đang làm' :
+                             '⏳ Chờ'}
+                          </span>
+                          {/* Hiển thị chef đã được gán cho món này */}
+                          {comboItem.assignedChef && (
+                            <div className="mt-1 text-xs text-blue-600">
+                              👨‍🍳 {typeof comboItem.assignedChef === 'object' ? comboItem.assignedChef.name : comboItem.assignedChef}
+                            </div>
+                          )}
+                        </div>
+                        <div className="flex items-center gap-2">
+                          {/* Nút Giao Bếp cho từng món trong combo */}
+                          {comboItem.status === "pending" && (
+                            <button
+                              onClick={() => {
+                                // Truyền orderItemId và comboItemIndex để biết giao món nào
+                                setCurrentItem({
+                                  orderItemId: normalizedItem.orderItemId,
+                                  comboItemIndex: index,
+                                  comboItemName: comboItem.itemName
+                                });
+                                setShowChefModal(true);
+                              }}
+                              className="bg-orange-500 hover:bg-orange-600 text-white px-2 py-1 rounded text-xs font-medium transition-colors"
+                            >
+                              Giao Bếp
+                            </button>
+                          )}
+                          {/* Nút Hoàn thành cho từng món trong combo */}
+                          {comboItem.status === "preparing" && (
+                            <button
+                              onClick={() => handleMarkComboItemAsReady(normalizedItem.orderItemId, index)}
+                              disabled={loading}
+                              className="bg-green-500 hover:bg-green-600 text-white px-2 py-1 rounded text-xs font-medium transition-colors disabled:bg-gray-400"
+                            >
+                              {loading ? "..." : "Hoàn thành"}
+                            </button>
+                          )}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                  {/* Trạng thái tổng thể của combo */}
+                  <div className="mt-3 pt-2 border-t border-gray-300">
+                    <div className="flex items-center justify-between">
+                      <span className="text-sm font-medium text-gray-700">Trạng thái combo:</span>
+                      <span className={`text-sm px-3 py-1 rounded font-medium ${
+                        normalizedItem.status === 'ready' ? 'bg-green-100 text-green-700' :
+                        normalizedItem.status === 'preparing' ? 'bg-yellow-100 text-yellow-700' :
+                        'bg-gray-100 text-gray-600'
+                      }`}>
+                        {normalizedItem.status === 'ready' ? '✅ Sẵn sàng' :
+                         normalizedItem.status === 'preparing' ? '🔄 Đang làm' :
+                         '⏳ Chờ'}
+                      </span>
+                    </div>
+                  </div>
+                </div>
+              )}
             </div>
             );
           })}

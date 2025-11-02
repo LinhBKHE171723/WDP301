@@ -87,11 +87,27 @@ export default function OrderCard({
 
           {/* Danh sách món ăn */}
           <ul className="mb-3 ps-3">
-            {orderItems?.map((item) => (
-              <li key={item._id} className="small text-dark">
-                {item.itemName} × {item.quantity}
-              </li>
-            ))}
+            {orderItems?.map((item) => {
+              const isCombo = item.itemType === 'menu' && item.comboItems && item.comboItems.length > 0;
+              return (
+                <li key={item._id} className="small text-dark mb-2">
+                  <div className="fw-semibold">
+                    {item.itemName || item.itemId?.name || "Món đã xóa"} × {item.quantity}
+                    {isCombo && <span className="text-primary ms-1">(Combo)</span>}
+                  </div>
+                  {/* Hiển thị các món trong combo */}
+                  {isCombo && (
+                    <ul className="ps-3 mt-1 mb-0" style={{ fontSize: '0.85em' }}>
+                      {item.comboItems.map((comboItem, idx) => (
+                        <li key={idx} className="text-muted">
+                          • {comboItem.itemName}
+                        </li>
+                      ))}
+                    </ul>
+                  )}
+                </li>
+              );
+            })}
           </ul>
 
           {/* ✅ Chọn bàn phục vụ (chỉ hiện khi isPending) */}

@@ -145,7 +145,7 @@ const createOrderItemsFromCart = async (orderItems) => {
 
     // Tạo OrderItem với số lượng được yêu cầu
     const OrderItem = require("../models/OrderItem");
-    const newOrderItem = new OrderItem({
+    const newOrderItemData = {
       orderId: null, // Sẽ được cập nhật sau khi tạo Order
       itemId: orderItem.itemId,
       itemName: item.name,
@@ -155,8 +155,27 @@ const createOrderItemsFromCart = async (orderItems) => {
       expense: expense, // Giá vốn tại thời điểm đặt món
       status: "pending", // Đảm bảo status là pending
       note: orderItem.note || "",
-    });
+    };
 
+    // Nếu là combo (menu với type === 'combo'), tạo comboItems
+    if (orderItem.type === 'menu' && item.type === 'combo' && item.items && item.items.length > 0) {
+      // Populate items để lấy thông tin từng món
+      const comboItemsData = [];
+      for (const comboItemId of item.items) {
+        const comboItem = await Item.findById(comboItemId);
+        if (comboItem) {
+          comboItemsData.push({
+            itemId: comboItem._id,
+            itemName: comboItem.name,
+            status: "pending",
+            assignedChef: null,
+          });
+        }
+      }
+      newOrderItemData.comboItems = comboItemsData;
+    }
+
+    const newOrderItem = new OrderItem(newOrderItemData);
     await newOrderItem.save();
     createdOrderItems.push(newOrderItem._id);
     totalAmount += item.price * orderItem.quantity; // Tính tổng tiền theo số lượng

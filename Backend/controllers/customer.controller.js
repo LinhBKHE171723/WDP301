@@ -500,7 +500,7 @@ exports.addItemsToOrder = async (req, res) => {
       const expense = await calculateExpense(item, orderItem.type);
 
       // Tạo OrderItem với số lượng được yêu cầu
-      const newOrderItem = new OrderItem({
+      const newOrderItemData = {
         orderId: orderId,
         itemId: orderItem.itemId,
         itemName: item.name,
@@ -510,8 +510,26 @@ exports.addItemsToOrder = async (req, res) => {
         expense: expense, // Giá vốn tại thời điểm đặt món
         status: "pending",
         note: orderItem.note || "",
-      });
+      };
 
+      // Nếu là combo (menu với type === 'combo'), tạo comboItems
+      if (orderItem.type === 'menu' && item.type === 'combo' && item.items && item.items.length > 0) {
+        const comboItemsData = [];
+        for (const comboItemId of item.items) {
+          const comboItem = await Item.findById(comboItemId);
+          if (comboItem) {
+            comboItemsData.push({
+              itemId: comboItem._id,
+              itemName: comboItem.name,
+              status: "pending",
+              assignedChef: null,
+            });
+          }
+        }
+        newOrderItemData.comboItems = comboItemsData;
+      }
+
+      const newOrderItem = new OrderItem(newOrderItemData);
       await newOrderItem.save();
       createdOrderItems.push(newOrderItem._id);
       additionalAmount += item.price * orderItem.quantity; // Tính tổng tiền theo số lượng
@@ -1086,6 +1104,98 @@ exports.updateOrderItemStatus = async (req, res) => {
       message: "Cập nhật trạng thái món ăn thành công",
       data: {
         orderItem: orderItem,
+        order: order
+      }
+    });
+  } catch (error) {
+    res.status(500).json({ 
+      success: false, 
+      message: error.message 
+    });
+  }
+};
+
+// Update combo item status (từng món trong combo)
+exports.updateComboItemStatus = async (req, res) => {
+  try {
+    const { orderItemId, comboItemIndex } = req.params;
+    const { status } = req.body;
+
+    // Validate status
+    const validStatuses = ['pending', 'preparing', 'ready', 'served'];
+    if (!validStatuses.includes(status)) {
+      return res.status(400).json({
+        success: false,
+        message: "Trạng thái không hợp lệ"
+      });
+    }
+
+    // Find order item
+    const orderItem = await OrderItem.findById(orderItemId);
+    if (!orderItem) {
+      return res.status(404).json({
+        success: false,
+        message: "Không tìm thấy món ăn trong đơn hàng"
+      });
+    }
+
+    // Check if orderItem has comboItems
+    if (!orderItem.comboItems || orderItem.comboItems.length === 0) {
+      return res.status(400).json({
+        success: false,
+        message: "Món ăn này không phải là combo hoặc không có món con"
+      });
+    }
+
+    // Validate comboItemIndex
+    const index = parseInt(comboItemIndex);
+    if (isNaN(index) || index < 0 || index >= orderItem.comboItems.length) {
+      return res.status(400).json({
+        success: false,
+        message: "Index món con không hợp lệ"
+      });
+    }
+
+    // Update combo item status
+    orderItem.comboItems[index].status = status;
+    await orderItem.save();
+
+    // Find and populate order
+    let order;
+    if (!orderItem.orderId) {
+      order = await Order.findOne({ orderItems: orderItemId })
+        .populate("orderItems")
+        .populate("tableId")
+        .populate("paymentId");
+    } else {
+      order = await Order.findById(orderItem.orderId)
+        .populate("orderItems")
+        .populate("tableId")
+        .populate("paymentId");
+    }
+
+    if (!order) {
+      return res.status(404).json({
+        success: false,
+        message: "Không tìm thấy đơn hàng"
+      });
+    }
+
+    // Emit WebSocket event để cập nhật real-time
+    const webSocketService = req.app.get("webSocketService");
+    if (webSocketService) {
+      webSocketService.broadcastToOrder(order._id, "order:item_updated", {
+        orderItem: orderItem,
+        order: order
+      });
+    }
+
+    res.status(200).json({
+      success: true,
+      message: "Cập nhật trạng thái món trong combo thành công",
+      data: {
+        orderItem: orderItem,
+        comboItem: orderItem.comboItems[index],
         order: order
       }
     });
