@@ -72,7 +72,9 @@ export function FeedbackTable() {
     return feedbacks.filter((f) => {
       const customerName = f?.userId?.name || "Guest";
       const staffName = f?.orderId?.servedBy?.name || "";
-      const text = `${customerName} ${staffName} ${f?.comment || ""}`.toLowerCase();
+      const text = `${customerName} ${staffName} ${
+        f?.comment || ""
+      }`.toLowerCase();
       const matchSearch = text.includes(search.toLowerCase());
       const matchRating =
         ratingFilter === "all" || Number(f?.rating) === Number(ratingFilter);
@@ -153,7 +155,10 @@ export function FeedbackTable() {
                 const rating = fb?.rating || 0;
 
                 return (
-                  <tr key={id} className="border-b last:border-0 hover:bg-gray-50">
+                  <tr
+                    key={id}
+                    className="border-b last:border-0 hover:bg-gray-50"
+                  >
                     <td className="p-3 font-medium">{customer}</td>
                     <td className="p-3">
                       {staff}
@@ -208,7 +213,9 @@ export function FeedbackTable() {
                                   <thead>
                                     <tr className="bg-gray-50 border-b">
                                       <th className="text-left p-2">Món ăn</th>
-                                      <th className="text-left p-2">Số lượng</th>
+                                      <th className="text-left p-2">
+                                        Số lượng
+                                      </th>
                                       <th className="text-left p-2">Đầu bếp</th>
                                     </tr>
                                   </thead>
@@ -236,7 +243,10 @@ export function FeedbackTable() {
                           </div>
 
                           <DialogFooter>
-                            <Button variant="outline" onClick={() => setOpenRow(null)}>
+                            <Button
+                              variant="outline"
+                              onClick={() => setOpenRow(null)}
+                            >
                               Đóng
                             </Button>
                           </DialogFooter>

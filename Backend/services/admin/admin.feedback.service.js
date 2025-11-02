@@ -22,14 +22,8 @@ exports.getAll = async ({ page = 1, limit = 10, rating, search }) => {
         {
           path: "orderItems",
           populate: [
-            {
-              path: "itemId",
-              select: "name price image",
-            },
-            {
-              path: "assignedChef",
-              select: "name role",
-            },
+            { path: "itemId", select: "name price" },
+            { path: "assignedChef", select: "name role" },
           ],
         },
       ],
@@ -47,6 +41,7 @@ exports.getAll = async ({ page = 1, limit = 10, rating, search }) => {
     feedbacks,
   };
 };
+
 
 exports.getOne = async (id) => {
   return await Feedback.findById(id)
