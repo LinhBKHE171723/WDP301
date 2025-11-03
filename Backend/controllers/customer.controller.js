@@ -419,9 +419,14 @@ exports.getOrderById = async (req, res) => {
     const { orderId } = req.params;
     const order = await Order.findById(orderId)
       .populate('tableId', 'tableNumber')
-      .populate('orderItems')
-      .populate('paymentId')
-      .populate('servedBy', 'name email');
+      .populate({
+        path: 'orderItems',
+        populate: {
+          path: 'servedBy',
+          select: 'name username email'
+        }
+      })
+      .populate('paymentId');
 
     if (!order) {
       return res.status(404).json({
@@ -1422,9 +1427,8 @@ exports.startEditOrder = async (req, res) => {
       }
     }
 
-    // Xóa tableId và servedBy khỏi order
+    // Xóa tableId khỏi order
     order.tableId = null;
-    order.servedBy = null;
     
     // Reset waiterResponse về pending - nhưng chỉ khi order chưa được confirmed
     // Nếu order đã được confirmed, giữ nguyên status để không xuất hiện lại trong pending list

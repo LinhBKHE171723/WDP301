@@ -14,7 +14,6 @@ export default function TableMap() {
 
   const [filterStatus, setFilterStatus] = useState("all");
   const [filterOrderStatus, setFilterOrderStatus] = useState("all");
-  const [filterWaiter, setFilterWaiter] = useState("all");
 
   const navigate = useNavigate();
 
@@ -50,24 +49,11 @@ export default function TableMap() {
       );
     }
 
-    // Lọc theo tên nhân viên phục vụ
-    if (filterWaiter !== "all") {
-      filtered = filtered.filter((t) => 
-        t.orderNow && t.orderNow.some(order => order.servedBy?.name === filterWaiter)
-      );
-    }
+    // Bỏ filter theo waiter vì mỗi order có thể có nhiều waiter phục vụ các món khác nhau
+    // (Filter này không còn phù hợp với cấu trúc mới)
 
     setFilteredTables(filtered);
-  }, [filterStatus, filterOrderStatus, filterWaiter, tables]);
-
-  // Lấy danh sách tên nhân viên phục vụ có trong dữ liệu
-  const waiterNames = [
-    ...new Set(
-      tables
-        .filter((t) => t.orderNow && t.orderNow.length > 0)
-        .flatMap((t) => t.orderNow.map(order => order.servedBy?.name).filter(Boolean))
-    ),
-  ];
+  }, [filterStatus, filterOrderStatus, tables]);
 
   return (
     <div className="min-vh-100 bg-light d-flex flex-column">
@@ -109,19 +95,7 @@ export default function TableMap() {
                 <option value="cancelled">Đã huỷ</option>
               </Form.Select>
             </Col>
-            <Col xs={12} md={4}>
-              <Form.Select
-                value={filterWaiter}
-                onChange={(e) => setFilterWaiter(e.target.value)}
-              >
-                <option value="all">Tất cả nhân viên phục vụ</option>
-                {waiterNames.map((name) => (
-                  <option key={name} value={name}>
-                    {name}
-                  </option>
-                ))}
-              </Form.Select>
-            </Col>
+            {/* Bỏ filter theo waiter vì mỗi order có thể có nhiều waiter */}
           </Row>
         </Card>
 
@@ -185,9 +159,7 @@ export default function TableMap() {
                                 <p className="mb-0">
                                   #{order._id.slice(-5)} - {order.status}
                                 </p>
-                                {order.servedBy && (
-                                  <p className="mb-0">👤 {order.servedBy.name}</p>
-                                )}
+                                {/* Mỗi món có thể có waiter riêng, không hiển thị order.servedBy */}
                               </div>
                             ))}
                             {table.orderNow.length > 2 && (

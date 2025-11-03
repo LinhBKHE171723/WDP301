@@ -122,7 +122,7 @@ const seedDatabase = async () => {
         role: "customer",
         point: 220,
       },
-      // Waiters
+      // Waiters (chỉ waiter01 và waiter02 active, còn lại inactive)
       {
         name: "Trần Thị Phục Vụ 1",
         username: "waiter01",
@@ -130,6 +130,7 @@ const seedDatabase = async () => {
         email: "waiter1@example.com",
         phone: "0987654321",
         role: "waiter",
+        status: "active",
       },
       {
         name: "Phạm Văn Phục Vụ 2",
@@ -138,6 +139,7 @@ const seedDatabase = async () => {
         email: "manhamsterdam2003@gmail.com",
         phone: "0987654322",
         role: "waiter",
+        status: "active",
       },
       {
         name: "Lê Thị Phục Vụ 3",
@@ -146,6 +148,7 @@ const seedDatabase = async () => {
         email: "waiter3@example.com",
         phone: "0987654323",
         role: "waiter",
+        status: "inactive",
       },
       {
         name: "Nguyễn Văn Phục Vụ 4",
@@ -154,6 +157,7 @@ const seedDatabase = async () => {
         email: "waiter4@example.com",
         phone: "0987654324",
         role: "waiter",
+        status: "inactive",
       },
       {
         name: "Hoàng Thị Phục Vụ 5",
@@ -162,6 +166,7 @@ const seedDatabase = async () => {
         email: "waiter5@example.com",
         phone: "0987654325",
         role: "waiter",
+        status: "inactive",
       },
       // Chefs
       {
@@ -1780,37 +1785,37 @@ const seedDatabase = async () => {
     ]);
     console.log("💬 Đã tạo các Feedback mẫu.");
 
+    // 🧹 Cleanup: đồng bộ lại logic table - order
+    const allTables = await Table.find().populate("orderNow");
+    for (const table of allTables) {
+      // Đảm bảo orderNow là mảng
+      if (!table.orderNow) {
+        table.orderNow = [];
+      }
+      
+      // Filter ra các orders active (populated orders)
+      const activeOrders = table.orderNow.filter(order => 
+        order && order.status && ["confirmed", "preparing", "served"].includes(order.status)
+      );
+      
+      // Chuyển về array of ObjectIds
+      table.orderNow = activeOrders.map(o => o._id);
+      
+      if (activeOrders.length > 0) {
+        table.status = "occupied";
+      } else {
+        table.status = "available";
+      }
+      
+      await table.save();
+    }
+    console.log("✅ Đã đồng bộ bàn và đơn hàng đúng logic mới!");
+
     console.log("✅ SEED DATABASE THÀNH CÔNG!");
   } catch (error) {
     console.error("❌ Lỗi khi seed database:", error);
+    throw error; // Re-throw để caller biết có lỗi
   }
-
-  // 🧹 Cleanup: đồng bộ lại logic table - order
-  const tables = await Table.find().populate("orderNow");
-  for (const table of tables) {
-    // Đảm bảo orderNow là mảng
-    if (!table.orderNow) {
-      table.orderNow = [];
-    }
-    
-    // Filter ra các orders active (populated orders)
-    const activeOrders = table.orderNow.filter(order => 
-      order && order.status && ["confirmed", "preparing", "served"].includes(order.status)
-    );
-    
-    // Chuyển về array of ObjectIds
-    table.orderNow = activeOrders.map(o => o._id);
-    
-    if (activeOrders.length > 0) {
-      table.status = "occupied";
-    } else {
-      table.status = "available";
-    }
-    
-    await table.save();
-  }
-  console.log("✅ Đã đồng bộ bàn và đơn hàng đúng logic mới!");
-
 };
 
 module.exports = seedDatabase;

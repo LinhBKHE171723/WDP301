@@ -124,7 +124,7 @@ export default function ServingHistory() {
                                         <h5 className="fw-bold">Đơn #{order._id.slice(-6)}</h5>
                                         <p className="mb-1">🍽 Bàn: <b>{order.tableId?.tableNumber || "-"}</b></p>
                                         <p className="mb-1">👤 Khách: {order.userId?.name || "Không rõ"}</p>
-                                        <p className="mb-0 text-muted small">👥 Phục vụ: {order.servedBy?.name || "Bạn"}</p>
+                                        {/* Mỗi món có thể có waiter riêng, không hiển thị order.servedBy nữa */}
                                         <p className="mb-0 text-muted small">🕒 Thời gian: {new Date(order.createdAt).toLocaleString()}</p>
                                     </Card.Body>
                                 </Card>
