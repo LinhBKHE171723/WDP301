@@ -41,11 +41,33 @@ exports.getWaitersPerformance = async ({ from, to }) => {
   );
 
   // B2: Tính toán hiệu suất và chuyên cần cho từng người
+  const OrderItem = require("../../models/OrderItem");
+  
   const performanceData = await Promise.all(
     waiters.map(async (waiter) => {
-      // Tính hiệu suất dựa trên Order
-      const orders = await Order.find({
+      // Tìm tất cả OrderItem mà waiter đã phục vụ (status = "served")
+      const servedOrderItems = await OrderItem.find({
         servedBy: waiter._id,
+        status: "served"
+      }).select("orderId");
+
+      // Tìm comboItems mà waiter đã phục vụ
+      const servedComboOrderItems = await OrderItem.find({
+        "comboItems.servedBy": waiter._id,
+        "comboItems.status": "served"
+      }).select("orderId");
+
+      // Lấy danh sách orderIds unique mà waiter đã tham gia phục vụ
+      const orderIds = [
+        ...new Set([
+          ...servedOrderItems.map(item => item.orderId.toString()),
+          ...servedComboOrderItems.map(item => item.orderId.toString())
+        ])
+      ];
+
+      // Tính hiệu suất dựa trên các orders mà waiter đã phục vụ ít nhất 1 món
+      const orders = await Order.find({
+        _id: { $in: orderIds },
         status: "paid",
         createdAt: { $gte: fromDate, $lte: toDate },
       });

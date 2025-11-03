@@ -1,7 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { Card } from "../ui/admin/card";
 import { Input } from "../ui/admin/input";
-import { Badge } from "../ui/admin/badge";
 import {
   Dialog,
   DialogContent,
@@ -10,7 +9,6 @@ import {
   DialogHeader,
   DialogTitle,
   DialogTrigger,
-  z,
 } from "../ui/admin/dialog";
 import { Button } from "../ui/admin/button";
 import axios from "axios";

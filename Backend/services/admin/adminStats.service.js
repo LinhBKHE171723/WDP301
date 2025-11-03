@@ -205,34 +205,100 @@ exports.getTopItems = async ({ from, to, limit }) => {
 exports.getTopStaff = async ({ from, to, limit }) => {
   const { fromDate, toDate } = normalizeTimeInputs("daily", from, to);
   const lim = clampInt(limit, 10, 1, 50);
+  const OrderItem = require("../../models/OrderItem");
+  const Order = require("../../models/Order");
 
-  const pipeline = [
-    { $match: { status: "paid", createdAt: { $gte: fromDate, $lte: toDate }, servedBy: { $ne: null } } },
-    {
-      $group: {
-        _id: "$servedBy",
-        orders: { $sum: 1 },
-        revenue: { $sum: { $ifNull: ["$totalAmount", 0] } },
-      }
+  // Aggregate từ OrderItem thay vì Order
+  // Tìm tất cả OrderItems đã served trong khoảng thời gian
+  const servedOrderItems = await OrderItem.find({
+    status: "served",
+    servedBy: { $ne: null }
+  }).populate({
+    path: "orderId",
+    match: {
+      status: "paid",
+      createdAt: { $gte: fromDate, $lte: toDate }
     },
-    { $lookup: { from: "users", localField: "_id", foreignField: "_id", as: "user" } },
-    { $unwind: { path: "$user", preserveNullAndEmptyArrays: true } },
-    {
-      $project: {
-        _id: 0,
-        staffId: "$_id",
-        staffName: { $ifNull: ["$user.name", null] },
-        staffEmail: { $ifNull: ["$user.email", null] },
-        orders: 1,
-        revenue: 1,
-      }
-    },
-    { $sort: { revenue: -1, orders: -1 } },
-    { $limit: lim },
-  ];
+    select: "totalAmount createdAt"
+  });
 
-  const rows = await Order.aggregate(pipeline);
-  return rows.map((r) => ({
+  // Tìm comboItems đã served
+  const servedComboItems = await OrderItem.find({
+    "comboItems.status": "served",
+    "comboItems.servedBy": { $ne: null },
+    orderId: {
+      $in: await Order.find({
+        status: "paid",
+        createdAt: { $gte: fromDate, $lte: toDate }
+      }).distinct("_id")
+    }
+  }).populate({
+    path: "orderId",
+    select: "totalAmount createdAt"
+  });
+
+  // Tạo map để tổng hợp theo waiter
+  const waiterMap = new Map();
+
+  // Xử lý OrderItem
+  for (const item of servedOrderItems) {
+    if (!item.orderId || !item.orderId.totalAmount) continue; // Skip nếu order không match hoặc không có totalAmount
+    const waiterId = item.servedBy?.toString();
+    if (!waiterId) continue;
+
+    if (!waiterMap.has(waiterId)) {
+      waiterMap.set(waiterId, { orderIds: new Set(), itemsCount: 0 });
+    }
+    waiterMap.get(waiterId).orderIds.add(item.orderId._id.toString());
+    waiterMap.get(waiterId).itemsCount += 1;
+  }
+
+  // Xử lý comboItems
+  for (const item of servedComboItems) {
+    if (!item.orderId || !item.orderId.totalAmount) continue;
+    if (!item.comboItems || !Array.isArray(item.comboItems)) continue;
+
+    for (const comboItem of item.comboItems) {
+      if (comboItem.status === "served" && comboItem.servedBy) {
+        const waiterId = comboItem.servedBy.toString();
+        if (!waiterMap.has(waiterId)) {
+          waiterMap.set(waiterId, { orderIds: new Set(), itemsCount: 0 });
+        }
+        waiterMap.get(waiterId).orderIds.add(item.orderId._id.toString());
+        waiterMap.get(waiterId).itemsCount += 1;
+      }
+    }
+  }
+
+  // Tính revenue cho mỗi waiter
+  const results = await Promise.all(
+    Array.from(waiterMap.entries()).map(async ([waiterId, data]) => {
+      const orderIds = Array.from(data.orderIds);
+      const orders = await Order.find({
+        _id: { $in: orderIds },
+        status: "paid",
+        createdAt: { $gte: fromDate, $lte: toDate }
+      }).select("totalAmount");
+
+      const revenue = orders.reduce((sum, order) => sum + (order.totalAmount || 0), 0);
+      const user = await require("../../models/User").findById(waiterId).select("name email");
+
+      return {
+        staffId: waiterId,
+        staffName: user?.name || null,
+        staffEmail: user?.email || null,
+        orders: orderIds.length,
+        revenue: revenue,
+        itemsCount: data.itemsCount
+      };
+    })
+  );
+
+  // Sắp xếp và limit
+  results.sort((a, b) => b.revenue - a.revenue || b.orders - a.orders);
+  const topResults = results.slice(0, lim);
+
+  return topResults.map((r) => ({
     ...r,
     revenueVND: fmtVND(r.revenue || 0),
   }));
