@@ -2,7 +2,6 @@ import React, { useEffect, useState } from "react";
 import { Container, Row, Col, Card, Spinner, Button, Form } from "react-bootstrap";
 import { useNavigate } from "react-router-dom";
 import Header from "./Header";
-import NotificationBell from "./NotificationBell";
 import waiterApi from "../../api/waiterApi";
 import { toast } from "react-toastify";
 
@@ -54,7 +53,6 @@ export default function ServingHistory() {
             <Container className="flex-grow-1 mt-4 pb-5">
                 <div className="d-flex justify-content-between align-items-center mb-3">
                     <h4 className="fw-bold">Lịch sử phục vụ của bạn</h4>
-                    <NotificationBell />
                 </div>
 
                 {/* Filter Section */}

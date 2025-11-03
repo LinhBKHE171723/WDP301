@@ -3,7 +3,6 @@ import { Container, Card, Spinner, Table as BSTable, Button } from "react-bootst
 import { useParams } from "react-router-dom";
 import { toast } from "react-toastify";
 import Header from "./Header";
-import NotificationBell from "./NotificationBell";
 import waiterApi from "../../api/waiterApi";
 import { useAuth } from "../../context/AuthContext";
 import useWaiterWebSocket from "../../hooks/useWaiterWebSocket";
@@ -110,7 +109,6 @@ export default function TableDetail() {
       <Container className="flex-grow-1 mt-4 pb-5">
         <div className="d-flex flex-wrap justify-content-between align-items-center mb-3">
           <h4 className="fw-bold text-dark mb-3 mb-md-0">Chi tiết bàn</h4>
-          <NotificationBell />
         </div>
 
         {loading ? (

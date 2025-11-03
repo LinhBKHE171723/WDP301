@@ -3,7 +3,6 @@ import { Container, Row, Col, Card, Spinner, Form } from "react-bootstrap";
 import { useNavigate } from "react-router-dom";
 import { toast } from "react-toastify";
 import Header from "./Header";
-import NotificationBell from "./NotificationBell";
 import waiterApi from "../../api/waiterApi";
 import { useAuth } from "../../context/AuthContext";
 
@@ -78,7 +77,6 @@ export default function TableMap() {
           <h4 className="fw-bold text-dark mb-3 mb-md-0">
             🍽️ Sơ đồ bàn hiện tại
           </h4>
-          <NotificationBell />
         </div>
 
         {/* Bộ lọc */}
