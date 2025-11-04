@@ -35,41 +35,65 @@ function normalizeTimeInputs(from, to) {
 exports.getWaitersPerformance = async ({ from, to }) => {
   const { fromDate, toDate } = normalizeTimeInputs(from, to);
 
-  // B1: Lấy danh sách tất cả nhân viên phục vụ đang hoạt động
-  const waiters = await User.find({ role: "waiter", status: "active" }).select(
-    "name email"
+  // B1: Lấy danh sách tất cả nhân viên phục vụ (chỉ loại bỏ tài khoản bị banned)
+  const waiters = await User.find({ role: "waiter", accountStatus: "active" }).select(
+    "name email status accountStatus"
   );
 
   // B2: Tính toán hiệu suất và chuyên cần cho từng người
   const OrderItem = require("../../models/OrderItem");
+  const Payment = require("../../models/Payment");
   
   const performanceData = await Promise.all(
     waiters.map(async (waiter) => {
-      // Tìm tất cả OrderItem mà waiter đã phục vụ (status = "served")
+      // Cách 1: Filter theo Payment.payTime (chính xác nhất - thời gian thanh toán thực tế)
+      const paymentsInRange = await Payment.find({
+        status: 'paid',
+        payTime: { $gte: fromDate, $lte: toDate },
+      }).select('orderId');
+
+      const orderIdsFromPayments = paymentsInRange.map(p => p.orderId).filter(id => id != null);
+
+      // Cách 2: Backup - Nếu không có payTime, filter theo Order.updatedAt khi status = 'paid'
+      // Lấy các orders có status = 'paid' và updatedAt trong khoảng thời gian
+      const paidOrdersByUpdateTime = await Order.find({
+        status: 'paid',
+        updatedAt: { $gte: fromDate, $lte: toDate },
+        _id: { $nin: orderIdsFromPayments }, // Loại bỏ những orders đã có trong payments
+      }).select('_id');
+
+      // Gộp orderIds từ cả 2 nguồn
+      const allPaidOrderIds = [
+        ...orderIdsFromPayments,
+        ...paidOrdersByUpdateTime.map(o => o._id)
+      ];
+
+      // Tìm tất cả OrderItem mà waiter đã phục vụ (status = "served") trong các orders đã thanh toán
       const servedOrderItems = await OrderItem.find({
         servedBy: waiter._id,
-        status: "served"
+        status: "served",
+        orderId: { $in: allPaidOrderIds }
       }).select("orderId");
 
       // Tìm comboItems mà waiter đã phục vụ
       const servedComboOrderItems = await OrderItem.find({
         "comboItems.servedBy": waiter._id,
-        "comboItems.status": "served"
+        "comboItems.status": "served",
+        orderId: { $in: allPaidOrderIds }
       }).select("orderId");
 
       // Lấy danh sách orderIds unique mà waiter đã tham gia phục vụ
-      const orderIds = [
+      const waiterOrderIds = [
         ...new Set([
           ...servedOrderItems.map(item => item.orderId.toString()),
           ...servedComboOrderItems.map(item => item.orderId.toString())
         ])
-      ];
+      ].map(id => new mongoose.Types.ObjectId(id));
 
       // Tính hiệu suất dựa trên các orders mà waiter đã phục vụ ít nhất 1 món
       const orders = await Order.find({
-        _id: { $in: orderIds },
+        _id: { $in: waiterOrderIds },
         status: "paid",
-        createdAt: { $gte: fromDate, $lte: toDate },
       });
 
       const totalRevenue = orders.reduce(
@@ -115,7 +139,8 @@ exports.getWaitersPerformance = async ({ from, to }) => {
 exports.getChefsPerformance = async ({ from, to }) => {
   const { fromDate, toDate } = normalizeTimeInputs(from, to);
 
-  const chefs = await User.find({ role: 'chef', status: 'active' }).select('name email');
+  // Lấy danh sách tất cả đầu bếp (chỉ loại bỏ tài khoản bị banned)
+  const chefs = await User.find({ role: 'chef', accountStatus: 'active' }).select('name email status accountStatus');
 
   // Lấy Payment model để filter theo payTime
   const Payment = require("../../models/Payment");
