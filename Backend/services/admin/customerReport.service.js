@@ -99,12 +99,16 @@ exports.getCustomerReport = async (filters = {}) => {
     let frequencyPerMonth = 0;
     if (customer.firstOrderDate && customer.lastOrderDate && customer.paidOrders > 0) {
       const daysDiff = (customer.lastOrderDate - customer.firstOrderDate) / (1000 * 60 * 60 * 24);
-      const monthsDiff = daysDiff / 30;
-      if (monthsDiff > 0) {
-        frequencyPerMonth = parseFloat((customer.paidOrders / monthsDiff).toFixed(1));
+      
+      // Nếu khoảng thời gian quá ngắn (< 30 ngày), tính frequency như thể đã dùng ít nhất 1 tháng
+      // Điều này tránh tần suất quá cao khi khách hàng mới chỉ có vài đơn trong thời gian ngắn
+      if (daysDiff < 30) {
+        // Tính như thể đã trải qua 1 tháng (30 ngày)
+        frequencyPerMonth = parseFloat((customer.paidOrders / 1).toFixed(1));
       } else {
-        // Nếu tất cả orders trong cùng ngày, tính frequency = paidOrders
-        frequencyPerMonth = customer.paidOrders;
+        // Nếu đã có đủ thời gian (> 30 ngày), tính frequency bình thường
+        const monthsDiff = daysDiff / 30;
+        frequencyPerMonth = parseFloat((customer.paidOrders / monthsDiff).toFixed(1));
       }
     }
 

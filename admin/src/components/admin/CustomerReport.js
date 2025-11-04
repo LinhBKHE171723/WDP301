@@ -11,9 +11,20 @@ const CustomerReport = () => {
     const initialFilters = { from: '', to: '', minSpent: '', minOrders: '', search: '' };
     const [filters, setFilters] = useState(initialFilters);
 
-    // State cho sort
-    const [sortField, setSortField] = useState('reliability'); // Mặc định sort theo reliability
-    const [sortDirection, setSortDirection] = useState('desc'); // desc = từ cao xuống thấp
+    // State cho sort - mảng các tiêu chí sort
+    const [sortCriteria, setSortCriteria] = useState([
+        { field: 'reliability', direction: 'desc' }
+    ]); // Mỗi item: { field: string, direction: 'asc' | 'desc' }
+    
+    // Các field có thể sort
+    const sortableFields = [
+        { value: 'reliability', label: 'Tỷ Lệ Thanh Toán' },
+        { value: 'totalSpent', label: 'Tổng Chi Tiêu' },
+        { value: 'averageOrderValue', label: 'Giá Trị Đơn TB' },
+        { value: 'frequencyPerMonth', label: 'Tần Suất' },
+        { value: 'recencyDays', label: 'Gần Đây' },
+        { value: 'paidOrders', label: 'Số Đơn Đã Thanh Toán' }
+    ];
 
     // State cho phân trang
     const [currentPage, setCurrentPage] = useState(1);
@@ -76,24 +87,46 @@ const CustomerReport = () => {
             });
         }
         
-        // Sắp xếp
+        // Sắp xếp theo nhiều tiêu chí (theo thứ tự trong mảng sortCriteria)
         customers.sort((a, b) => {
-            let aValue = a[sortField];
-            let bValue = b[sortField];
-            
-            // Xử lý null values
-            if (aValue === null || aValue === undefined) aValue = sortField === 'recencyDays' ? Infinity : -Infinity;
-            if (bValue === null || bValue === undefined) bValue = sortField === 'recencyDays' ? Infinity : -Infinity;
-            
-            if (sortDirection === 'desc') {
-                return bValue - aValue;
-            } else {
-                return aValue - bValue;
+            for (const criteria of sortCriteria) {
+                const { field, direction } = criteria;
+                let aValue = a[field];
+                let bValue = b[field];
+                
+                // Xử lý null values
+                if (aValue === null || aValue === undefined) {
+                    aValue = field === 'recencyDays' ? Infinity : -Infinity;
+                }
+                if (bValue === null || bValue === undefined) {
+                    bValue = field === 'recencyDays' ? Infinity : -Infinity;
+                }
+                
+                // So sánh
+                let comparison = 0;
+                if (typeof aValue === 'number' && typeof bValue === 'number') {
+                    comparison = aValue - bValue;
+                } else {
+                    // Nếu không phải số, so sánh chuỗi
+                    comparison = String(aValue).localeCompare(String(bValue));
+                }
+                
+                // Áp dụng direction
+                if (direction === 'desc') {
+                    comparison = -comparison;
+                }
+                
+                // Nếu khác nhau, trả về kết quả
+                if (comparison !== 0) {
+                    return comparison;
+                }
+                // Nếu bằng nhau, tiếp tục với tiêu chí tiếp theo
             }
+            return 0; // Tất cả tiêu chí đều bằng nhau
         });
         
         return customers;
-    }, [allCustomers, filters, sortField, sortDirection]);
+    }, [allCustomers, filters, sortCriteria]);
 
 
     // Tính toán dữ liệu cho trang hiện tại
@@ -111,21 +144,38 @@ const CustomerReport = () => {
     const handleResetFilters = () => {
         setFilters(initialFilters);
         setCurrentPage(1);
-        setSortField('reliability');
-        setSortDirection('desc');
+        setSortCriteria([{ field: 'reliability', direction: 'desc' }]);
     };
 
-    const handleSort = (field) => {
-        if (sortField === field) {
-            // Đổi chiều sort nếu đã sort theo field này
-            setSortDirection(sortDirection === 'desc' ? 'asc' : 'desc');
-        } else {
-            // Sort theo field mới, mặc định desc
-            setSortField(field);
-            setSortDirection('desc');
+    // Thêm tiêu chí sort
+    const addSortCriterion = () => {
+        setSortCriteria([...sortCriteria, { field: 'reliability', direction: 'desc' }]);
+    };
+
+    // Xóa tiêu chí sort
+    const removeSortCriterion = (index) => {
+        if (sortCriteria.length > 1) {
+            setSortCriteria(sortCriteria.filter((_, i) => i !== index));
+            setCurrentPage(1);
         }
+    };
+
+    // Cập nhật field của tiêu chí
+    const updateSortField = (index, field) => {
+        setSortCriteria(sortCriteria.map((item, i) => 
+            i === index ? { ...item, field } : item
+        ));
         setCurrentPage(1);
     };
+
+    // Cập nhật direction của tiêu chí
+    const updateSortDirection = (index) => {
+        setSortCriteria(sortCriteria.map((item, i) => 
+            i === index ? { ...item, direction: item.direction === 'asc' ? 'desc' : 'asc' } : item
+        ));
+        setCurrentPage(1);
+    };
+
 
     // --- RENDER ---
     if (loading) {
@@ -138,6 +188,52 @@ const CustomerReport = () => {
     return (
         <div className="p-4 bg-white rounded-lg shadow-md font-sans">
             <h1 className="text-2xl font-bold mb-4">Báo Cáo Khách Hàng Thân Thiết</h1>
+            
+            {/* --- BỘ SẮP XẾP TÙY CHỈNH --- */}
+            <div className="mb-4 p-4 border rounded-md bg-gray-50">
+                <div className="flex justify-between items-center mb-3">
+                    <h2 className="text-lg font-semibold text-gray-700">Sắp xếp theo nhiều tiêu chí</h2>
+                    <button
+                        onClick={addSortCriterion}
+                        className="px-3 py-1 bg-blue-500 text-white rounded-md text-sm hover:bg-blue-600"
+                    >
+                        + Thêm tiêu chí
+                    </button>
+                </div>
+                <div className="space-y-2">
+                    {sortCriteria.map((criterion, index) => (
+                        <div key={index} className="flex items-center gap-2 p-2 bg-white rounded border">
+                            <span className="text-sm font-medium text-gray-600 w-8">#{index + 1}</span>
+                            <select
+                                value={criterion.field}
+                                onChange={(e) => updateSortField(index, e.target.value)}
+                                className="flex-1 p-2 border border-gray-300 rounded-md text-sm"
+                            >
+                                {sortableFields.map(field => (
+                                    <option key={field.value} value={field.value}>
+                                        {field.label}
+                                    </option>
+                                ))}
+                            </select>
+                            <button
+                                onClick={() => updateSortDirection(index)}
+                                className="px-3 py-2 bg-gray-200 text-gray-700 rounded-md text-sm hover:bg-gray-300"
+                                title={criterion.direction === 'desc' ? 'Giảm dần' : 'Tăng dần'}
+                            >
+                                {criterion.direction === 'desc' ? '↓' : '↑'}
+                            </button>
+                            <button
+                                onClick={() => removeSortCriterion(index)}
+                                disabled={sortCriteria.length === 1}
+                                className="px-3 py-2 bg-red-500 text-white rounded-md text-sm hover:bg-red-600 disabled:opacity-50 disabled:cursor-not-allowed"
+                                title="Xóa"
+                            >
+                                ×
+                            </button>
+                        </div>
+                    ))}
+                </div>
+            </div>
             
             {/* --- BỘ LỌC --- */}
             <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-4 p-4 border rounded-md">
@@ -181,36 +277,21 @@ const CustomerReport = () => {
                             <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Hạng</th>
                             <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Tên Khách Hàng</th>
                             <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Email / SĐT</th>
-                            <th 
-                                className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100"
-                                onClick={() => handleSort('reliability')}
-                            >
-                                Tỷ Lệ Thanh Toán {sortField === 'reliability' && (sortDirection === 'desc' ? '↓' : '↑')}
+                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                Tỷ Lệ Thanh Toán
                             </th>
                             <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Số Đơn</th>
-                            <th 
-                                className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100"
-                                onClick={() => handleSort('totalSpent')}
-                            >
-                                Tổng Chi Tiêu {sortField === 'totalSpent' && (sortDirection === 'desc' ? '↓' : '↑')}
+                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                Tổng Chi Tiêu
                             </th>
-                            <th 
-                                className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100"
-                                onClick={() => handleSort('averageOrderValue')}
-                            >
-                                Giá Trị Đơn TB {sortField === 'averageOrderValue' && (sortDirection === 'desc' ? '↓' : '↑')}
+                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                Giá Trị Đơn TB
                             </th>
-                            <th 
-                                className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100"
-                                onClick={() => handleSort('frequencyPerMonth')}
-                            >
-                                Tần Suất {sortField === 'frequencyPerMonth' && (sortDirection === 'desc' ? '↓' : '↑')}
+                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                Tần Suất
                             </th>
-                            <th 
-                                className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100"
-                                onClick={() => handleSort('recencyDays')}
-                            >
-                                Gần Đây {sortField === 'recencyDays' && (sortDirection === 'desc' ? '↓' : '↑')}
+                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                Gần Đây
                             </th>
                             <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Lần Cuối</th>
                         </tr>
