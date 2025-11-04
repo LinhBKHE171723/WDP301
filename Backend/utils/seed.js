@@ -146,6 +146,34 @@ const seedDatabase = async () => {
         phone: "0909999000",
         role: "admin",
       },
+      // Cashiers
+      {
+        name: "Nguyễn Thị Thu Ngân 1",
+        username: "cashier01",
+        password: "cashier@123",
+        email: "cashier1@example.com",
+        phone: "0911111111",
+        role: "cashier",
+        status: "active",
+      },
+      {
+        name: "Trần Văn Thu Ngân 2",
+        username: "cashier02",
+        password: "cashier@123",
+        email: "cashier2@example.com",
+        phone: "0911111112",
+        role: "cashier",
+        status: "active",
+      },
+      {
+        name: "Lê Thị Thu Ngân 3",
+        username: "cashier03",
+        password: "cashier@123",
+        email: "cashier3@example.com",
+        phone: "0911111113",
+        role: "cashier",
+        status: "inactive",
+      },
     ];
 
     const users = [];
