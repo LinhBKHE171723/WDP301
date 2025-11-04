@@ -274,7 +274,7 @@ const CustomerReport = () => {
                 <table className="min-w-full divide-y divide-gray-200">
                     <thead className="bg-gray-50">
                         <tr>
-                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Hạng</th>
+                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">STT</th>
                             <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Tên Khách Hàng</th>
                             <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Email / SĐT</th>
                             <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
@@ -298,9 +298,11 @@ const CustomerReport = () => {
                     </thead>
                     <tbody className="bg-white divide-y divide-gray-200">
                         {currentCustomers.length > 0 ? (
-                            currentCustomers.map((customer) => (
+                            currentCustomers.map((customer, index) => (
                                 <tr key={customer.userId}>
-                                    <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">{customer.rank}</td>
+                                    <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
+                                        {(currentPage - 1) * ITEMS_PER_PAGE + index + 1}
+                                    </td>
                                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-700">{customer.name}</td>
                                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{customer.email || customer.phone}</td>
                                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-700">
