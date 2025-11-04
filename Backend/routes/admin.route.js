@@ -39,6 +39,7 @@ router.get("/customers/:userId/info", preorderController.getCustomerInfo);
 // --- API cho Trang "Doanh thu Tổng quan" (Trang hiện tại của bạn) ---
 router.get("/revenue", statsCtrl.getRevenueStats); // <-- API này bạn nói đang chạy mượt
 router.get("/top-staff", statsCtrl.getTopStaff);
+router.get("/stats/ingredient-waste", statsCtrl.getIngredientWasteStats);
 
 // --- API cho Trang "Báo cáo Hiệu suất Món ăn" (Trang TỔNG QUAN mới) ---
 //  Endpoint 1: Lấy danh sách món ăn để điền vào bộ lọc
@@ -49,6 +50,8 @@ router.get("/top-items", statsCtrl.getTopItems);
 // --- API cho Trang "Phân tích Xu hướng" (Trang CHI TIẾT của bạn) ---
 //  Endpoint 3: Lấy dữ liệu cho biểu đồ chi tiết của 1 món ăn
 router.get("/items/trend", itemTrendCtrl.getItemTrendStats);
+//  Endpoint 4: Lấy dữ liệu bán hàng của nhiều món theo thời gian (cho chart view)
+router.get("/items/sales-by-time", statsCtrl.getItemsSalesByTimePeriod);
 
 // trang khách hàng thân thiết
 router.get("/reports/customers", customerReportCtrl.getCustomerReport);

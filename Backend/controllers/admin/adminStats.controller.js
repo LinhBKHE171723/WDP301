@@ -32,3 +32,24 @@ exports.getTopStaff = async (req, res) => {
     res.status(500).json({ message: "Server error", error: String(err) });
   }
 };
+
+exports.getIngredientWasteStats = async (req, res) => {
+  try {
+    const data = await service.getIngredientWasteStats();
+    res.json(data);
+  } catch (err) {
+    console.error("getIngredientWasteStats:", err);
+    res.status(500).json({ message: "Server error", error: String(err) });
+  }
+};
+
+exports.getItemsSalesByTimePeriod = async (req, res) => {
+  try {
+    const { type = "daily", from, to, topN = 10, itemIds } = req.query;
+    const data = await service.getItemsSalesByTimePeriod({ type, from, to, topN, itemIds });
+    res.json(data);
+  } catch (err) {
+    console.error("getItemsSalesByTimePeriod:", err);
+    res.status(500).json({ message: "Server error", error: String(err) });
+  }
+};
