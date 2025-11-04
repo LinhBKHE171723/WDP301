@@ -7,6 +7,7 @@ const Order = require("../../models/Order");
 const OrderItem = require("../../models/OrderItem");
 const User = require("../../models/User");
 const Shift = require("../../models/Shift"); // Model chấm công/ca làm việc
+const Feedback = require("../../models/Feedback"); // Model feedback
 const mongoose = require("mongoose");
 
 // ===== HÀM HELPER CHUNG =====
@@ -108,20 +109,56 @@ exports.getWaitersPerformance = async ({ from, to }) => {
         date: { $gte: fromDate, $lte: toDate },
       });
       
+      // Tính tổng giờ làm việc (từ các shift đã checkout)
+      const completedShifts = shifts.filter(s => s.status === 'checked_out');
+      const totalHours = completedShifts.reduce((sum, shift) => {
+        // duration tính bằng phút, chuyển sang giờ
+        return sum + (shift.duration || 0) / 60;
+      }, 0);
+      
       // (Giả sử bạn có logic để xác định đi muộn)
       const lateCount = shifts.filter(s => s.status === 'checked_in' /* && s.isLate */).length; 
       const daysWorked = shifts.length;
 
+      // Lấy feedback có waiterRating từ các Order mà waiter đã phục vụ
+      let averageRating = null;
+      let totalRatings = 0;
+      let goodRatingRate = null;
+      
+      if (waiterOrderIds.length > 0) {
+        const feedbacks = await Feedback.find({
+          orderId: { $in: waiterOrderIds },
+          waiterRating: { $exists: true, $ne: null }
+        }).select('waiterRating');
+
+        const waiterRatings = feedbacks.map(f => f.waiterRating).filter(r => r != null && r > 0);
+        if (waiterRatings.length > 0) {
+          averageRating = waiterRatings.reduce((sum, r) => sum + r, 0) / waiterRatings.length;
+          totalRatings = waiterRatings.length;
+          goodRatingRate = (waiterRatings.filter(r => r >= 4).length / waiterRatings.length) * 100;
+        }
+      }
+
+      // Tính số món đã phục vụ
+      const itemsServedCount = servedOrderItems.length + servedComboOrderItems.length;
+
       return {
         employee: waiter,
         performance: {
-          totalRevenue,
+          totalRevenue, // Giữ lại để tương thích, sẽ bỏ sau
           orderCount,
-          averageOrderValue: orderCount > 0 ? totalRevenue / orderCount : 0,
+          averageOrderValue: orderCount > 0 ? totalRevenue / orderCount : 0, // Giữ lại để tương thích
+          itemsServedCount,
+          ordersPerHour: totalHours > 0 ? orderCount / totalHours : 0,
+          itemsPerHour: totalHours > 0 ? itemsServedCount / totalHours : 0,
+          averageRating,
+          totalRatings,
+          goodRatingRate,
         },
         attendance: {
           daysWorked,
           lateCount,
+          totalHours,
           // Cần thêm logic để tính ngày vắng
           absentCount: 0, 
         },
@@ -129,8 +166,8 @@ exports.getWaitersPerformance = async ({ from, to }) => {
     })
   );
 
-  // B3: Sắp xếp theo doanh thu giảm dần
-  performanceData.sort((a, b) => b.performance.totalRevenue - a.performance.totalRevenue);
+  // B3: Sắp xếp theo số món đã phục vụ giảm dần (thay vì doanh thu)
+  performanceData.sort((a, b) => (b.performance.itemsServedCount || 0) - (a.performance.itemsServedCount || 0));
 
   return performanceData;
 };
@@ -207,15 +244,79 @@ exports.getChefsPerformance = async ({ from, to }) => {
         userId: chef._id,
         date: { $gte: fromDate, $lte: toDate },
       });
+      
+      // Tính tổng giờ làm việc (từ các shift đã checkout)
+      const completedShifts = shifts.filter(s => s.status === 'checked_out');
+      const totalHours = completedShifts.reduce((sum, shift) => {
+        // duration tính bằng phút, chuyển sang giờ
+        return sum + (shift.duration || 0) / 60;
+      }, 0);
+      
       const daysWorked = shifts.length;
+
+      // Lấy các orderIds mà chef đã nấu (từ paidOrders đã lấy)
+      const chefOrderIds = [];
+      for (const order of paidOrders) {
+        const orderItemIds = order.orderItems || [];
+        const orderItemsForChef = await OrderItem.find({
+          _id: { $in: orderItemIds },
+        }).select('assignedChef comboItems');
+        
+        for (const orderItem of orderItemsForChef) {
+          let chefFound = false;
+          // Kiểm tra OrderItem chính
+          if (orderItem.assignedChef && orderItem.assignedChef.toString() === chef._id.toString()) {
+            chefFound = true;
+          }
+          // Kiểm tra comboItems
+          if (!chefFound && orderItem.comboItems && Array.isArray(orderItem.comboItems)) {
+            for (const comboItem of orderItem.comboItems) {
+              if (comboItem.assignedChef && comboItem.assignedChef.toString() === chef._id.toString()) {
+                chefFound = true;
+                break;
+              }
+            }
+          }
+          
+          if (chefFound && !chefOrderIds.includes(order._id.toString())) {
+            chefOrderIds.push(order._id.toString());
+            break; // Chỉ cần thêm orderId một lần
+          }
+        }
+      }
+
+      // Lấy feedback có chefRating từ các Order mà chef đã nấu
+      let averageRating = null;
+      let totalRatings = 0;
+      let goodRatingRate = null;
+      
+      if (chefOrderIds.length > 0) {
+        const feedbacks = await Feedback.find({
+          orderId: { $in: chefOrderIds.map(id => new mongoose.Types.ObjectId(id)) },
+          chefRating: { $exists: true, $ne: null }
+        }).select('chefRating');
+
+        const chefRatings = feedbacks.map(f => f.chefRating).filter(r => r != null && r > 0);
+        if (chefRatings.length > 0) {
+          averageRating = chefRatings.reduce((sum, r) => sum + r, 0) / chefRatings.length;
+          totalRatings = chefRatings.length;
+          goodRatingRate = (chefRatings.filter(r => r >= 4).length / chefRatings.length) * 100;
+        }
+      }
 
       return {
         employee: chef,
         performance: {
           itemsCookedCount,
+          itemsPerHour: totalHours > 0 ? itemsCookedCount / totalHours : 0,
+          itemsPerDay: daysWorked > 0 ? itemsCookedCount / daysWorked : 0,
+          averageRating,
+          totalRatings,
+          goodRatingRate,
         },
         attendance: {
           daysWorked,
+          totalHours,
           absentCount: 0,
         },
       };

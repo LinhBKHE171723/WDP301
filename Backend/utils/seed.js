@@ -2033,11 +2033,64 @@ const seedDatabase = async () => {
       
       const comment = commentPool[Math.floor(Math.random() * commentPool.length)];
       
+      // Lấy order items để tìm waiters và chefs đã phục vụ
+      const orderItems = await OrderItem.find({ orderId: order._id })
+        .populate('servedBy', '_id')
+        .populate('assignedChef', '_id');
+      
+      // Tìm tất cả waiters đã phục vụ (từ order items và combo items)
+      const waiterIds = new Set();
+      const chefIds = new Set();
+      
+      for (const item of orderItems) {
+        // Lấy waiter từ OrderItem chính
+        if (item.servedBy && item.status === "served") {
+          waiterIds.add(item.servedBy._id.toString());
+        }
+        
+        // Lấy chef từ OrderItem chính
+        if (item.assignedChef) {
+          chefIds.add(item.assignedChef._id.toString());
+        }
+        
+        // Lấy waiter và chef từ comboItems
+        if (item.comboItems && Array.isArray(item.comboItems)) {
+          for (const comboItem of item.comboItems) {
+            if (comboItem.servedBy && comboItem.status === "served") {
+              waiterIds.add(comboItem.servedBy.toString());
+            }
+            if (comboItem.assignedChef) {
+              chefIds.add(comboItem.assignedChef.toString());
+            }
+          }
+        }
+      }
+      
+      // Tạo waiterRating và chefRating (70-80% feedback có rating cho waiter/chef)
+      let waiterRating = null;
+      let chefRating = null;
+      
+      if (waiterIds.size > 0 && Math.random() > 0.2) { // 80% có waiterRating
+        // waiterRating thường gần với rating tổng thể, nhưng có thể chênh lệch 1 sao
+        const baseWaiterRating = rating;
+        const variation = Math.random() > 0.5 ? (Math.random() > 0.5 ? 1 : -1) : 0;
+        waiterRating = Math.max(1, Math.min(5, baseWaiterRating + variation));
+      }
+      
+      if (chefIds.size > 0 && Math.random() > 0.2) { // 80% có chefRating
+        // chefRating thường gần với rating tổng thể, nhưng có thể chênh lệch 1 sao
+        const baseChefRating = rating;
+        const variation = Math.random() > 0.5 ? (Math.random() > 0.5 ? 1 : -1) : 0;
+        chefRating = Math.max(1, Math.min(5, baseChefRating + variation));
+      }
+      
       feedbacks.push({
         orderId: order._id,
         userId: order.userId._id,
         rating: rating,
         comment: comment,
+        waiterRating: waiterRating || undefined,
+        chefRating: chefRating || undefined,
       });
     }
     

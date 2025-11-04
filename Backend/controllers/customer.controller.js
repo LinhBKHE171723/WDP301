@@ -882,7 +882,7 @@ exports.updateOrderStatus = async (req, res) => {
 exports.createFeedback = async (req, res) => {
   try {
     const { orderId } = req.params;
-    const { rating, comment } = req.body;
+    const { rating, comment, waiterRating, chefRating } = req.body;
 
     // Kiểm tra order tồn tại
     const order = await Order.findById(orderId);
@@ -910,7 +910,7 @@ exports.createFeedback = async (req, res) => {
       });
     }
 
-    // Validate rating
+    // Validate rating tổng thể (bắt buộc)
     if (!rating || rating < 1 || rating > 5) {
       return res.status(400).json({
         success: false,
@@ -918,12 +918,34 @@ exports.createFeedback = async (req, res) => {
       });
     }
 
+    // Validate waiterRating (nếu có)
+    if (waiterRating !== undefined && waiterRating !== null) {
+      if (waiterRating < 1 || waiterRating > 5) {
+        return res.status(400).json({
+          success: false,
+          message: "Đánh giá phục vụ phải từ 1 đến 5 sao"
+        });
+      }
+    }
+
+    // Validate chefRating (nếu có)
+    if (chefRating !== undefined && chefRating !== null) {
+      if (chefRating < 1 || chefRating > 5) {
+        return res.status(400).json({
+          success: false,
+          message: "Đánh giá món ăn phải từ 1 đến 5 sao"
+        });
+      }
+    }
+
     // Tạo feedback mới
     const feedback = new Feedback({
       orderId: orderId,
       userId: order.userId || null, // có thể null nếu khách không đăng nhập
       rating: rating,
-      comment: comment || ""
+      comment: comment || "",
+      waiterRating: waiterRating || undefined,
+      chefRating: chefRating || undefined
     });
 
     await feedback.save();
@@ -965,6 +987,183 @@ exports.getOrderFeedback = async (req, res) => {
     res.status(200).json({
       success: true,
       data: feedback
+    });
+  } catch (error) {
+    res.status(500).json({ 
+      success: false, 
+      message: error.message 
+    });
+  }
+};
+
+// Lấy danh sách waiter và chef đã tham gia order (để khách đánh giá)
+exports.getOrderEmployees = async (req, res) => {
+  try {
+    const { orderId } = req.params;
+    const User = require("../models/User");
+
+    // Kiểm tra order tồn tại
+    const order = await Order.findById(orderId);
+    if (!order) {
+      return res.status(404).json({
+        success: false,
+        message: "Không tìm thấy đơn hàng"
+      });
+    }
+
+    // Lấy tất cả OrderItem của order này
+    const orderItems = await OrderItem.find({ orderId: orderId })
+      .populate("servedBy", "name email")
+      .populate("assignedChef", "name email");
+
+    // Lấy tất cả waiter IDs và chef IDs đã tham gia order (unique)
+    const waiterIds = new Set();
+    const chefIds = new Set();
+
+    for (const item of orderItems) {
+      // Lấy waiter từ OrderItem chính
+      if (item.servedBy && item.status === "served") {
+        waiterIds.add(item.servedBy._id.toString());
+      }
+
+      // Lấy chef từ OrderItem chính
+      if (item.assignedChef) {
+        chefIds.add(item.assignedChef._id.toString());
+      }
+
+      // Lấy waiter và chef từ comboItems
+      if (item.comboItems && Array.isArray(item.comboItems)) {
+        for (const comboItem of item.comboItems) {
+          if (comboItem.servedBy && comboItem.status === "served") {
+            waiterIds.add(comboItem.servedBy.toString());
+          }
+          if (comboItem.assignedChef) {
+            chefIds.add(comboItem.assignedChef.toString());
+          }
+        }
+      }
+    }
+
+    // Lấy thông tin chi tiết của tất cả waiters
+    const waiters = [];
+    if (waiterIds.size > 0) {
+      // Thử lấy từ OrderItem đã populate trước
+      const waiterMap = new Map();
+      for (const item of orderItems) {
+        if (item.servedBy && waiterIds.has(item.servedBy._id.toString())) {
+          const waiterId = item.servedBy._id.toString();
+          if (!waiterMap.has(waiterId)) {
+            waiterMap.set(waiterId, {
+              _id: item.servedBy._id,
+              name: item.servedBy.name,
+              email: item.servedBy.email
+            });
+          }
+        }
+      }
+
+      // Lấy từ comboItems đã populate
+      for (const item of orderItems) {
+        if (item.comboItems && Array.isArray(item.comboItems)) {
+          for (const comboItem of item.comboItems) {
+            if (comboItem.servedBy && comboItem.status === "served") {
+              const waiterId = comboItem.servedBy.toString();
+              if (waiterIds.has(waiterId) && !waiterMap.has(waiterId)) {
+                // Cần fetch từ DB vì comboItems không được populate
+                const waiter = await User.findById(waiterId).select("name email");
+                if (waiter) {
+                  waiterMap.set(waiterId, {
+                    _id: waiter._id,
+                    name: waiter.name,
+                    email: waiter.email
+                  });
+                }
+              }
+            }
+          }
+        }
+      }
+
+      // Fetch những waiter còn thiếu từ DB
+      for (const waiterId of waiterIds) {
+        if (!waiterMap.has(waiterId)) {
+          const waiter = await User.findById(waiterId).select("name email");
+          if (waiter) {
+            waiterMap.set(waiterId, {
+              _id: waiter._id,
+              name: waiter.name,
+              email: waiter.email
+            });
+          }
+        }
+      }
+
+      waiters.push(...Array.from(waiterMap.values()));
+    }
+
+    // Lấy thông tin chi tiết của tất cả chefs
+    const chefs = [];
+    if (chefIds.size > 0) {
+      // Thử lấy từ OrderItem đã populate trước
+      const chefMap = new Map();
+      for (const item of orderItems) {
+        if (item.assignedChef && chefIds.has(item.assignedChef._id.toString())) {
+          const chefId = item.assignedChef._id.toString();
+          if (!chefMap.has(chefId)) {
+            chefMap.set(chefId, {
+              _id: item.assignedChef._id,
+              name: item.assignedChef.name,
+              email: item.assignedChef.email
+            });
+          }
+        }
+      }
+
+      // Lấy từ comboItems đã populate
+      for (const item of orderItems) {
+        if (item.comboItems && Array.isArray(item.comboItems)) {
+          for (const comboItem of item.comboItems) {
+            if (comboItem.assignedChef) {
+              const chefId = comboItem.assignedChef.toString();
+              if (chefIds.has(chefId) && !chefMap.has(chefId)) {
+                // Cần fetch từ DB vì comboItems không được populate
+                const chef = await User.findById(chefId).select("name email");
+                if (chef) {
+                  chefMap.set(chefId, {
+                    _id: chef._id,
+                    name: chef.name,
+                    email: chef.email
+                  });
+                }
+              }
+            }
+          }
+        }
+      }
+
+      // Fetch những chef còn thiếu từ DB
+      for (const chefId of chefIds) {
+        if (!chefMap.has(chefId)) {
+          const chef = await User.findById(chefId).select("name email");
+          if (chef) {
+            chefMap.set(chefId, {
+              _id: chef._id,
+              name: chef.name,
+              email: chef.email
+            });
+          }
+        }
+      }
+
+      chefs.push(...Array.from(chefMap.values()));
+    }
+
+    res.status(200).json({
+      success: true,
+      data: {
+        waiters: waiters,
+        chefs: chefs
+      }
     });
   } catch (error) {
     res.status(500).json({ 

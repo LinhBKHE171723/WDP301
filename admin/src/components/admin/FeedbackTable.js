@@ -69,10 +69,7 @@ export function FeedbackTable() {
     // vẫn giữ filter phía FE để người dùng tìm nhanh trong trang hiện tại
     return feedbacks.filter((f) => {
       const customerName = f?.userId?.name || "Guest";
-      const staffName = f?.orderId?.servedBy?.name || "";
-      const text = `${customerName} ${staffName} ${
-        f?.comment || ""
-      }`.toLowerCase();
+      const text = `${customerName} ${f?.comment || ""}`.toLowerCase();
       const matchSearch = text.includes(search.toLowerCase());
       const matchRating =
         ratingFilter === "all" || Number(f?.rating) === Number(ratingFilter);
@@ -90,7 +87,7 @@ export function FeedbackTable() {
         {/* Search + Filter rating */}
         <div className="flex items-center gap-3">
           <Input
-            placeholder="Tìm theo khách hàng / nhân viên / nội dung..."
+            placeholder="Tìm theo khách hàng / nội dung..."
             value={search}
             onChange={(e) => {
               setSearch(e.target.value);
@@ -132,7 +129,6 @@ export function FeedbackTable() {
             <thead>
               <tr className="border-b bg-gray-50 text-left text-sm text-gray-700">
                 <th className="p-3">Khách hàng</th>
-                <th className="p-3">Nhân viên phục vụ</th>
                 <th className="p-3">Đánh giá</th>
                 <th className="p-3">Bình luận</th>
                 <th className="p-3">Mã đơn</th>
@@ -143,10 +139,6 @@ export function FeedbackTable() {
               {filtered.map((fb) => {
                 const id = fb?._id || `${fb?.orderId?._id}-${fb?.createdAt}`;
                 const customer = fb?.userId?.name || "Guest / Khách ẩn danh";
-                const staff = fb?.orderId?.servedBy?.name || "-";
-                const staffRole = fb?.orderId?.servedBy?.role
-                  ? ` (${fb.orderId.servedBy.role})`
-                  : "";
                 const orderShort = fb?.orderId?._id
                   ? `${String(fb.orderId._id).slice(-4)}...`
                   : "-";
@@ -158,10 +150,6 @@ export function FeedbackTable() {
                     className="border-b last:border-0 hover:bg-gray-50"
                   >
                     <td className="p-3 font-medium">{customer}</td>
-                    <td className="p-3">
-                      {staff}
-                      {staffRole}
-                    </td>
                     <td className="p-3">{renderStars(rating)}</td>
                     <td className="p-3">
                       <Dialog
@@ -186,10 +174,6 @@ export function FeedbackTable() {
                           </DialogHeader>
 
                           <div className="space-y-2">
-                            <div>
-                              <span className="text-gray-500">Nhân viên:</span>{" "}
-                              {staff || "-"}
-                            </div>
                             <div>
                               <span className="text-gray-500">Đánh giá:</span>{" "}
                               {renderStars(rating)}
@@ -229,8 +213,7 @@ export function FeedbackTable() {
                                           {item?.quantity || 1}
                                         </td>
                                         <td className="p-2">
-                                          {item?.assignedChef?.name ||
-                                            "Chưa gán"}
+                                          {item?.assignedChef ? "Đã gán" : "Chưa gán"}
                                         </td>
                                       </tr>
                                     ))}
@@ -261,7 +244,7 @@ export function FeedbackTable() {
 
               {filtered.length === 0 && (
                 <tr>
-                  <td className="p-6 text-center text-gray-500" colSpan={6}>
+                  <td className="p-6 text-center text-gray-500" colSpan={5}>
                     Không có phản hồi phù hợp.
                   </td>
                 </tr>
