@@ -18,6 +18,14 @@ export default function InventoryManager({ ingredients, onRefresh }) {
 
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState("");
+  const [copiedId, setCopiedId] = useState(null);
+
+  // ✅ Copy ID vào clipboard
+  const handleCopyId = (id) => {
+    navigator.clipboard.writeText(id);
+    setCopiedId(id);
+    setTimeout(() => setCopiedId(null), 2000);
+  };
 
   // ✅ Hiển thị định dạng tồn kho
   const displayQuantity = (ing) => {
@@ -202,6 +210,7 @@ export default function InventoryManager({ ingredients, onRefresh }) {
         <table className="w-full border-collapse text-sm text-gray-700">
           <thead className="bg-gray-100">
             <tr>
+              <th className="px-4 py-2 text-left">ID</th>
               <th className="px-4 py-2 text-left">Tên nguyên liệu</th>
               <th className="px-4 py-2 text-left">Đơn vị</th>
               <th className="px-4 py-2 text-left">Tồn kho</th>
@@ -214,6 +223,24 @@ export default function InventoryManager({ ingredients, onRefresh }) {
           <tbody>
             {ingredients.map((ing) => (
               <tr key={ing._id} className="border-t hover:bg-gray-50">
+                <td className="px-4 py-2">
+                  <div className="flex items-center space-x-2">
+                    <code className="text-xs bg-gray-100 px-2 py-1 rounded border border-gray-300 font-mono">
+                      {ing._id.substring(0, 8)}...
+                    </code>
+                    <button
+                      onClick={() => handleCopyId(ing._id)}
+                      className={`px-2 py-1 text-xs rounded transition-colors ${
+                        copiedId === ing._id
+                          ? "bg-green-500 text-white"
+                          : "bg-blue-500 hover:bg-blue-600 text-white"
+                      }`}
+                      title={ing._id}
+                    >
+                      {copiedId === ing._id ? "✓" : "📋"}
+                    </button>
+                  </div>
+                </td>
                 <td className="px-4 py-2 font-medium">{ing.name}</td>
                 <td className="px-4 py-2">{ing.unit}</td>
                 <td className="px-4 py-2">{displayQuantity(ing)}</td>
