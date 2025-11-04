@@ -12,7 +12,7 @@ export default function OrderCard({
   availableTables = [],
   onOrderUpdate // Callback để refresh order sau khi đánh dấu đã phục vụ
 }) {
-  const { tableId, status, totalAmount, orderItems, servedBy } = order;
+  const { tableId, status, totalAmount, orderItems } = order;
   const [showRejectModal, setShowRejectModal] = useState(false);
   const [rejectReason, setRejectReason] = useState("");
   const [selectedTable, setSelectedTable] = useState("");
@@ -20,33 +20,29 @@ export default function OrderCard({
   const [markingServed, setMarkingServed] = useState({}); // Track which item is being marked
   const { user } = useAuth();
   
-  // Kiểm tra xem waiter này có quyền đánh dấu đã phục vụ không
-  // Xử lý cả trường hợp servedBy là object hoặc string/ObjectId
-  const canMarkServed = servedBy && user && (
-    (servedBy._id && servedBy._id.toString() === user.id?.toString()) ||
-    (typeof servedBy === 'string' && servedBy === user.id?.toString()) ||
-    (servedBy.toString && servedBy.toString() === user.id?.toString())
-  );
-  
-  // Debug log
-  useEffect(() => {
-    if (!isPending && orderItems) {
-      console.log('🔍 OrderCard Debug:', {
-        orderId: order._id,
-        canMarkServed,
-        servedBy,
-        userId: user?.id,
-        orderItems: orderItems.map(oi => ({
-          _id: oi._id,
-          itemName: oi.itemName,
-          status: oi.status,
-          itemType: oi.itemType,
-          hasComboItems: !!(oi.comboItems && oi.comboItems.length > 0),
-          comboItemsStatus: oi.comboItems?.map(ci => ({ itemName: ci.itemName, status: ci.status }))
-        }))
-      });
-    }
-  }, [order, canMarkServed, isPending, user, orderItems]);
+  // Helper function để check waiter có quyền phục vụ một món không
+  const canMarkItemServed = (orderItem) => {
+    if (!orderItem || !user) return false;
+    const servedBy = orderItem.servedBy;
+    if (!servedBy) return false;
+    return (
+      (servedBy._id && servedBy._id.toString() === user.id?.toString()) ||
+      (typeof servedBy === 'string' && servedBy === user.id?.toString()) ||
+      (servedBy.toString && servedBy.toString() === user.id?.toString())
+    );
+  };
+
+  // Helper function để check waiter có quyền phục vụ một comboItem không
+  const canMarkComboItemServed = (comboItem) => {
+    if (!comboItem || !user) return false;
+    const servedBy = comboItem.servedBy;
+    if (!servedBy) return false;
+    return (
+      (servedBy._id && servedBy._id.toString() === user.id?.toString()) ||
+      (typeof servedBy === 'string' && servedBy === user.id?.toString()) ||
+      (servedBy.toString && servedBy.toString() === user.id?.toString())
+    );
+  };
 
   // Tự động chọn bàn hiện tại nếu order đã có tableId
   useEffect(() => {
@@ -169,6 +165,13 @@ export default function OrderCard({
                       <div className="fw-semibold small text-dark">
                         {itemName} × {item.quantity}
                         {isCombo && <Badge bg="primary" className="ms-2">Combo</Badge>}
+                        {item.servedBy && (
+                          <div className="small text-muted mt-1">
+                            Phục vụ: <span className="fw-semibold">
+                              {item.servedBy.name || item.servedBy}
+                            </span>
+                          </div>
+                        )}
                       </div>
                       {/* Status badge cho món đơn (không phải combo) */}
                       {!isCombo && (
@@ -181,7 +184,7 @@ export default function OrderCard({
                           } className="me-2">
                             {item.status || 'pending'}
                           </Badge>
-                          {!isPending && canMarkServed && item.status === 'ready' && (
+                          {!isPending && canMarkItemServed(item) && item.status === 'ready' && (
                             <Button
                               size="sm"
                               variant="success"
@@ -204,6 +207,11 @@ export default function OrderCard({
                         <div key={idx} className="mb-2 d-flex justify-content-between align-items-center">
                           <div className="flex-grow-1">
                             <small className="text-muted">└ {comboItem.itemName}</small>
+                            {comboItem.servedBy && (
+                              <small className="text-muted ms-2">
+                                (Phục vụ: {comboItem.servedBy.name || comboItem.servedBy})
+                              </small>
+                            )}
                             <Badge bg={
                               comboItem.status === 'ready' ? 'success' :
                               comboItem.status === 'preparing' ? 'warning' :
@@ -213,7 +221,7 @@ export default function OrderCard({
                               {comboItem.status || 'pending'}
                             </Badge>
                           </div>
-                          {!isPending && canMarkServed && comboItem.status === 'ready' && (
+                          {!isPending && canMarkComboItemServed(comboItem) && comboItem.status === 'ready' && (
                             <Button
                               size="sm"
                               variant="success"

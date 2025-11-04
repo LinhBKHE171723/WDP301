@@ -50,6 +50,28 @@ router.get("/reports/customers", customerReportCtrl.getCustomerReport);
 
 // hieu suat nhan vien 
 router.get("/waiters", performanceController.getWaiterStats);
+
+// Test endpoint để trigger stale items reassignment (chỉ dùng để debug)
+router.post("/test/reassign-stale-items", async (req, res) => {
+  try {
+    const { thresholdMinutes } = req.body;
+    const { checkAndReassignStaleItems } = require("../utils/staleItemsChecker");
+    const webSocketService = req.app.get("webSocketService");
+    
+    await checkAndReassignStaleItems(webSocketService, thresholdMinutes || 1);
+    
+    res.status(200).json({
+      success: true,
+      message: `Stale items check completed (threshold: ${thresholdMinutes || 1} minutes)`,
+    });
+  } catch (error) {
+    console.error("Error in test endpoint:", error);
+    res.status(500).json({
+      success: false,
+      message: error.message,
+    });
+  }
+});
 router.get("/chefs", performanceController.getChefStats);
 router.get("/cashiers", performanceController.getCashierStats);
 // ca lam viec

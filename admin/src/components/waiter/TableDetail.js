@@ -3,7 +3,6 @@ import { Container, Card, Spinner, Table as BSTable, Button } from "react-bootst
 import { useParams } from "react-router-dom";
 import { toast } from "react-toastify";
 import Header from "./Header";
-import NotificationBell from "./NotificationBell";
 import waiterApi from "../../api/waiterApi";
 import { useAuth } from "../../context/AuthContext";
 import useWaiterWebSocket from "../../hooks/useWaiterWebSocket";
@@ -110,7 +109,6 @@ export default function TableDetail() {
       <Container className="flex-grow-1 mt-4 pb-5">
         <div className="d-flex flex-wrap justify-content-between align-items-center mb-3">
           <h4 className="fw-bold text-dark mb-3 mb-md-0">Chi tiết bàn</h4>
-          <NotificationBell />
         </div>
 
         {loading ? (
@@ -160,11 +158,6 @@ export default function TableDetail() {
                       {order.totalAmount?.toLocaleString()}₫
                     </span>
                   </p>
-                  {order.servedBy && (
-                    <p className="mb-1 text-muted">
-                      Phục vụ bởi: <span className="fw-semibold">{order.servedBy.name}</span>
-                    </p>
-                  )}
 
                   <div className="table-responsive mt-3">
                     <BSTable striped bordered hover size="sm" responsive>
@@ -180,7 +173,12 @@ export default function TableDetail() {
                         {order.orderItems?.map((oi) => {
                           const isCombo = oi.itemType === 'menu' && oi.comboItems && oi.comboItems.length > 0;
                           const itemName = oi.itemName || oi.itemId?.name || "N/A";
-                          const canMarkServed = order.servedBy && user && order.servedBy._id?.toString() === user.id?.toString();
+                          // Kiểm tra waiter có quyền phục vụ món này không (orderItem.servedBy)
+                          const canMarkItemServed = oi.servedBy && user && (
+                            (oi.servedBy._id && oi.servedBy._id.toString() === user.id?.toString()) ||
+                            (typeof oi.servedBy === 'string' && oi.servedBy === user.id?.toString()) ||
+                            (oi.servedBy.toString && oi.servedBy.toString() === user.id?.toString())
+                          );
                           return (
                             <React.Fragment key={oi._id}>
                               <tr>
@@ -188,6 +186,13 @@ export default function TableDetail() {
                                   <div className="fw-semibold">
                                     {itemName}
                                     {isCombo && <span className="badge bg-primary ms-2">Combo</span>}
+                                    {oi.servedBy && (
+                                      <div className="small text-muted mt-1">
+                                        Phục vụ: <span className="fw-semibold">
+                                          {oi.servedBy.name || oi.servedBy}
+                                        </span>
+                                      </div>
+                                    )}
                                   </div>
                                 </td>
                             <td>{oi.quantity}</td>
@@ -202,7 +207,7 @@ export default function TableDetail() {
                                     }`}>
                                       {oi.status}
                                     </span>
-                                    {!isCombo && canMarkServed && oi.status === 'ready' && (
+                                    {!isCombo && canMarkItemServed && oi.status === 'ready' && (
                                       <Button
                                         size="sm"
                                         variant="success"
@@ -222,7 +227,15 @@ export default function TableDetail() {
                                   <td className="ps-4">
                                     <div className="d-flex align-items-center gap-2">
                                       <small className="text-muted">└ {comboItem.itemName}</small>
-                                      {canMarkServed && comboItem.status === 'ready' && (
+                                      {comboItem.servedBy && (
+                                        <small className="text-muted ms-2">
+                                          (Phục vụ: {comboItem.servedBy.name || comboItem.servedBy})
+                                        </small>
+                                      )}
+                                      {comboItem.servedBy && user && (
+                                        ((comboItem.servedBy._id && comboItem.servedBy._id.toString() === user.id?.toString()) ||
+                                        (typeof comboItem.servedBy === 'string' && comboItem.servedBy === user.id?.toString()))
+                                      ) && comboItem.status === 'ready' && (
                                         <Button
                                           size="sm"
                                           variant="success"

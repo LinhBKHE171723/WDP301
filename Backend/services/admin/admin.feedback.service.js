@@ -13,17 +13,14 @@ exports.getAll = async ({ page = 1, limit = 10, rating, search }) => {
     })
     .populate({
       path: "orderId",
-      select: "_id createdAt servedBy orderItems",
+      select: "_id createdAt orderItems",
       populate: [
-        {
-          path: "servedBy",
-          select: "name email role",
-        },
         {
           path: "orderItems",
           populate: [
             { path: "itemId", select: "name price" },
             { path: "assignedChef", select: "name role" },
+            { path: "servedBy", select: "name email role" },
           ],
         },
       ],

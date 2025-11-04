@@ -31,6 +31,39 @@ async function populateComboItemsChefs(orderItems) {
     }
   }
 }
+
+// Helper function để populate servedBy cho comboItems
+async function populateComboItemsServers(orderItems) {
+  if (!orderItems || !Array.isArray(orderItems)) return;
+  
+  for (const oi of orderItems) {
+    if (oi.comboItems && oi.comboItems.length > 0) {
+      for (const ci of oi.comboItems) {
+        if (ci.servedBy) {
+          // Kiểm tra xem đã được populate chưa
+          if (typeof ci.servedBy === 'object' && ci.servedBy._id && ci.servedBy.name) {
+            // Đã được populate, giữ nguyên
+            continue;
+          } else if (typeof ci.servedBy === 'string' || (typeof ci.servedBy === 'object' && ci.servedBy._id)) {
+            // Chỉ là ObjectId, cần populate
+            const waiterId = typeof ci.servedBy === 'string' ? ci.servedBy : ci.servedBy._id || ci.servedBy;
+            try {
+              const waiter = await User.findById(waiterId).select("name username email");
+              if (waiter) {
+                ci.servedBy = waiter;
+                console.log(`✅ Populated servedBy for comboItem: ${ci.itemName || 'unknown'} -> ${waiter.name}`);
+              } else {
+                console.warn(`⚠️ Waiter not found for comboItem servedBy: ${waiterId}`);
+              }
+            } catch (error) {
+              console.error(`❌ Error populating servedBy for comboItem:`, error);
+            }
+          }
+        }
+      }
+    }
+  }
+}
 // Lấy danh sách đơn hàng cần xác nhận từ waiter
 exports.getPendingOrders = async (req, res) => {
   try {
@@ -39,14 +72,25 @@ exports.getPendingOrders = async (req, res) => {
       "waiterResponse.status": "pending"
     })
       .populate('tableId', 'tableNumber')
-      .populate('orderItems')
+      .populate({
+        path: 'orderItems',
+        populate: {
+          path: 'servedBy',
+          select: 'name username email'
+        }
+      })
       .populate('userId', 'name')
-      .populate('servedBy', 'name email')
       .sort({ createdAt: -1 });
 
     // Populate thông tin item trong orderItems
     for (const order of orders) {
       await populateOrderItemDetails(order.orderItems);
+      
+      // Populate assignedChef và servedBy cho comboItems
+      if (order.orderItems && order.orderItems.length > 0) {
+        await populateComboItemsChefs(order.orderItems);
+        await populateComboItemsServers(order.orderItems); // Populate servedBy cho comboItems
+      }
     }
 
     res.status(200).json({
@@ -150,7 +194,7 @@ exports.respondToOrder = async (req, res) => {
         }
       }
 
-      // Tìm người phục vụ
+      // Tìm người phục vụ (để validate)
       const waiter = await User.findById(waiterId);
       if (!waiter) {
         return res.status(404).json({
@@ -159,7 +203,7 @@ exports.respondToOrder = async (req, res) => {
         });
       }
 
-      order.servedBy = new mongoose.Types.ObjectId(waiter._id);
+      // Không còn set order.servedBy nữa, waiter sẽ được assign tự động khi món ready
       order.waiterResponse.status = 'approved';
       order.waiterResponse.reason = null;
       order.waiterResponse.respondedAt = new Date();
@@ -178,6 +222,9 @@ exports.respondToOrder = async (req, res) => {
     }
 
     // Lưu lịch sử
+    if (!order.confirmationHistory) {
+      order.confirmationHistory = [];
+    }
     order.confirmationHistory.push({
       action: approved ? 'waiter_approved' : 'waiter_rejected',
       timestamp: new Date(),
@@ -190,11 +237,27 @@ exports.respondToOrder = async (req, res) => {
 
     // Populate để trả về cho UI bên phía khách hàng
     const populatedOrder = await Order.findById(order._id)
-      .populate("orderItems")
-      .populate("tableId")
+      .populate({
+        path: "orderItems",
+        select: "itemName itemType comboItems quantity price note status assignedChef servedBy",
+        populate: [
+          {
+            path: "itemId",
+            select: "name price"
+          },
+          {
+            path: "assignedChef",
+            select: "name username"
+          },
+          {
+            path: "servedBy",
+            select: "name username email"
+          }
+        ]
+      })
+      .populate("tableId", "tableNumber status")
       .populate("paymentId")
-      .populate("userId", "name")
-      .populate("servedBy", "name email");
+      .populate("userId", "name email phone");
 
     // Emit WebSocket event để cập nhật real-time cho khách hàng 
     const webSocketService = req.app.get("webSocketService");
@@ -221,35 +284,68 @@ exports.respondToOrder = async (req, res) => {
 // Lấy danh sách đơn hàng đang phục vụ (đã xác nhận)
 exports.getActiveOrders = async (req, res) => {
   try {
+    const waiterId = req.user.id; // Lấy ID của waiter từ token
+
+    // Tìm tất cả các orderItems mà waiter này được gán và có status là 'ready'
+    const assignedReadyOrderItems = await OrderItem.find({
+      servedBy: waiterId,
+      status: "ready"
+    }).select("orderId");
+
+    // Tìm tất cả các comboItems mà waiter này được gán và có status là 'ready'
+    const assignedReadyComboItems = await OrderItem.find({
+      "comboItems.servedBy": waiterId,
+      "comboItems.status": "ready"
+    }).select("orderId");
+
+    // Lấy danh sách các orderId duy nhất từ cả hai loại item
+    const orderIdsWithReadyItems = [
+      ...new Set([
+        ...assignedReadyOrderItems.map(item => item.orderId.toString()),
+        ...assignedReadyComboItems.map(item => item.orderId.toString())
+      ])
+    ].map(id => new mongoose.Types.ObjectId(id));
+
+    // Chỉ lấy các orders có ít nhất 1 món "ready" được gán cho waiter này
     const orders = await Order.find({
-      status: { $in: ["confirmed", "preparing", "ready"] }
+      _id: { $in: orderIdsWithReadyItems }
     })
       .populate('tableId', 'tableNumber')
       .populate({
         path: 'orderItems',
-        select: 'itemName itemType comboItems quantity price note status assignedChef', // Đảm bảo có đầy đủ fields
-        populate: {
-          path: 'assignedChef',
-          select: 'name username'
-        }
+        select: 'itemName itemType comboItems quantity price note status assignedChef servedBy', // Đảm bảo có đầy đủ fields
+        populate: [
+          {
+            path: 'itemId',
+            select: 'name price'
+          },
+          {
+            path: 'assignedChef',
+            select: 'name username'
+          },
+          {
+            path: 'servedBy',
+            select: 'name username email'
+          }
+        ]
       })
       .populate('userId', 'name')
-      .populate('servedBy', 'name email')
       .sort({ createdAt: -1 });
 
     // Populate thông tin item trong orderItems
     for (const order of orders) {
       await populateOrderItemDetails(order.orderItems);
       
-      // Populate assignedChef cho comboItems
+      // Populate assignedChef và servedBy cho comboItems
       if (order.orderItems && order.orderItems.length > 0) {
         await populateComboItemsChefs(order.orderItems);
+        await populateComboItemsServers(order.orderItems); // Populate servedBy cho comboItems
       }
     }
 
     res.status(200).json({
       success: true,
-      data: orders // Đổi từ 'orders' sang 'data' để consistent với các API khác
+      data: orders
     });
   } catch (error) {
     res.status(500).json({
@@ -328,7 +424,28 @@ exports.getServingHistory = async (req, res, next) => {
 
     const { search, table, fromDate, toDate } = req.query;
 
-    const query = { servedBy: waiterId };
+    // Tìm các OrderItem mà waiter này đã phục vụ (status = "served")
+    // Để lấy danh sách orders mà waiter đã tham gia phục vụ
+    const servedOrderItems = await OrderItem.find({
+      servedBy: waiterId,
+      status: "served"
+    }).select("orderId");
+
+    // Cũng tìm comboItems mà waiter đã phục vụ
+    const servedComboOrderItems = await OrderItem.find({
+      "comboItems.servedBy": waiterId,
+      "comboItems.status": "served"
+    }).select("orderId");
+
+    // Lấy danh sách orderIds unique
+    const orderIds = [
+      ...new Set([
+        ...servedOrderItems.map(item => item.orderId.toString()),
+        ...servedComboOrderItems.map(item => item.orderId.toString())
+      ])
+    ].map(id => new mongoose.Types.ObjectId(id));
+
+    const query = { _id: { $in: orderIds } };
 
     // 🔍 Search theo tên khách
     if (search && search.trim() !== "") {
@@ -387,14 +504,32 @@ exports.getServingHistoryDetails = async (req, res) => {
     const waiterId = req.user.id;
     const { orderId } = req.params;
 
-    const order = await Order.findOne({
-      _id: orderId,
-      servedBy: waiterId
-    })
+    // Kiểm tra waiter có phục vụ ít nhất 1 món trong order này không
+    const hasServedItems = await OrderItem.findOne({
+      orderId: orderId,
+      $or: [
+        { servedBy: waiterId, status: "served" },
+        { "comboItems.servedBy": waiterId, "comboItems.status": "served" }
+      ]
+    });
+
+    if (!hasServedItems) {
+      return res.status(403).json({
+        success: false,
+        message: "Bạn không có quyền xem đơn hàng này"
+      });
+    }
+
+    const order = await Order.findById(orderId)
       .populate('tableId', 'tableNumber')
-      .populate('orderItems')
-      .populate('userId', 'name phone email')
-      .populate('servedBy', 'name email');
+      .populate({
+        path: 'orderItems',
+        populate: {
+          path: 'servedBy',
+          select: 'name username email'
+        }
+      })
+      .populate('userId', 'name phone email');
 
     if (!order) {
       return res.status(404).json({
@@ -433,9 +568,8 @@ exports.markOrderItemServed = async (req, res) => {
       });
     }
 
-    // Tìm Order để kiểm tra servedBy
-    const order = await Order.findById(orderItem.orderId)
-      .populate("servedBy", "name email");
+    // Tìm Order để kiểm tra
+    const order = await Order.findById(orderItem.orderId);
 
     if (!order) {
       return res.status(404).json({
@@ -444,11 +578,11 @@ exports.markOrderItemServed = async (req, res) => {
       });
     }
 
-    // Validate: Chỉ waiter được gán order mới có thể đánh dấu đã phục vụ
-    if (!order.servedBy || order.servedBy._id.toString() !== waiterId.toString()) {
+    // Validate: Chỉ waiter được gán món (orderItem.servedBy) mới có thể đánh dấu đã phục vụ
+    if (!orderItem.servedBy || orderItem.servedBy.toString() !== waiterId.toString()) {
       return res.status(403).json({
         success: false,
-        message: "Bạn không có quyền đánh dấu món này. Chỉ waiter được gán order mới có thể thực hiện."
+        message: "Bạn không có quyền đánh dấu món này. Chỉ waiter được gán món mới có thể thực hiện."
       });
     }
 
@@ -500,10 +634,15 @@ exports.markOrderItemServed = async (req, res) => {
 
     // Populate để trả về
     const populatedOrder = await Order.findById(order._id)
-      .populate("orderItems")
+      .populate({
+        path: "orderItems",
+        populate: {
+          path: "servedBy",
+          select: "name username email"
+        }
+      })
       .populate("tableId")
-      .populate("paymentId")
-      .populate("servedBy", "name email");
+      .populate("paymentId");
 
     // Populate thông tin item trong orderItems
     await populateOrderItemDetails(populatedOrder.orderItems);
@@ -560,9 +699,8 @@ exports.markComboItemServed = async (req, res) => {
       });
     }
 
-    // Tìm Order để kiểm tra servedBy
-    const order = await Order.findById(orderItem.orderId)
-      .populate("servedBy", "name email");
+    // Tìm Order để kiểm tra
+    const order = await Order.findById(orderItem.orderId);
 
     if (!order) {
       return res.status(404).json({
@@ -571,16 +709,17 @@ exports.markComboItemServed = async (req, res) => {
       });
     }
 
-    // Validate: Chỉ waiter được gán order mới có thể đánh dấu đã phục vụ
-    if (!order.servedBy || order.servedBy._id.toString() !== waiterId.toString()) {
+    // Validate: Chỉ waiter được gán comboItem (comboItem.servedBy) mới có thể đánh dấu đã phục vụ
+    const comboItem = orderItem.comboItems[index];
+    if (!comboItem.servedBy || comboItem.servedBy.toString() !== waiterId.toString()) {
       return res.status(403).json({
         success: false,
-        message: "Bạn không có quyền đánh dấu món này. Chỉ waiter được gán order mới có thể thực hiện."
+        message: "Bạn không có quyền đánh dấu món này. Chỉ waiter được gán món mới có thể thực hiện."
       });
     }
 
     // Validate: comboItem phải ở trạng thái ready
-    if (orderItem.comboItems[index].status !== "ready") {
+    if (comboItem.status !== "ready") {
       return res.status(400).json({
         success: false,
         message: `Món trong combo phải ở trạng thái 'ready' mới có thể đánh dấu đã phục vụ. Trạng thái hiện tại: ${orderItem.comboItems[index].status}`
@@ -643,19 +782,25 @@ exports.markComboItemServed = async (req, res) => {
     const populatedOrder = await Order.findById(order._id)
       .populate({
         path: "orderItems",
-        select: "itemName itemType comboItems quantity note status assignedChef",
-        populate: {
-          path: "assignedChef",
-          select: "name username"
-        }
+        select: "itemName itemType comboItems quantity note status assignedChef servedBy",
+        populate: [
+          {
+            path: "assignedChef",
+            select: "name username"
+          },
+          {
+            path: "servedBy",
+            select: "name username email"
+          }
+        ]
       })
       .populate("tableId")
-      .populate("paymentId")
-      .populate("servedBy", "name email");
+      .populate("paymentId");
 
-    // Populate assignedChef cho comboItems
+    // Populate assignedChef và servedBy cho comboItems
     if (populatedOrder.orderItems) {
       await populateComboItemsChefs(populatedOrder.orderItems);
+      await populateComboItemsServers(populatedOrder.orderItems); // Dùng helper function
     }
 
     // Populate thông tin item trong orderItems

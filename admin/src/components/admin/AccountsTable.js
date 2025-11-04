@@ -41,7 +41,7 @@ export function AccountsTable() {
   const [limit] = useState(10);
   const [total, setTotal] = useState(0);
 
-  const toggleDropdown = (id) => setOpenRow(openRow === id ? null : id);
+  // const toggleDropdown = (id) => setOpenRow(openRow === id ? null : id); // Unused, commented out
   const handleEdit = (user) => {
     setEditData(user);
     setOpenEdit(true);

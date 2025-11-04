@@ -88,10 +88,10 @@ exports.getItemTrend = async ({ itemId, type = "daily", from, to }) => {
   const defaultFrom = new Date(Date.now() - 7 * 86400000); // Mặc định 7 ngày
   const fromDate = parseDate(from, defaultFrom);
 
-  // 1️⃣ Lấy item + giá vốn (expense) & nguyên liệu hiện tại
+  // 1️⃣ Lấy item + nguyên liệu hiện tại
   const item = await Item.findById(itemId).populate({
     path: "ingredients.ingredient",
-    select: "priceNow name unit"
+    select: "name unit"
   });
 
   if (!item) throw new Error("Item not found");
@@ -129,19 +129,13 @@ exports.getItemTrend = async ({ itemId, type = "daily", from, to }) => {
       const revenue = qty * price;
 
       // ✅ Dùng expense từ OrderItem (snapshot tại thời điểm đặt món)
-      // Nếu OrderItem cũ không có expense, fallback về tính lại (cho backward compatibility)
-      let expensePerUnit = orderItem.expense;
-      if (expensePerUnit == null && item.ingredients?.length) {
-        // Fallback: tính lại từ ingredients hiện tại (cho orders cũ)
-        expensePerUnit = 0;
-        for (const ing of item.ingredients) {
-          const ingDoc = ing.ingredient;
-          if (ingDoc && ingDoc.priceNow != null) {
-            expensePerUnit += ingDoc.priceNow * ing.quantity;
-          }
-        }
+      // Nếu OrderItem không có expense → return 0 (không thể tính lại vì đã bỏ priceNow)
+      const expensePerUnit = orderItem.expense || 0;
+      const totalExpense = expensePerUnit * qty;
+      
+      if (expensePerUnit === 0 && orderItem.expense == null) {
+        console.warn(`⚠️ OrderItem ${orderItem._id} không có expense. Không thể tính expense chính xác.`);
       }
-      const totalExpense = (expensePerUnit || 0) * qty;
 
       // ✅ Gộp dữ liệu
       current.totalQuantity += qty;

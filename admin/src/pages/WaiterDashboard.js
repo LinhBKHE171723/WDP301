@@ -1,7 +1,6 @@
 import React, { useEffect, useState } from "react";
 import Header from "../components/waiter/Header";
 import OrderCard from "../components/waiter/OrderCard";
-import NotificationBell from "../components/waiter/NotificationBell";
 import waiterApi from "../api/waiterApi";
 import useWaiterWebSocket from "../hooks/useWaiterWebSocket";
 import { Container, Spinner, Row, Col } from "react-bootstrap";
@@ -272,7 +271,6 @@ WaiterDashboard có một useEffect lắng nghe lastMessage → xử lý cập n
                             {connectionState === 'reconnecting' && '🟡 Đang kết nối lại...'}
                             {connectionState === 'disconnected' && '🔴 Mất kết nối'}
                         </div>
-                        <NotificationBell />
                     </div>
                 </div>
 

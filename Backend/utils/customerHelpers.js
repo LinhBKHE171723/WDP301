@@ -65,54 +65,159 @@ const validateTableAvailability = (table) => {
 };
 
 /**
- * Tính expense (giá vốn) cho Item hoặc Menu tại thời điểm hiện tại
- * @param {Object} itemOrMenu - Item hoặc Menu object (đã populate ingredients nếu cần)
- * @param {String} type - 'item' hoặc 'menu'
- * @returns {Number} Expense (giá vốn)
+ * Track ingredients từ kho (dry-run - không trừ kho, chỉ track)
+ * @param {Object} item - Item object đã populate ingredients.ingredient
+ * @param {Number} quantity - Số lượng món được đặt
+ * @returns {Array} Array of ingredientUsage objects: [{ purchaseOrderId, ingredientId, quantity, price, batchInfo }]
  */
-const calculateExpense = async (itemOrMenu, type) => {
-  if (type === 'menu') {
-    // Menu: expense = tổng expense của các items trong menu
-    if (!itemOrMenu.items || itemOrMenu.items.length === 0) {
-      return 0;
+const trackIngredientsFromStockDryRun = async (item, quantity) => {
+  if (!item || !item.ingredients || item.ingredients.length === 0) {
+    return [];
+  }
+
+  // Đảm bảo ingredients đã được populate
+  let ingredients = item.ingredients;
+  if (ingredients.length > 0 && (!ingredients[0].ingredient || typeof ingredients[0].ingredient === 'string')) {
+    const populatedItem = await Item.findById(item._id).populate('ingredients.ingredient');
+    if (populatedItem && populatedItem.ingredients) {
+      ingredients = populatedItem.ingredients;
     }
-    
-    let totalExpense = 0;
-    for (const itemId of itemOrMenu.items) {
-      const item = await Item.findById(itemId).populate('ingredients.ingredient');
-      if (item && item.ingredients) {
-        for (const ing of item.ingredients) {
-          const ingDoc = ing.ingredient;
-          if (ingDoc && ingDoc.priceNow != null) {
-            totalExpense += ingDoc.priceNow * ing.quantity;
-          }
+  }
+
+  const PurchaseOrder = require("../models/PurchaseOrder");
+  const now = new Date();
+  const ingredientUsage = [];
+
+  for (const ing of ingredients) {
+    const ingDoc = ing.ingredient;
+    if (ingDoc && ingDoc._id) {
+      const ingredientId = typeof ingDoc === 'object' ? ingDoc._id : ingDoc;
+      const ingredient = await Ingredient.findById(ingredientId);
+      
+      if (!ingredient) {
+        console.warn(`⚠️ Không tìm thấy nguyên liệu với ID: ${ingredientId}`);
+        continue;
+      }
+
+      const quantityToDeduct = quantity * ing.quantity;
+      let remainingToDeduct = quantityToDeduct;
+
+      // Tìm tất cả các lô nhập còn valid - sắp xếp theo FIFO (cũ nhất trước)
+      const allBatches = await PurchaseOrder.find({
+        ingredientId: ingredientId,
+        status: 'valid'
+      })
+      .sort({ time: 1 })
+      .lean();
+
+      // Track từ lô cũ nhất trước, ưu tiên lô chưa hết hạn
+      for (const batch of allBatches) {
+        if (remainingToDeduct <= 0) break;
+
+        // Kiểm tra lô còn hạn không
+        const isStillValid = !batch.expiryDate || new Date(batch.expiryDate) > now;
+        if (!isStillValid) {
+          continue;
+        }
+
+        // Số lượng còn lại trong lô này
+        const availableInBatch = batch.quantity - batch.usedQuantity;
+        
+        if (availableInBatch > 0) {
+          // Số lượng sẽ trừ từ lô này
+          const deductFromBatch = Math.min(remainingToDeduct, availableInBatch);
+          
+          remainingToDeduct -= deductFromBatch;
+          
+          const batchInfo = batch.expiryDate 
+            ? `lô nhập ${new Date(batch.time).toLocaleDateString()} (hết hạn: ${new Date(batch.expiryDate).toLocaleDateString()})`
+            : `lô nhập ${new Date(batch.time).toLocaleDateString()} (không có ngày hết hạn)`;
+          
+          // Lưu thông tin lô (không trừ kho)
+          ingredientUsage.push({
+            purchaseOrderId: batch._id,
+            ingredientId: ingredientId,
+            quantity: deductFromBatch,
+            price: batch.price,
+            batchInfo: batchInfo
+          });
         }
       }
     }
-    return totalExpense;
-  } else {
-    // Item: expense = tổng (ingredient.priceNow * quantity) của tất cả ingredients
-    if (!itemOrMenu.ingredients || itemOrMenu.ingredients.length === 0) {
-      return 0;
+  }
+
+  return ingredientUsage;
+};
+
+/**
+ * Tính expense với tracking từng lô (FIFO - giá thực tế)
+ * @param {Object} itemOrMenu - Item hoặc Menu object (đã populate ingredients nếu cần)
+ * @param {String} type - 'item' hoặc 'menu'
+ * @param {Number} quantity - Số lượng món được đặt
+ * @returns {Object} { expense: Number, ingredientUsage: Array }
+ */
+const calculateExpenseWithTracking = async (itemOrMenu, type, quantity = 1) => {
+  if (type === 'menu') {
+    // Menu: expense = tổng expense của các items trong menu
+    if (!itemOrMenu.items || itemOrMenu.items.length === 0) {
+      return { expense: 0, ingredientUsage: [] };
     }
     
     let totalExpense = 0;
-    // Nếu ingredients chưa được populate, cần populate
-    let ingredients = itemOrMenu.ingredients;
-    if (ingredients.length > 0 && !ingredients[0].ingredient || typeof ingredients[0].ingredient === 'string') {
-      // Chưa populate, cần populate
-      const populatedItem = await Item.findById(itemOrMenu._id).populate('ingredients.ingredient');
-      ingredients = populatedItem.ingredients;
-    }
+    const allIngredientUsage = [];
     
-    for (const ing of ingredients) {
-      const ingDoc = ing.ingredient;
-      if (ingDoc && ingDoc.priceNow != null) {
-        totalExpense += ingDoc.priceNow * ing.quantity;
+    for (const itemId of itemOrMenu.items) {
+      const item = await Item.findById(itemId).populate('ingredients.ingredient');
+      if (item && item.ingredients) {
+        // Track ingredients cho item này (dry-run, không trừ kho)
+        const itemUsage = await trackIngredientsFromStockDryRun(item, quantity);
+        allIngredientUsage.push(...itemUsage);
+        
+        // Tính expense từ ingredientUsage
+        const itemExpense = itemUsage.reduce((sum, usage) => sum + (usage.quantity * usage.price), 0);
+        totalExpense += itemExpense;
       }
     }
-    return totalExpense;
+    
+    return { expense: totalExpense, ingredientUsage: allIngredientUsage };
+  } else {
+    // Item: track từng ingredient và tính expense từ giá thực tế
+    if (!itemOrMenu.ingredients || itemOrMenu.ingredients.length === 0) {
+      return { expense: 0, ingredientUsage: [] };
+    }
+    
+    // Đảm bảo ingredients đã được populate
+    let ingredients = itemOrMenu.ingredients;
+    if (ingredients.length > 0 && (!ingredients[0].ingredient || typeof ingredients[0].ingredient === 'string')) {
+      const populatedItem = await Item.findById(itemOrMenu._id).populate('ingredients.ingredient');
+      if (populatedItem && populatedItem.ingredients) {
+        ingredients = populatedItem.ingredients;
+      }
+    }
+    
+    // Track ingredients từ kho (dry-run, không trừ kho)
+    const ingredientUsage = await trackIngredientsFromStockDryRun(itemOrMenu, quantity);
+    
+    // Tính expense từ ingredientUsage (giá thực tế của từng lô)
+    const expense = ingredientUsage.reduce((sum, usage) => sum + (usage.quantity * usage.price), 0);
+    
+    return { expense, ingredientUsage };
   }
+};
+
+/**
+ * Tính expense (giá vốn) cho Item hoặc Menu - DEPRECATED (backward compatibility only)
+ * @deprecated Không còn dùng priceNow. Nên dùng calculateExpenseWithTracking() để tính từ giá thực tế (FIFO)
+ * @param {Object} itemOrMenu - Item hoặc Menu object (đã populate ingredients nếu cần)
+ * @param {String} type - 'item' hoặc 'menu'
+ * @returns {Number} Expense (giá vốn) - Trả về 0 vì không thể tính chính xác không có priceNow
+ */
+const calculateExpense = async (itemOrMenu, type) => {
+  // ⚠️ priceNow đã bị loại bỏ, không thể tính expense chính xác
+  // Function này chỉ giữ lại cho backward compatibility
+  // Nên dùng calculateExpenseWithTracking() thay thế
+  console.warn('⚠️ calculateExpense() is deprecated. Use calculateExpenseWithTracking() instead.');
+  return 0;
 };
 
 /**
@@ -140,8 +245,10 @@ const createOrderItemsFromCart = async (orderItems) => {
       }
     }
 
-    // Tính expense tại thời điểm đặt món
-    const expense = await calculateExpense(item, orderItem.type);
+    // Tính expense với tracking (FIFO - giá thực tế)
+    const expenseResult = await calculateExpenseWithTracking(item, orderItem.type, orderItem.quantity);
+    const expense = expenseResult.expense;
+    let allIngredientUsage = expenseResult.ingredientUsage;
 
     // Tạo OrderItem với số lượng được yêu cầu
     const OrderItem = require("../models/OrderItem");
@@ -152,7 +259,8 @@ const createOrderItemsFromCart = async (orderItems) => {
       itemType: orderItem.type,
       quantity: orderItem.quantity, // Sử dụng số lượng từ frontend
       price: item.price,
-      expense: expense, // Giá vốn tại thời điểm đặt món
+      expense: expense, // Giá vốn tại thời điểm đặt món (từ giá thực tế)
+      ingredientUsage: allIngredientUsage, // Track từng lô nguyên liệu đã dùng
       status: "pending", // Đảm bảo status là pending
       note: orderItem.note || "",
     };
@@ -180,7 +288,7 @@ const createOrderItemsFromCart = async (orderItems) => {
     createdOrderItems.push(newOrderItem._id);
     totalAmount += item.price * orderItem.quantity; // Tính tổng tiền theo số lượng
 
-    // Trừ nguyên liệu từ kho khi đặt món
+    // Trừ nguyên liệu từ kho khi đặt món (actual deduction)
     try {
       // Xử lý món đơn (itemType === 'item')
       if (orderItem.type === 'item') {
@@ -216,10 +324,11 @@ const createOrderItemsFromCart = async (orderItems) => {
  * Trừ nguyên liệu từ kho khi đặt món (theo FIFO - First In First Out)
  * @param {Object} item - Item object đã populate ingredients.ingredient
  * @param {Number} quantity - Số lượng món được đặt
+ * @returns {Array} Array of ingredientUsage objects: [{ purchaseOrderId, ingredientId, quantity, price, batchInfo }]
  */
 const deductIngredientsFromStock = async (item, quantity) => {
   if (!item || !item.ingredients || item.ingredients.length === 0) {
-    return;
+    return [];
   }
 
   // Đảm bảo ingredients đã được populate
@@ -233,6 +342,7 @@ const deductIngredientsFromStock = async (item, quantity) => {
 
   const PurchaseOrder = require("../models/PurchaseOrder");
   const now = new Date();
+  const ingredientUsage = []; // Array để lưu thông tin các lô đã dùng
 
   for (const ing of ingredients) {
     const ingDoc = ing.ingredient;
@@ -284,6 +394,15 @@ const deductIngredientsFromStock = async (item, quantity) => {
             ? `lô nhập ${new Date(batch.time).toLocaleDateString()} (hết hạn: ${new Date(batch.expiryDate).toLocaleDateString()})`
             : `lô nhập ${new Date(batch.time).toLocaleDateString()} (không có ngày hết hạn)`;
           
+          // Lưu thông tin lô đã dùng vào ingredientUsage
+          ingredientUsage.push({
+            purchaseOrderId: batch._id,
+            ingredientId: ingredientId,
+            quantity: deductFromBatch,
+            price: batch.price, // Giá mua ban đầu của lô
+            batchInfo: batchInfo
+          });
+          
           console.log(`📦 Đã trừ ${deductFromBatch} ${ingredient.unit} từ ${batchInfo} (còn lại trong lô: ${availableInBatch - deductFromBatch})`);
         }
       }
@@ -299,6 +418,8 @@ const deductIngredientsFromStock = async (item, quantity) => {
       }
     }
   }
+
+  return ingredientUsage;
 };
 
 /**
@@ -636,6 +757,7 @@ module.exports = {
   validateTableAvailability,
   createOrderItemsFromCart,
   calculateExpense,
+  calculateExpenseWithTracking,
   deductIngredientsFromStock,
   returnIngredientsToStock,
   returnIngredientsForUnservedItems,

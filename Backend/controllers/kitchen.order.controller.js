@@ -295,7 +295,6 @@ exports.getOrderDetails = async (req, res) => {
   try {
     const order = await Order.findById(orderId)
       .populate("tableId", "tableNumber") // Lấy số bàn từ Table
-      .populate("servedBy", "name username") // Lấy tên nhân viên phục vụ
       .populate("userId", "name phone") // Lấy thông tin khách hàng (nếu có)
       .populate({
         path: "orderItems",
@@ -310,8 +309,13 @@ exports.getOrderDetails = async (req, res) => {
             path: "assignedChef",
             select: "name username", // Tên và username của Chef
           },
+          // Lồng ghép 3: Lấy thông tin Waiter được phân công từ User
+          {
+            path: "servedBy",
+            select: "name username", // Tên và username của Waiter
+          },
         ],
-        select: "quantity note status createdAt itemType comboItems itemName", // Số lượng, ghi chú, trạng thái của OrderItem
+        select: "quantity note status createdAt itemType comboItems itemName servedBy", // Số lượng, ghi chú, trạng thái của OrderItem
       });
 
     if (!order) {
@@ -336,8 +340,6 @@ exports.getOrderDetails = async (req, res) => {
         status: order.status,
         // Thông tin Bàn
         tableNumber: order.tableId ? order.tableId.tableNumber : "N/A",
-        // Thông tin Nhân viên
-        servedBy: order.servedBy ? order.servedBy.name : "Chưa gán",
         // Thông tin Khách hàng (Nếu có)
         customerName: order.userId ? order.userId.name : "Khách vãng lai",
 
@@ -401,7 +403,12 @@ exports.markItemReady = async (req, res) => {
 
     // 2. Cập nhật trạng thái
     orderItem.status = "ready";
+    orderItem.readyAt = new Date(); // Set timestamp khi món chuyển sang "ready"
     await orderItem.save();
+
+    // 2.5. Tự động assign waiter dựa trên workload
+    const { assignWaiterToItem } = require("../utils/waiterHelpers");
+    const assignedWaiter = await assignWaiterToItem(orderItemId);
 
     // 3. (Tùy chọn) Kiểm tra và cập nhật trạng thái Order tổng thể
     // Khi tất cả OrderItem của Order đó đều là 'ready' hoặc 'served',
@@ -429,24 +436,30 @@ exports.markItemReady = async (req, res) => {
       const fullOrder = await Order.findById(orderItem.orderId)
         .populate({
           path: "orderItems",
-          select: "itemName itemType comboItems quantity note status assignedChef", // Đảm bảo có itemName
-          populate: {
-            path: "assignedChef",
-            select: "name username"
-          }
+          select: "itemName itemType comboItems quantity note status assignedChef servedBy", // Đảm bảo có itemName và servedBy
+          populate: [
+            {
+              path: "assignedChef",
+              select: "name username"
+            },
+            {
+              path: "servedBy",
+              select: "name username email"
+            }
+          ]
         })
         .populate("tableId")
-        .populate("paymentId")
-        .populate("servedBy", "name");
+        .populate("paymentId");
       
       if (fullOrder) {
         webSocketService.broadcastToOrder(orderItem.orderId, "order:updated", fullOrder);
         
-        // Thông báo cho waiter được gán order (servedBy) khi món ready
-        if (fullOrder.servedBy && fullOrder.servedBy._id) {
+        // Thông báo cho waiter được gán món (orderItem.servedBy) khi món ready
+        const currentOrderItem = await OrderItem.findById(orderItemId).populate("servedBy", "name username email");
+        if (currentOrderItem && currentOrderItem.servedBy && currentOrderItem.servedBy._id) {
           const itemName = populatedItem.itemName || (populatedItem.itemId?.name || "Món ăn");
           webSocketService.broadcastToWaiter(
-            fullOrder.servedBy._id,
+            currentOrderItem.servedBy._id,
             "item:ready",
             {
               orderId: fullOrder._id.toString(),
@@ -521,6 +534,11 @@ exports.updateComboItemStatus = async (req, res) => {
     // Update combo item status
     orderItem.comboItems[index].status = status;
     
+    // Nếu status là "ready", set readyAt timestamp
+    if (status === "ready") {
+      orderItem.comboItems[index].readyAt = new Date();
+    }
+    
     // Tự động cập nhật status của combo dựa trên comboItems
     const { updateComboStatusBasedOnComboItems } = require("../utils/customerHelpers");
     const oldComboStatus = orderItem.status;
@@ -530,7 +548,14 @@ exports.updateComboItemStatus = async (req, res) => {
       console.log(`🔄 Tự động cập nhật combo status từ '${oldComboStatus}' sang '${newComboStatus}' dựa trên comboItems`);
     }
     
+    // Save trước để comboItem.status được lưu vào DB
     await orderItem.save();
+    
+    // Nếu status là "ready", tự động assign waiter SAU KHI đã save
+    if (status === "ready") {
+      const { assignWaiterToComboItem } = require("../utils/waiterHelpers");
+      await assignWaiterToComboItem(orderItemId, index);
+    }
 
     // Check and update order status
     const order = await Order.findById(orderItem.orderId).populate("orderItems");
@@ -550,38 +575,66 @@ exports.updateComboItemStatus = async (req, res) => {
       const fullOrder = await Order.findById(orderItem.orderId)
         .populate({
           path: "orderItems",
-          select: "itemName itemType comboItems quantity note status assignedChef", // Đảm bảo có itemName
-          populate: {
-            path: "assignedChef",
-            select: "name username"
-          }
+          select: "itemName itemType comboItems quantity note status assignedChef servedBy", // Đảm bảo có itemName và servedBy
+          populate: [
+            {
+              path: "assignedChef",
+              select: "name username"
+            },
+            {
+              path: "servedBy",
+              select: "name username email"
+            }
+          ]
         })
         .populate("tableId")
-        .populate("paymentId")
-        .populate("servedBy", "name");
+        .populate("paymentId");
       
-      // Populate assignedChef cho comboItems
+      // Populate assignedChef và servedBy cho comboItems
       if (fullOrder && fullOrder.orderItems) {
         await populateComboItemsChefs(fullOrder.orderItems);
+        // Populate servedBy cho comboItems
+        for (const oi of fullOrder.orderItems) {
+          if (oi.comboItems && oi.comboItems.length > 0) {
+            for (const ci of oi.comboItems) {
+              if (ci.servedBy && typeof ci.servedBy === 'string') {
+                const waiter = await User.findById(ci.servedBy).select("name username email");
+                if (waiter) {
+                  ci.servedBy = waiter;
+                }
+              }
+            }
+          }
+        }
       }
       
       if (fullOrder) {
         webSocketService.broadcastToOrder(orderItem.orderId, "order:updated", fullOrder);
         
-        // Thông báo cho waiter được gán order (servedBy) khi combo item ready
-        if (status === 'ready' && fullOrder.servedBy && fullOrder.servedBy._id) {
-          const comboItemName = orderItem.comboItems[index].itemName || "Món ăn";
-          webSocketService.broadcastToWaiter(
-            fullOrder.servedBy._id,
-            "comboItem:ready",
-            {
-              orderId: fullOrder._id.toString(),
-              orderItemId: orderItem._id.toString(),
-              comboItemIndex: index,
-              tableNumber: fullOrder.tableId?.tableNumber || fullOrder.tableId?.number || "N/A",
-              comboItemName: comboItemName
+        // Thông báo cho waiter được gán comboItem (comboItem.servedBy) khi combo item ready
+        if (status === 'ready') {
+          // Reload orderItem để có servedBy mới nhất
+          const updatedOrderItem = await OrderItem.findById(orderItemId);
+          if (updatedOrderItem && updatedOrderItem.comboItems && updatedOrderItem.comboItems[index]) {
+            const comboItem = updatedOrderItem.comboItems[index];
+            if (comboItem.servedBy) {
+              const waiter = await User.findById(comboItem.servedBy).select("name username email");
+              if (waiter) {
+                const comboItemName = comboItem.itemName || "Món ăn";
+                webSocketService.broadcastToWaiter(
+                  waiter._id,
+                  "comboItem:ready",
+                  {
+                    orderId: fullOrder._id.toString(),
+                    orderItemId: orderItem._id.toString(),
+                    comboItemIndex: index,
+                    tableNumber: fullOrder.tableId?.tableNumber || fullOrder.tableId?.number || "N/A",
+                    comboItemName: comboItemName
+                  }
+                );
+              }
             }
-          );
+          }
         }
       }
     }
