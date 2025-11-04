@@ -189,83 +189,219 @@ const CustomerReport = () => {
         <div className="p-4 bg-white rounded-lg shadow-md font-sans">
             <h1 className="text-2xl font-bold mb-4">Báo Cáo Khách Hàng Thân Thiết</h1>
             
-            {/* --- BỘ SẮP XẾP TÙY CHỈNH --- */}
-            <div className="mb-4 p-4 border rounded-md bg-gray-50">
-                <div className="flex justify-between items-center mb-3">
-                    <h2 className="text-lg font-semibold text-gray-700">Sắp xếp theo nhiều tiêu chí</h2>
-                    <button
-                        onClick={addSortCriterion}
-                        className="px-3 py-1 bg-blue-500 text-white rounded-md text-sm hover:bg-blue-600"
-                    >
-                        + Thêm tiêu chí
-                    </button>
-                </div>
-                <div className="space-y-2">
-                    {sortCriteria.map((criterion, index) => (
-                        <div key={index} className="flex items-center gap-2 p-2 bg-white rounded border">
-                            <span className="text-sm font-medium text-gray-600 w-8">#{index + 1}</span>
-                            <select
-                                value={criterion.field}
-                                onChange={(e) => updateSortField(index, e.target.value)}
-                                className="flex-1 p-2 border border-gray-300 rounded-md text-sm"
-                            >
-                                {sortableFields.map(field => (
-                                    <option key={field.value} value={field.value}>
-                                        {field.label}
-                                    </option>
-                                ))}
-                            </select>
-                            <button
-                                onClick={() => updateSortDirection(index)}
-                                className="px-3 py-2 bg-gray-200 text-gray-700 rounded-md text-sm hover:bg-gray-300"
-                                title={criterion.direction === 'desc' ? 'Giảm dần' : 'Tăng dần'}
-                            >
-                                {criterion.direction === 'desc' ? '↓' : '↑'}
-                            </button>
-                            <button
-                                onClick={() => removeSortCriterion(index)}
-                                disabled={sortCriteria.length === 1}
-                                className="px-3 py-2 bg-red-500 text-white rounded-md text-sm hover:bg-red-600 disabled:opacity-50 disabled:cursor-not-allowed"
-                                title="Xóa"
-                            >
-                                ×
-                            </button>
-                        </div>
-                    ))}
-                </div>
-            </div>
-            
-            {/* --- BỘ LỌC --- */}
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-4 p-4 border rounded-md">
-                <div className="col-span-full">
-                    <label className="text-sm font-medium text-gray-700 block mb-1">Tìm kiếm (Tên / Email / SĐT)</label>
+            {/* --- BỘ LỌC VÀ SẮP XẾP - Tối ưu --- */}
+            <div style={{ display: "grid", gridTemplateColumns: "1fr", gap: "0.75rem", marginBottom: "1rem", padding: "0.75rem", backgroundColor: "white", borderRadius: "8px", border: "1px solid #e5e7eb", boxShadow: "0 1px 3px 0 rgb(0 0 0 / 0.1)" }}>
+                {/* Search - Full Width */}
+                <div style={{ gridColumn: "1 / -1" }}>
+                    <label style={{ display: "block", marginBottom: "0.375rem", fontWeight: "500", color: "#374151", fontSize: "0.8125rem" }}>Tìm kiếm (Tên / Email / SĐT)</label>
                     <input 
                         type="text" 
                         name="search" 
                         placeholder="Nhập tên, email hoặc số điện thoại..." 
                         value={filters.search} 
                         onChange={handleFilterChange} 
-                        className="w-full p-2 border border-gray-300 rounded-md text-sm"
+                        style={{ 
+                            width: "100%", 
+                            padding: "0.4375rem 0.5rem", 
+                            border: "1px solid #d1d5db", 
+                            borderRadius: "6px", 
+                            fontSize: "0.8125rem",
+                            outline: "none"
+                        }}
                     />
                 </div>
-                <div>
-                    <label className="text-sm font-medium text-gray-700 block mb-1">Từ ngày</label>
-                    <input type="date" name="from" value={filters.from} onChange={handleFilterChange} className="w-full p-2 border border-gray-300 rounded-md text-sm"/>
+
+                {/* Other Filters - Compact Grid */}
+                <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(160px, 1fr))", gap: "0.75rem", gridColumn: "1 / -1" }}>
+                    <div>
+                        <label style={{ display: "block", marginBottom: "0.375rem", fontWeight: "500", color: "#374151", fontSize: "0.8125rem" }}>Từ ngày</label>
+                        <input 
+                            type="date" 
+                            name="from" 
+                            value={filters.from} 
+                            onChange={handleFilterChange} 
+                            style={{ 
+                                width: "100%", 
+                                padding: "0.4375rem 0.5rem", 
+                                border: "1px solid #d1d5db", 
+                                borderRadius: "6px", 
+                                fontSize: "0.8125rem",
+                                outline: "none"
+                            }}
+                        />
+                    </div>
+                    <div>
+                        <label style={{ display: "block", marginBottom: "0.375rem", fontWeight: "500", color: "#374151", fontSize: "0.8125rem" }}>Đến ngày</label>
+                        <input 
+                            type="date" 
+                            name="to" 
+                            value={filters.to} 
+                            onChange={handleFilterChange} 
+                            style={{ 
+                                width: "100%", 
+                                padding: "0.4375rem 0.5rem", 
+                                border: "1px solid #d1d5db", 
+                                borderRadius: "6px", 
+                                fontSize: "0.8125rem",
+                                outline: "none"
+                            }}
+                        />
+                    </div>
+                    <div>
+                        <label style={{ display: "block", marginBottom: "0.375rem", fontWeight: "500", color: "#374151", fontSize: "0.8125rem" }}>Chi tiêu tối thiểu (VND)</label>
+                        <input 
+                            type="number" 
+                            name="minSpent" 
+                            placeholder="VD: 5000000" 
+                            value={filters.minSpent} 
+                            onChange={handleFilterChange} 
+                            style={{ 
+                                width: "100%", 
+                                padding: "0.4375rem 0.5rem", 
+                                border: "1px solid #d1d5db", 
+                                borderRadius: "6px", 
+                                fontSize: "0.8125rem",
+                                outline: "none"
+                            }}
+                        />
+                    </div>
+                    <div>
+                        <label style={{ display: "block", marginBottom: "0.375rem", fontWeight: "500", color: "#374151", fontSize: "0.8125rem" }}>Số đơn tối thiểu</label>
+                        <input 
+                            type="number" 
+                            name="minOrders" 
+                            placeholder="VD: 10" 
+                            value={filters.minOrders} 
+                            onChange={handleFilterChange} 
+                            style={{ 
+                                width: "100%", 
+                                padding: "0.4375rem 0.5rem", 
+                                border: "1px solid #d1d5db", 
+                                borderRadius: "6px", 
+                                fontSize: "0.8125rem",
+                                outline: "none"
+                            }}
+                        />
+                    </div>
                 </div>
-                <div>
-                    <label className="text-sm font-medium text-gray-700 block mb-1">Đến ngày</label>
-                    <input type="date" name="to" value={filters.to} onChange={handleFilterChange} className="w-full p-2 border border-gray-300 rounded-md text-sm"/>
+
+                {/* Sắp xếp theo nhiều tiêu chí */}
+                <div style={{ gridColumn: "1 / -1", marginTop: "0.5rem", paddingTop: "0.75rem", borderTop: "1px solid #e5e7eb" }}>
+                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "0.5rem" }}>
+                        <label style={{ fontWeight: "500", color: "#374151", fontSize: "0.8125rem" }}>Sắp xếp theo nhiều tiêu chí</label>
+                        <button
+                            onClick={addSortCriterion}
+                            style={{ 
+                                padding: "0.375rem 0.625rem", 
+                                backgroundColor: "#3b82f6", 
+                                color: "white", 
+                                borderRadius: "6px", 
+                                fontSize: "0.75rem",
+                                border: "none",
+                                cursor: "pointer",
+                                fontWeight: "500"
+                            }}
+                            onMouseOver={(e) => e.target.style.backgroundColor = "#2563eb"}
+                            onMouseOut={(e) => e.target.style.backgroundColor = "#3b82f6"}
+                        >
+                            + Thêm tiêu chí
+                        </button>
+                    </div>
+                    <div style={{ display: "flex", flexDirection: "column", gap: "0.5rem" }}>
+                        {sortCriteria.map((criterion, index) => (
+                            <div key={index} style={{ display: "flex", alignItems: "center", gap: "0.5rem", padding: "0.5rem", backgroundColor: "#f9fafb", borderRadius: "6px", border: "1px solid #e5e7eb" }}>
+                                <span style={{ fontSize: "0.75rem", fontWeight: "500", color: "#6b7280", minWidth: "24px" }}>#{index + 1}</span>
+                                <select
+                                    value={criterion.field}
+                                    onChange={(e) => updateSortField(index, e.target.value)}
+                                    style={{ 
+                                        flex: 1, 
+                                        padding: "0.4375rem 0.5rem", 
+                                        border: "1px solid #d1d5db", 
+                                        borderRadius: "6px", 
+                                        fontSize: "0.8125rem",
+                                        outline: "none",
+                                        backgroundColor: "white"
+                                    }}
+                                >
+                                    {sortableFields.map(field => (
+                                        <option key={field.value} value={field.value}>
+                                            {field.label}
+                                        </option>
+                                    ))}
+                                </select>
+                                <button
+                                    onClick={() => updateSortDirection(index)}
+                                    style={{ 
+                                        padding: "0.4375rem 0.625rem", 
+                                        backgroundColor: "#e5e7eb", 
+                                        color: "#374151", 
+                                        borderRadius: "6px", 
+                                        fontSize: "0.8125rem",
+                                        border: "none",
+                                        cursor: "pointer",
+                                        fontWeight: "500",
+                                        minWidth: "36px"
+                                    }}
+                                    onMouseOver={(e) => e.target.style.backgroundColor = "#d1d5db"}
+                                    onMouseOut={(e) => e.target.style.backgroundColor = "#e5e7eb"}
+                                    title={criterion.direction === 'desc' ? 'Giảm dần' : 'Tăng dần'}
+                                >
+                                    {criterion.direction === 'desc' ? '↓' : '↑'}
+                                </button>
+                                <button
+                                    onClick={() => removeSortCriterion(index)}
+                                    disabled={sortCriteria.length === 1}
+                                    style={{ 
+                                        padding: "0.4375rem 0.625rem", 
+                                        backgroundColor: sortCriteria.length === 1 ? "#d1d5db" : "#ef4444", 
+                                        color: "white", 
+                                        borderRadius: "6px", 
+                                        fontSize: "0.8125rem",
+                                        border: "none",
+                                        cursor: sortCriteria.length === 1 ? "not-allowed" : "pointer",
+                                        fontWeight: "500",
+                                        minWidth: "36px",
+                                        opacity: sortCriteria.length === 1 ? 0.5 : 1
+                                    }}
+                                    onMouseOver={(e) => {
+                                        if (sortCriteria.length > 1) {
+                                            e.target.style.backgroundColor = "#dc2626";
+                                        }
+                                    }}
+                                    onMouseOut={(e) => {
+                                        if (sortCriteria.length > 1) {
+                                            e.target.style.backgroundColor = "#ef4444";
+                                        }
+                                    }}
+                                    title="Xóa"
+                                >
+                                    ×
+                                </button>
+                            </div>
+                        ))}
+                    </div>
                 </div>
-                <div>
-                    <label className="text-sm font-medium text-gray-700 block mb-1">Chi tiêu tối thiểu (VND)</label>
-                    <input type="number" name="minSpent" placeholder="VD: 5000000" value={filters.minSpent} onChange={handleFilterChange} className="w-full p-2 border border-gray-300 rounded-md text-sm"/>
-                </div>
-                <div>
-                    <label className="text-sm font-medium text-gray-700 block mb-1">Số đơn tối thiểu</label>
-                    <input type="number" name="minOrders" placeholder="VD: 10" value={filters.minOrders} onChange={handleFilterChange} className="w-full p-2 border border-gray-300 rounded-md text-sm"/>
-                </div>
-                 <div className="col-span-full flex justify-end">
-                    <button onClick={handleResetFilters} className="px-4 py-2 bg-gray-500 text-white rounded-md text-sm">Xóa bộ lọc</button>
+
+                {/* Clear Filters Button */}
+                <div style={{ gridColumn: "1 / -1", display: "flex", justifyContent: "flex-end", marginTop: "0.5rem", paddingTop: "0.75rem", borderTop: "1px solid #e5e7eb" }}>
+                    <button 
+                        onClick={handleResetFilters} 
+                        style={{ 
+                            padding: "0.4375rem 0.875rem", 
+                            backgroundColor: "#6b7280", 
+                            color: "white", 
+                            borderRadius: "6px", 
+                            fontSize: "0.8125rem",
+                            border: "none",
+                            cursor: "pointer",
+                            fontWeight: "500"
+                        }}
+                        onMouseOver={(e) => e.target.style.backgroundColor = "#4b5563"}
+                        onMouseOut={(e) => e.target.style.backgroundColor = "#6b7280"}
+                    >
+                        Xóa bộ lọc
+                    </button>
                 </div>
             </div>
 

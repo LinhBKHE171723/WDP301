@@ -1478,6 +1478,77 @@ const seedDatabase = async () => {
       return selectedItems;
     };
 
+    // Helper function để tạo combo order items
+    const createComboOrderItems = async (menus, items, status, assignedChef = null, waiter = null) => {
+      const selectedItems = [];
+      // Chỉ chọn các combo available
+      const availableMenus = menus.filter(menu => menu.isAvailable && menu.type === "combo");
+      if (availableMenus.length === 0) {
+        console.log("⚠️ No available combos found, skipping combo order items");
+        return selectedItems;
+      }
+      
+      // Chọn 1-2 combos
+      const numCombos = getRandomInt(1, 2);
+      
+      for (let j = 0; j < numCombos; j++) {
+        const randomMenu = availableMenus[Math.floor(Math.random() * availableMenus.length)];
+        
+        // Populate menu items để lấy thông tin
+        const populatedMenu = await Menu.findById(randomMenu._id).populate('items');
+        if (!populatedMenu || !populatedMenu.items || populatedMenu.items.length === 0) continue;
+        
+        const quantity = getRandomInt(1, 2);
+        
+        // Tính expense cho combo: tổng expense của tất cả items trong combo
+        let totalExpense = 0;
+        let allIngredientUsage = [];
+        
+        for (const comboItemId of populatedMenu.items) {
+          const comboItem = await Item.findById(comboItemId).populate('ingredients.ingredient');
+          if (!comboItem) continue;
+          
+          // Trừ kho cho từng item trong combo
+          const ingredientUsage = await deductIngredientsFromStock(comboItem, quantity);
+          const expense = ingredientUsage.reduce((sum, usage) => sum + (usage.quantity * usage.price), 0);
+          totalExpense += expense;
+          allIngredientUsage = allIngredientUsage.concat(ingredientUsage);
+        }
+        
+        // Tạo comboItems array
+        const comboItemsData = [];
+        for (const comboItemId of populatedMenu.items) {
+          const comboItem = await Item.findById(comboItemId);
+          if (comboItem) {
+            comboItemsData.push({
+              itemId: comboItem._id,
+              itemName: comboItem.name,
+              status: "pending",
+              assignedChef: null,
+            });
+          }
+        }
+        
+        const servedBy = (status === "served" || status === "paid") && waiter ? waiter._id : null;
+        
+        const orderItem = await OrderItem.create({
+          itemId: randomMenu._id, // itemId trỏ đến Menu collection
+          itemName: randomMenu.name,
+          itemType: "menu", // Quan trọng: itemType = "menu" để nhận biết combo
+          quantity: quantity,
+          price: randomMenu.price,
+          expense: totalExpense,
+          ingredientUsage: allIngredientUsage,
+          comboItems: comboItemsData, // Thêm comboItems array
+          assignedChef,
+          servedBy,
+          status,
+        });
+        selectedItems.push(orderItem);
+      }
+      return selectedItems;
+    };
+
     // ===============================
     // 📌 Cập nhật table theo order
     // ===============================
@@ -1639,8 +1710,17 @@ const seedDatabase = async () => {
       const waiter = activeWaiters[Math.floor(Math.random() * activeWaiters.length)]; // Random waiter
       const chef = chefs[i % chefs.length];
 
-      const orderItems = await createOrderItems(items, "served", chef._id, waiter);
-      const totalAmount = orderItems.reduce(
+      // 20% orders sẽ có combo (khoảng 1-2 orders trong 6 orders)
+      const isComboOrder = (i === 9 || i === 12); // 2 orders có combo
+      const orderItems = isComboOrder 
+        ? await createComboOrderItems(menus, items, "served", chef._id, waiter)
+        : await createOrderItems(items, "served", chef._id, waiter);
+      
+      // Fallback nếu không có combo available
+      const finalOrderItems = orderItems.length === 0 
+        ? await createOrderItems(items, "served", chef._id, waiter)
+        : orderItems;
+      const totalAmount = finalOrderItems.reduce(
         (sum, oi) => sum + oi.price * oi.quantity,
         0
       );
@@ -1656,7 +1736,7 @@ const seedDatabase = async () => {
         userId: customer._id,
         servedBy: waiter._id,
         tableId: table._id,
-        orderItems: orderItems.map((oi) => oi._id),
+        orderItems: finalOrderItems.map((oi) => oi._id),
         paymentId: payment._id,
         status: "paid",
         waiterResponse: { status: "approved", respondedAt: new Date() },
@@ -1666,7 +1746,7 @@ const seedDatabase = async () => {
       });
 
       await OrderItem.updateMany(
-        { _id: { $in: orderItems.map((oi) => oi._id) } },
+        { _id: { $in: finalOrderItems.map((oi) => oi._id) } },
         { orderId: order._id }
       );
 
@@ -1737,8 +1817,29 @@ const seedDatabase = async () => {
         const orderStatus = isCancelled ? "cancelled" : "paid";
         
         // Chọn helper function dựa trên customerType
+        // 20% orders sẽ có combo
+        const isComboOrder = Math.random() < 0.2;
         let orderItems;
-        if (customerType.includes('HIGH_VALUE') || customerType === 'VIP') {
+        
+        if (isComboOrder) {
+          // Tạo combo order items
+          orderItems = await createComboOrderItems(
+            menus,
+            items,
+            isCancelled ? "pending" : "served",
+            randomChef._id,
+            isCancelled ? null : randomWaiter
+          );
+          // Nếu không có combo available, fallback về items thông thường
+          if (orderItems.length === 0) {
+            orderItems = await createOrderItemsWithVariableExpense(
+              items,
+              isCancelled ? "pending" : "served",
+              randomChef._id,
+              isCancelled ? null : randomWaiter
+            );
+          }
+        } else if (customerType.includes('HIGH_VALUE') || customerType === 'VIP') {
           orderItems = await createHighValueOrderItems(
             items,
             isCancelled ? "pending" : "served",
