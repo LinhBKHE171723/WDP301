@@ -9,6 +9,7 @@ const OrderItem = require("../models/OrderItem");
 const Payment = require("../models/Payment");
 const Feedback = require("../models/Feedback");
 const PurchaseOrder = require("../models/PurchaseOrder");
+const Shift = require("../models/Shift");
 
 const seedDatabase = async () => {
   try {
@@ -31,7 +32,7 @@ const seedDatabase = async () => {
 
     // 2️⃣ Tạo user mẫu (dùng for để trigger pre-save hash)
     const userData = [
-      // Customers
+      // Customers - VIP (thân thiết)
       {
         name: "Nguyễn Văn Khách",
         username: "customer01",
@@ -39,7 +40,7 @@ const seedDatabase = async () => {
         email: "customer@example.com",
         phone: "0123456789",
         role: "customer",
-        point: 100,
+        point: 750, // VIP: điểm cao
       },
       {
         name: "Trần Thị Minh",
@@ -48,7 +49,7 @@ const seedDatabase = async () => {
         email: "customer02@example.com",
         phone: "0123456790",
         role: "customer",
-        point: 250,
+        point: 950, // VIP: điểm cao
       },
       {
         name: "Lê Văn Hùng",
@@ -57,8 +58,9 @@ const seedDatabase = async () => {
         email: "customer03@example.com",
         phone: "0123456791",
         role: "customer",
-        point: 150,
+        point: 600, // VIP: điểm cao
       },
+      // Customers - Xấu
       {
         name: "Phạm Thị Lan",
         username: "customer04",
@@ -66,7 +68,7 @@ const seedDatabase = async () => {
         email: "customer04@example.com",
         phone: "0123456792",
         role: "customer",
-        point: 300,
+        point: 10, // Xấu: điểm thấp
       },
       {
         name: "Hoàng Văn Nam",
@@ -75,8 +77,9 @@ const seedDatabase = async () => {
         email: "customer05@example.com",
         phone: "0123456793",
         role: "customer",
-        point: 80,
+        point: 5, // Xấu: điểm thấp
       },
+      // Customers - Bình thường
       {
         name: "Ngô Thị Mai",
         username: "customer06",
@@ -231,57 +234,136 @@ const seedDatabase = async () => {
     const customers = users.filter((u) => u.role === "customer");
     const waiters = users.filter((u) => u.role === "waiter");
     const chefs = users.filter((u) => u.role === "chef");
+    const kitchenManagers = users.filter((u) => u.role === "kitchen_manager");
+
+    // 2.5️⃣ Tạo Shift Data cho nhân viên
+    console.log("📅 Bắt đầu tạo Shift data...");
+    const shifts = [];
+    const shiftThreeMonthsAgo = new Date();
+    shiftThreeMonthsAgo.setMonth(shiftThreeMonthsAgo.getMonth() - 3);
+    const shiftToday = new Date();
+    const shiftTotalDays = Math.floor((shiftToday - shiftThreeMonthsAgo) / (1000 * 60 * 60 * 24));
+
+    // Helper function để tạo shifts cho một nhân viên
+    const createShiftsForEmployee = (employee, daysToWork) => {
+      const employeeShifts = [];
+      const shiftDays = [];
+      
+      // Chọn ngẫu nhiên các ngày làm việc (không làm tất cả các ngày)
+      while (shiftDays.length < daysToWork) {
+        const randomDay = Math.floor(Math.random() * shiftTotalDays);
+        if (!shiftDays.includes(randomDay)) {
+          shiftDays.push(randomDay);
+        }
+      }
+      shiftDays.sort((a, b) => a - b);
+
+      for (const dayOffset of shiftDays) {
+        const shiftDate = new Date(shiftThreeMonthsAgo);
+        shiftDate.setDate(shiftDate.getDate() + dayOffset);
+        
+        // Chọn ca làm việc: ca sáng (7h-15h) hoặc ca chiều (15h-23h)
+        const isMorningShift = Math.random() > 0.5;
+        const startHour = isMorningShift ? 7 + Math.floor(Math.random() * 2) : 15 + Math.floor(Math.random() * 2);
+        const startMinute = Math.floor(Math.random() * 60);
+        
+        const startTime = new Date(shiftDate);
+        startTime.setHours(startHour, startMinute, 0);
+        
+        // End time: sau startTime 6-8 giờ
+        const durationHours = 6 + Math.floor(Math.random() * 3); // 6-8 giờ
+        const endTime = new Date(startTime);
+        endTime.setHours(endTime.getHours() + durationHours);
+        
+        employeeShifts.push({
+          userId: employee._id,
+          date: shiftDate,
+          startTime: startTime,
+          endTime: endTime,
+          status: "checked_out", // Đã check out
+          duration: durationHours * 60, // Phút
+        });
+      }
+
+      return employeeShifts;
+    };
+
+    // Tạo shifts cho waiters (active waiters)
+    const activeWaitersForShift = waiters.filter(w => w.status === "active");
+    for (const waiter of activeWaitersForShift) {
+      const daysToWork = 20 + Math.floor(Math.random() * 11); // 20-30 ngày
+      const waiterShifts = createShiftsForEmployee(waiter, daysToWork);
+      shifts.push(...waiterShifts);
+    }
+
+    // Tạo shifts cho chefs
+    for (const chef of chefs) {
+      const daysToWork = 20 + Math.floor(Math.random() * 11); // 20-30 ngày
+      const chefShifts = createShiftsForEmployee(chef, daysToWork);
+      shifts.push(...chefShifts);
+    }
+
+    // Tạo shifts cho kitchen managers
+    for (const manager of kitchenManagers) {
+      const daysToWork = 20 + Math.floor(Math.random() * 11); // 20-30 ngày
+      const managerShifts = createShiftsForEmployee(manager, daysToWork);
+      shifts.push(...managerShifts);
+    }
+
+    await Shift.insertMany(shifts);
+    console.log(`✅ Đã tạo ${shifts.length} shifts cho nhân viên.`);
 
     // 3️⃣ Nguyên liệu
+    // Lưu ý: stockQuantity sẽ được cập nhật tự động bởi post-save hook của PurchaseOrder
     const ingredients = await Ingredient.insertMany([
-      { name: "Thịt bò", unit: "kg", stockQuantity: 50, minStock: 10, priceNow: 100000 }, // 2000000/20
-      { name: "Cá hồi", unit: "kg", stockQuantity: 30, minStock: 5, priceNow: 100000 }, // 1500000/15
-      { name: "Khoai tây", unit: "kg", stockQuantity: 40, minStock: 8, priceNow: 20000 },
-      { name: "Rau xà lách", unit: "bó", stockQuantity: 60, minStock: 10, priceNow: 10000 }, // 500000/50
-      { name: "Trứng gà", unit: "quả", stockQuantity: 100, minStock: 20, priceNow: 3000 },
-      { name: "Tôm tươi", unit: "kg", stockQuantity: 45, minStock: 10, priceNow: 100000 }, // 2000000/20
-      { name: "Phô mai", unit: "kg", stockQuantity: 25, minStock: 5, priceNow: 80000 }, // 800000/10
-      { name: "Bột mì", unit: "kg", stockQuantity: 30, minStock: 8, priceNow: 12000 }, // 600000/50
-      { name: "Thịt gà", unit: "kg", stockQuantity: 35, minStock: 5, priceNow: 70000 },
-      { name: "Ớt chuông", unit: "kg", stockQuantity: 20, minStock: 3, priceNow: 25000 },
-      { name: "Cà chua", unit: "kg", stockQuantity: 40, minStock: 8, priceNow: 15000 },
-      { name: "Hành tây", unit: "kg", stockQuantity: 25, minStock: 5, priceNow: 20000 },
-      { name: "Bơ", unit: "hộp", stockQuantity: 15, minStock: 3, priceNow: 80000 },
-      { name: "Nước mắm", unit: "chai", stockQuantity: 50, minStock: 10, priceNow: 40000 },
-      { name: "Tỏi", unit: "kg", stockQuantity: 30, minStock: 6, priceNow: 50000 },
+      { name: "Thịt bò", unit: "kg", stockQuantity: 50, minStock: 10 },
+      { name: "Cá hồi", unit: "kg", stockQuantity: 30, minStock: 5 },
+      { name: "Khoai tây", unit: "kg", stockQuantity: 40, minStock: 8 },
+      { name: "Rau xà lách", unit: "bó", stockQuantity: 60, minStock: 10 },
+      { name: "Trứng gà", unit: "quả", stockQuantity: 100, minStock: 20 },
+      { name: "Tôm tươi", unit: "kg", stockQuantity: 45, minStock: 10 },
+      { name: "Phô mai", unit: "kg", stockQuantity: 25, minStock: 5 },
+      { name: "Bột mì", unit: "kg", stockQuantity: 30, minStock: 8 },
+      { name: "Thịt gà", unit: "kg", stockQuantity: 35, minStock: 5 },
+      { name: "Ớt chuông", unit: "kg", stockQuantity: 20, minStock: 3 },
+      { name: "Cà chua", unit: "kg", stockQuantity: 40, minStock: 8 },
+      { name: "Hành tây", unit: "kg", stockQuantity: 25, minStock: 5 },
+      { name: "Bơ", unit: "hộp", stockQuantity: 15, minStock: 3 },
+      { name: "Nước mắm", unit: "chai", stockQuantity: 50, minStock: 10 },
+      { name: "Tỏi", unit: "kg", stockQuantity: 30, minStock: 6 },
       // Thêm nguyên liệu mới
-      { name: "Thịt heo", unit: "kg", stockQuantity: 8, minStock: 10, priceNow: 72000 }, // 1800000/25 - Stock thấp để test cảnh báo
-      { name: "Cá basa", unit: "kg", stockQuantity: 25, minStock: 5, priceNow: 40000 }, // 1200000/30
-      { name: "Mực tươi", unit: "kg", stockQuantity: 20, minStock: 5, priceNow: 100000 }, // 1500000/15
-      { name: "Cua biển", unit: "kg", stockQuantity: 15, minStock: 3, priceNow: 180000 },
-      { name: "Nấm hương", unit: "kg", stockQuantity: 12, minStock: 2, priceNow: 150000 },
-      { name: "Rau muống", unit: "bó", stockQuantity: 30, minStock: 5, priceNow: 8000 },
-      { name: "Rau cải", unit: "bó", stockQuantity: 25, minStock: 5, priceNow: 7000 },
-      { name: "Cà rốt", unit: "kg", stockQuantity: 35, minStock: 8, priceNow: 18000 },
-      { name: "Khoai lang", unit: "kg", stockQuantity: 20, minStock: 5, priceNow: 15000 },
-      { name: "Bí đỏ", unit: "kg", stockQuantity: 15, minStock: 3, priceNow: 12000 },
-      { name: "Dưa chuột", unit: "kg", stockQuantity: 18, minStock: 4, priceNow: 16000 },
-      { name: "Cà tím", unit: "kg", stockQuantity: 12, minStock: 3, priceNow: 20000 },
-      { name: "Đậu phụ", unit: "miếng", stockQuantity: 50, minStock: 10, priceNow: 5000 },
-      { name: "Mì tôm", unit: "gói", stockQuantity: 100, minStock: 20, priceNow: 5000 },
-      { name: "Bún tươi", unit: "kg", stockQuantity: 25, minStock: 5, priceNow: 15000 },
-      { name: "Phở tươi", unit: "kg", stockQuantity: 20, minStock: 4, priceNow: 20000 },
-      { name: "Gạo", unit: "kg", stockQuantity: 200, minStock: 50, priceNow: 10000 }, // 1000000/100
-      { name: "Dầu ăn", unit: "chai", stockQuantity: 30, minStock: 5, priceNow: 45000 },
-      { name: "Muối", unit: "kg", stockQuantity: 50, minStock: 10, priceNow: 8000 },
-      { name: "Đường", unit: "kg", stockQuantity: 40, minStock: 8, priceNow: 15000 },
-      { name: "Tiêu", unit: "kg", stockQuantity: 15, minStock: 3, priceNow: 250000 },
-      { name: "Ớt hiểm", unit: "kg", stockQuantity: 8, minStock: 2, priceNow: 80000 },
-      { name: "Chanh", unit: "quả", stockQuantity: 60, minStock: 10, priceNow: 2000 },
-      { name: "Coca Cola", unit: "lon", stockQuantity: 200, minStock: 50, priceNow: 2500 }, // 500000/200
-      { name: "Pepsi", unit: "lon", stockQuantity: 150, minStock: 30, priceNow: 2500 },
-      { name: "Nước suối", unit: "chai", stockQuantity: 300, minStock: 50, priceNow: 5000 },
-      { name: "Trà đá", unit: "ly", stockQuantity: 100, minStock: 20, priceNow: 3000 },
-      { name: "Cà phê đen", unit: "ly", stockQuantity: 80, minStock: 15, priceNow: 5000 },
-      { name: "Sữa tươi", unit: "hộp", stockQuantity: 50, minStock: 10, priceNow: 13333 }, // 400000/30
-      { name: "Kem vani", unit: "hộp", stockQuantity: 20, minStock: 5, priceNow: 50000 },
-      { name: "Bánh mì", unit: "ổ", stockQuantity: 100, minStock: 20, priceNow: 10000 },
-      { name: "Bánh ngọt", unit: "cái", stockQuantity: 30, minStock: 5, priceNow: 20000 },
+      { name: "Thịt heo", unit: "kg", stockQuantity: 8, minStock: 10 }, // Stock thấp để test cảnh báo
+      { name: "Cá basa", unit: "kg", stockQuantity: 25, minStock: 5 },
+      { name: "Mực tươi", unit: "kg", stockQuantity: 20, minStock: 5 },
+      { name: "Cua biển", unit: "kg", stockQuantity: 15, minStock: 3 },
+      { name: "Nấm hương", unit: "kg", stockQuantity: 12, minStock: 2 },
+      { name: "Rau muống", unit: "bó", stockQuantity: 30, minStock: 5 },
+      { name: "Rau cải", unit: "bó", stockQuantity: 25, minStock: 5 },
+      { name: "Cà rốt", unit: "kg", stockQuantity: 35, minStock: 8 },
+      { name: "Khoai lang", unit: "kg", stockQuantity: 20, minStock: 5 },
+      { name: "Bí đỏ", unit: "kg", stockQuantity: 15, minStock: 3 },
+      { name: "Dưa chuột", unit: "kg", stockQuantity: 18, minStock: 4 },
+      { name: "Cà tím", unit: "kg", stockQuantity: 12, minStock: 3 },
+      { name: "Đậu phụ", unit: "miếng", stockQuantity: 50, minStock: 10 },
+      { name: "Mì tôm", unit: "gói", stockQuantity: 100, minStock: 20 },
+      { name: "Bún tươi", unit: "kg", stockQuantity: 25, minStock: 5 },
+      { name: "Phở tươi", unit: "kg", stockQuantity: 20, minStock: 4 },
+      { name: "Gạo", unit: "kg", stockQuantity: 200, minStock: 50 },
+      { name: "Dầu ăn", unit: "chai", stockQuantity: 30, minStock: 5 },
+      { name: "Muối", unit: "kg", stockQuantity: 50, minStock: 10 },
+      { name: "Đường", unit: "kg", stockQuantity: 40, minStock: 8 },
+      { name: "Tiêu", unit: "kg", stockQuantity: 15, minStock: 3 },
+      { name: "Ớt hiểm", unit: "kg", stockQuantity: 8, minStock: 2 },
+      { name: "Chanh", unit: "quả", stockQuantity: 60, minStock: 10 },
+      { name: "Coca Cola", unit: "lon", stockQuantity: 200, minStock: 50 },
+      { name: "Pepsi", unit: "lon", stockQuantity: 150, minStock: 30 },
+      { name: "Nước suối", unit: "chai", stockQuantity: 300, minStock: 50 },
+      { name: "Trà đá", unit: "ly", stockQuantity: 100, minStock: 20 },
+      { name: "Cà phê đen", unit: "ly", stockQuantity: 80, minStock: 15 },
+      { name: "Sữa tươi", unit: "hộp", stockQuantity: 50, minStock: 10 },
+      { name: "Kem vani", unit: "hộp", stockQuantity: 20, minStock: 5 },
+      { name: "Bánh mì", unit: "ổ", stockQuantity: 100, minStock: 20 },
+      { name: "Bánh ngọt", unit: "cái", stockQuantity: 30, minStock: 5 },
     ]);
     console.log("🥦 Đã tạo các Ingredient mẫu.");
 
@@ -951,53 +1033,298 @@ const seedDatabase = async () => {
       )
     );
 
-    // 6️⃣ Tạo orders với nhiều trạng thái khác nhau
+    // ===============================
+    // 📦 5.5️⃣ Purchase Orders - TẠO TRƯỚC Orders để có thể tính expense chính xác
+    // ===============================
+    console.log("📦 Bắt đầu tạo Purchase Orders...");
+    
+    // Lưu giá trị ban đầu của stockQuantity trước khi set = 0
+    const originalStockQuantities = {};
+    for (const ingredient of ingredients) {
+      originalStockQuantities[ingredient.name] = ingredient.stockQuantity;
+      ingredient.stockQuantity = 0;
+      await ingredient.save();
+    }
+    
+    const purchaseOrders = [];
+    const now = Date.now();
+    
+    // Helper function để tạo PurchaseOrder cho một ingredient
+    const createPurchaseOrdersForIngredient = (ingredient, batches) => {
+      // batches = [{ quantity, daysFromNow, price }]
+      let totalQuantity = 0;
+      batches.forEach((batch, index) => {
+        const daysAgo = batch.daysAgo || 0; // Nếu không có daysAgo, mặc định là 0 (hôm nay)
+        const time = new Date(now - daysAgo * 24 * 60 * 60 * 1000);
+        const expiryDate = batch.daysFromNow 
+          ? new Date(now + batch.daysFromNow * 24 * 60 * 60 * 1000)
+          : null;
+        
+        purchaseOrders.push({
+          ingredientId: ingredient._id,
+          quantity: batch.quantity,
+          unit: ingredient.unit,
+          price: batch.price || 0, // Giá phải được set trong batch
+          time: time,
+          expiryDate: expiryDate,
+          usedQuantity: 0,
+          status: expiryDate && expiryDate < new Date() ? 'expired' : 'valid'
+        });
+        totalQuantity += batch.quantity;
+      });
+      
+      // Kiểm tra xem tổng có khớp với stockQuantity không (sau khi post-save hook cộng)
+      // Lưu ý: stockQuantity ban đầu = 0, sẽ được cộng bởi post-save hook
+    };
+
+    // Tạo PurchaseOrders cho từng ingredient, chia thành nhiều lô để test FIFO
+    // LƯU Ý: Tăng số lượng lên nhiều lần (x20-30) để đủ cho ~2000 orders trong 90 ngày
+    // Ví dụ: Thịt bò có 50kg ban đầu → tăng lên 1000kg để đủ cho tất cả orders
+    
+    // Thịt bò: 50kg × 20 = 1000kg
+    createPurchaseOrdersForIngredient(
+      ingredients.find((i) => i.name === "Thịt bò"),
+      [
+        { quantity: 400, daysAgo: 10, daysFromNow: 15, price: 95000 }, // Lô cũ, hết hạn sau 15 ngày
+        { quantity: 600, daysAgo: 2, daysFromNow: 30, price: 105000 }  // Lô mới, hết hạn sau 30 ngày
+      ]
+    );
+
+    // Cá hồi: 30kg × 20 = 600kg
+    createPurchaseOrdersForIngredient(
+      ingredients.find((i) => i.name === "Cá hồi"),
+      [
+        { quantity: 300, daysAgo: 8, daysFromNow: 7, price: 95000 },   // Lô cũ, hết hạn sau 7 ngày
+        { quantity: 300, daysAgo: 1, daysFromNow: 20, price: 105000 } // Lô mới, hết hạn sau 20 ngày
+      ]
+    );
+
+    // Khoai tây: 40kg × 20 = 800kg
+    createPurchaseOrdersForIngredient(
+      ingredients.find((i) => i.name === "Khoai tây"),
+      [
+        { quantity: 400, daysAgo: 15, daysFromNow: 45, price: 19000 },
+        { quantity: 400, daysAgo: 3, daysFromNow: 60, price: 21000 }
+      ]
+    );
+
+    // Rau xà lách: 60 bó × 20 = 1200 bó
+    createPurchaseOrdersForIngredient(
+      ingredients.find((i) => i.name === "Rau xà lách"),
+      [
+        { quantity: 600, daysAgo: 5, daysFromNow: 3, price: 9500 },  // Lô cũ, hết hạn sau 3 ngày
+        { quantity: 600, daysAgo: 1, daysFromNow: 7, price: 10500 } // Lô mới, hết hạn sau 7 ngày
+      ]
+    );
+
+    // Trứng gà: 100 quả × 20 = 2000 quả
+    createPurchaseOrdersForIngredient(
+      ingredients.find((i) => i.name === "Trứng gà"),
+      [
+        { quantity: 1000, daysAgo: 7, daysFromNow: 14, price: 2900 },
+        { quantity: 1000, daysAgo: 2, daysFromNow: 21, price: 3100 }
+      ]
+    );
+
+    // Tôm tươi: 45kg × 20 = 900kg
+    createPurchaseOrdersForIngredient(
+      ingredients.find((i) => i.name === "Tôm tươi"),
+      [
+        { quantity: 400, daysAgo: 6, daysFromNow: 4, price: 95000 },   // Lô cũ, hết hạn sau 4 ngày
+        { quantity: 500, daysAgo: 1, daysFromNow: 15, price: 105000 }  // Lô mới, hết hạn sau 15 ngày
+      ]
+    );
+
+    // Phô mai: 25kg × 20 = 500kg
+    createPurchaseOrdersForIngredient(
+      ingredients.find((i) => i.name === "Phô mai"),
+      [
+        { quantity: 200, daysAgo: 12, daysFromNow: 18, price: 75000 },
+        { quantity: 300, daysAgo: 3, daysFromNow: 30, price: 85000 }
+      ]
+    );
+
+    // Bột mì: 30kg × 20 = 600kg
+    createPurchaseOrdersForIngredient(
+      ingredients.find((i) => i.name === "Bột mì"),
+      [
+        { quantity: 300, daysAgo: 20, daysFromNow: 100, price: 11500 },
+        { quantity: 300, daysAgo: 5, daysFromNow: 120, price: 12500 }
+      ]
+    );
+
+    // Thịt gà: 35kg × 20 = 700kg
+    createPurchaseOrdersForIngredient(
+      ingredients.find((i) => i.name === "Thịt gà"),
+      [
+        { quantity: 300, daysAgo: 10, daysFromNow: 10, price: 68000 },
+        { quantity: 400, daysAgo: 2, daysFromNow: 25, price: 72000 }
+      ]
+    );
+
+    // Thịt heo: 8kg × 20 = 160kg (vẫn thấp để test cảnh báo)
+    createPurchaseOrdersForIngredient(
+      ingredients.find((i) => i.name === "Thịt heo"),
+      [
+        { quantity: 160, daysAgo: 3, daysFromNow: 5, price: 70000 }
+      ]
+    );
+
+    // Thêm một số lô đã HẾT HẠN để test hệ thống
+    // Rau xà lách: thêm lô đã hết hạn (hết hạn 2 ngày trước)
+    createPurchaseOrdersForIngredient(
+      ingredients.find((i) => i.name === "Rau xà lách"),
+      [
+        { quantity: 50, daysAgo: 5, daysFromNow: -2, price: 9000 } // Đã hết hạn 2 ngày trước
+      ]
+    );
+
+    // Cá hồi: thêm lô sắp hết hạn (hết hạn sau 1 ngày)
+    createPurchaseOrdersForIngredient(
+      ingredients.find((i) => i.name === "Cá hồi"),
+      [
+        { quantity: 50, daysAgo: 3, daysFromNow: 1, price: 98000 } // Sắp hết hạn (1 ngày)
+      ]
+    );
+
+    // Tôm tươi: thêm lô đã hết hạn (hết hạn 5 ngày trước)
+    createPurchaseOrdersForIngredient(
+      ingredients.find((i) => i.name === "Tôm tươi"),
+      [
+        { quantity: 30, daysAgo: 10, daysFromNow: -5, price: 93000 } // Đã hết hạn 5 ngày trước
+      ]
+    );
+
+    // Trứng gà: thêm lô sắp hết hạn (hết hạn sau 2 ngày)
+    createPurchaseOrdersForIngredient(
+      ingredients.find((i) => i.name === "Trứng gà"),
+      [
+        { quantity: 100, daysAgo: 5, daysFromNow: 2, price: 2800 } // Sắp hết hạn (2 ngày)
+      ]
+    );
+
+    // Thịt bò: thêm lô đã hết hạn (hết hạn 3 ngày trước) - nhưng vẫn còn một ít trong kho
+    createPurchaseOrdersForIngredient(
+      ingredients.find((i) => i.name === "Thịt bò"),
+      [
+        { quantity: 50, daysAgo: 8, daysFromNow: -3, price: 92000 } // Đã hết hạn 3 ngày trước
+      ]
+    );
+
+    // Tạo PurchaseOrders cho các nguyên liệu còn lại (đơn giản hóa: 1 lô mỗi ingredient)
+    const remainingIngredients = ingredients.filter(ing => 
+      !['Thịt bò', 'Cá hồi', 'Khoai tây', 'Rau xà lách', 'Trứng gà', 'Tôm tươi', 
+        'Phô mai', 'Bột mì', 'Thịt gà', 'Thịt heo'].includes(ing.name)
+    );
+
+    // Giá mặc định cho các nguyên liệu còn lại (có thể điều chỉnh)
+    const defaultPrices = {
+      'Ớt chuông': 25000, 'Cà chua': 15000, 'Hành tây': 20000, 'Bơ': 80000,
+      'Nước mắm': 40000, 'Tỏi': 50000, 'Cá basa': 40000, 'Mực tươi': 100000,
+      'Cua biển': 180000, 'Nấm hương': 150000, 'Rau muống': 8000, 'Rau cải': 7000,
+      'Cà rốt': 18000, 'Khoai lang': 15000, 'Bí đỏ': 12000, 'Dưa chuột': 16000,
+      'Cà tím': 20000, 'Đậu phụ': 5000, 'Mì tôm': 5000, 'Bún tươi': 15000,
+      'Phở tươi': 20000, 'Gạo': 10000, 'Dầu ăn': 45000, 'Muối': 8000,
+      'Đường': 15000, 'Tiêu': 250000, 'Ớt hiểm': 80000, 'Chanh': 2000,
+      'Coca Cola': 2500, 'Pepsi': 2500, 'Nước suối': 5000, 'Trà đá': 3000,
+      'Cà phê đen': 5000, 'Sữa tươi': 13333, 'Kem vani': 50000, 'Bánh mì': 10000,
+      'Bánh ngọt': 20000
+    };
+
+    remainingIngredients.forEach(ingredient => {
+      const defaultPrice = defaultPrices[ingredient.name] || 10000; // Giá mặc định 10000 nếu không có
+      
+      // Tăng số lượng lên 20 lần để đủ cho ~2000 orders
+      // Lấy giá trị ban đầu từ originalStockQuantities (trước khi set = 0)
+      const originalStockQty = originalStockQuantities[ingredient.name] || 0;
+      // Tạm thời dùng multiplier 20-30 tùy theo loại nguyên liệu
+      // Đồ uống và gạo có multiplier thấp hơn vì số lượng ban đầu đã lớn
+      const multiplier = ingredient.name.includes('Coca') || ingredient.name.includes('Pepsi') || 
+                        ingredient.name.includes('Nước suối') || ingredient.name.includes('Gạo') ? 10 : 20;
+      
+      const totalQuantity = originalStockQty * multiplier;
+      
+      // Tạo 1-2 lô tùy theo số lượng
+      if (totalQuantity > 100) {
+        // Chia thành 2 lô nếu số lượng lớn
+        const qty1 = Math.floor(totalQuantity / 2);
+        const qty2 = totalQuantity - qty1;
+        createPurchaseOrdersForIngredient(ingredient, [
+          { quantity: qty1, daysAgo: 5, daysFromNow: 30, price: defaultPrice * 0.95 },
+          { quantity: qty2, daysAgo: 1, daysFromNow: 60, price: defaultPrice * 1.05 }
+        ]);
+      } else {
+        // 1 lô nếu số lượng nhỏ
+        createPurchaseOrdersForIngredient(ingredient, [
+          { quantity: totalQuantity, daysAgo: 3, daysFromNow: 30, price: defaultPrice }
+        ]);
+      }
+    });
+
+    // Insert tất cả PurchaseOrders
+    // LƯU Ý: insertMany KHÔNG trigger post-save hooks, nên cần tính lại stockQuantity thủ công
+    const createdPurchaseOrders = await PurchaseOrder.insertMany(purchaseOrders);
+    console.log(`📦 Đã tạo ${createdPurchaseOrders.length} PurchaseOrders cho ${ingredients.length} nguyên liệu.`);
+    
+    // Tính lại stockQuantity cho mỗi ingredient từ các PurchaseOrders
+    // (vì insertMany không trigger post-save hook)
+    for (const ingredient of ingredients) {
+      const ingredientPurchaseOrders = createdPurchaseOrders.filter(
+        po => po.ingredientId.toString() === ingredient._id.toString()
+      );
+      
+      // Tính tổng quantity từ tất cả PurchaseOrders
+      const totalQuantity = ingredientPurchaseOrders.reduce((sum, po) => sum + po.quantity, 0);
+      
+      // Cập nhật stockQuantity
+      ingredient.stockQuantity = totalQuantity;
+      await ingredient.save();
+      
+      console.log(`✅ Đã cập nhật ${ingredient.name}: stockQuantity = ${totalQuantity} (từ ${ingredientPurchaseOrders.length} lô nhập)`);
+    }
+
+    // ===============================
+    // 🍽️ 6️⃣ Tạo orders mẫu
+    // ===============================
 
 
     // ===============================
     // ⚙️ Helper functions
     // ===============================
 
-    // Helper function tính expense từ ingredients
-    const calculateItemExpense = async (item) => {
-      if (!item.ingredients || item.ingredients.length === 0) {
-        return 0;
-      }
-      
-      // Luôn populate ingredients vì items từ insertMany() chưa được populate
-      // và ingredients.ingredient chỉ là ObjectId references
-      const populatedItem = await Item.findById(item._id).populate('ingredients.ingredient');
-      
-      if (!populatedItem || !populatedItem.ingredients) {
-        return 0;
-      }
-      
-      let totalExpense = 0;
-      for (const ing of populatedItem.ingredients) {
-        const ingDoc = ing.ingredient;
-        if (ingDoc && typeof ingDoc.priceNow === 'number') {
-          totalExpense += ingDoc.priceNow * ing.quantity;
-        }
-      }
-      return totalExpense;
-    };
-
-    const createOrderItems = async (items, status, assignedChef = null) => {
+    // Helper function - Thực sự trừ kho và tính expense từ giá thực tế (FIFO)
+    const { deductIngredientsFromStock } = require("./customerHelpers");
+    
+    const createOrderItems = async (items, status, assignedChef = null, waiter = null) => {
       const selectedItems = [];
       for (let j = 0; j < Math.min(3, items.length); j++) {
         const randomItem = items[Math.floor(Math.random() * items.length)];
         
-        // Tính expense tại thời điểm tạo OrderItem
-        const expense = await calculateItemExpense(randomItem);
+        // Populate ingredients để trừ kho
+        const populatedItem = await Item.findById(randomItem._id).populate('ingredients.ingredient');
+        if (!populatedItem) continue;
+        
+        const quantity = Math.floor(Math.random() * 2) + 1;
+        
+        // Thực sự trừ kho và lấy ingredientUsage (FIFO - giá thực tế)
+        const ingredientUsage = await deductIngredientsFromStock(populatedItem, quantity);
+        
+        // Tính expense từ ingredientUsage (giá thực tế của từng lô)
+        const expense = ingredientUsage.reduce((sum, usage) => sum + (usage.quantity * usage.price), 0);
+        
+        // Gán servedBy nếu status là "served" hoặc "paid" và có waiter
+        const servedBy = (status === "served" || status === "paid") && waiter ? waiter._id : null;
         
         const orderItem = await OrderItem.create({
           itemId: randomItem._id,
           itemName: randomItem.name,
           itemType: "item",
-          quantity: Math.floor(Math.random() * 2) + 1,
+          quantity: quantity,
           price: randomItem.price,
-          expense: expense, // Giá vốn tại thời điểm đặt món
+          expense: expense, // Giá vốn tại thời điểm đặt món (từ giá thực tế FIFO)
+          ingredientUsage: ingredientUsage, // Track từng lô nguyên liệu đã dùng (thực tế đã trừ kho)
           assignedChef,
+          servedBy,
           status,
         });
         selectedItems.push(orderItem);
@@ -1043,29 +1370,39 @@ const seedDatabase = async () => {
       return newDate;
     };
 
-    // Tạo order items với expense biến động ngẫu nhiên
-    const createOrderItemsWithVariableExpense = async (items, status, assignedChef = null) => {
+    // Tạo order items với expense biến động ngẫu nhiên (cho testing variation)
+    const createOrderItemsWithVariableExpense = async (items, status, assignedChef = null, waiter = null) => {
       const selectedItems = [];
       const numItems = getRandomInt(1, 5); // 1-5 items mỗi order
       
       for (let j = 0; j < numItems; j++) {
         const randomItem = items[Math.floor(Math.random() * items.length)];
         
-        // Tính expense base tại thời điểm tạo OrderItem
-        const baseExpense = await calculateItemExpense(randomItem);
+        // Populate ingredients để trừ kho
+        const populatedItem = await Item.findById(randomItem._id).populate('ingredients.ingredient');
+        if (!populatedItem) continue;
         
-        // Áp dụng multiplier ngẫu nhiên (0.8x - 1.2x)
-        const expenseMultiplier = getRandomExpenseMultiplier();
-        const finalExpense = baseExpense * expenseMultiplier;
+        const quantity = getRandomInt(1, 3); // 1-3 quantity
+        
+        // Thực sự trừ kho và lấy ingredientUsage (FIFO - giá thực tế)
+        const ingredientUsage = await deductIngredientsFromStock(populatedItem, quantity);
+        
+        // Tính expense từ ingredientUsage (giá thực tế của từng lô)
+        const expense = ingredientUsage.reduce((sum, usage) => sum + (usage.quantity * usage.price), 0);
+        
+        // Gán servedBy nếu status là "served" hoặc "paid" và có waiter
+        const servedBy = (status === "served" || status === "paid") && waiter ? waiter._id : null;
         
         const orderItem = await OrderItem.create({
           itemId: randomItem._id,
           itemName: randomItem.name,
           itemType: "item",
-          quantity: getRandomInt(1, 3), // 1-3 quantity
+          quantity: quantity,
           price: randomItem.price,
-          expense: Math.round(finalExpense), // Làm tròn expense
+          expense: expense, // Giá vốn tại thời điểm đặt món (từ giá thực tế FIFO)
+          ingredientUsage: ingredientUsage, // Track từng lô nguyên liệu đã dùng (thực tế đã trừ kho, giá thực tế)
           assignedChef,
+          servedBy,
           status,
         });
         selectedItems.push(orderItem);
@@ -1105,6 +1442,7 @@ const seedDatabase = async () => {
     // 🍽️ 6️⃣ Tạo orders mẫu
     // ===============================
     let orderCount = 0;
+    const activeWaiters = waiters.filter(w => w.status === "active"); // Chỉ dùng active waiters
 
     // A. pending orders đã được xóa để test hệ thống sạch
 
@@ -1175,10 +1513,10 @@ const seedDatabase = async () => {
     for (let i = 5; i < 9; i++) {
       const table = tables[i];
       const customer = customers[i % customers.length];
-      const waiter = waiters[i % waiters.length];
+      const waiter = activeWaiters[Math.floor(Math.random() * activeWaiters.length)]; // Random waiter
       const chef = chefs[i % chefs.length];
 
-      const orderItems = await createOrderItems(items, "served", chef._id);
+      const orderItems = await createOrderItems(items, "served", chef._id, waiter);
       const totalAmount = orderItems.reduce(
         (sum, oi) => sum + oi.price * oi.quantity,
         0
@@ -1230,10 +1568,10 @@ const seedDatabase = async () => {
     for (let i = 9; i < 15; i++) {
       const table = tables[i];
       const customer = customers[i % customers.length];
-      const waiter = waiters[i % waiters.length];
+      const waiter = activeWaiters[Math.floor(Math.random() * activeWaiters.length)]; // Random waiter
       const chef = chefs[i % chefs.length];
 
-      const orderItems = await createOrderItems(items, "served", chef._id);
+      const orderItems = await createOrderItems(items, "served", chef._id, waiter);
       const totalAmount = orderItems.reduce(
         (sum, oi) => sum + oi.price * oi.quantity,
         0
@@ -1301,14 +1639,15 @@ const seedDatabase = async () => {
       for (let i = 0; i < ordersPerDay; i++) {
         const randomTable = tables[getRandomInt(0, tables.length - 1)];
         const randomCustomer = customers[getRandomInt(0, customers.length - 1)];
-        const randomWaiter = waiters[getRandomInt(0, waiters.length - 1)];
+        const randomWaiter = activeWaiters[Math.floor(Math.random() * activeWaiters.length)]; // Random active waiter
         const randomChef = chefs[getRandomInt(0, chefs.length - 1)];
         
         // Tạo order items với expense biến động
         const orderItems = await createOrderItemsWithVariableExpense(
           items,
           "served",
-          randomChef._id
+          randomChef._id,
+          randomWaiter
         );
         
         const totalAmount = orderItems.reduce(
@@ -1380,6 +1719,148 @@ const seedDatabase = async () => {
     orderCount += bulkOrderCount;
     console.log(`✅ Đã tạo ${bulkOrderCount} paid orders phân bố trong ${totalDays} ngày.`);
 
+    // I.1. Tạo Orders cho Customer VIP (thân thiết) - customer01, customer02, customer03
+    console.log("⭐ Bắt đầu tạo orders cho customers VIP...");
+    const vipCustomers = customers.slice(0, 3); // customer01, customer02, customer03
+    const vipOrders = [];
+    
+    for (const vipCustomer of vipCustomers) {
+      const numOrders = 15 + Math.floor(Math.random() * 6); // 15-20 orders mỗi VIP customer
+      
+      for (let i = 0; i < numOrders; i++) {
+        const randomTable = tables[Math.floor(Math.random() * tables.length)];
+        const randomWaiter = activeWaiters[Math.floor(Math.random() * activeWaiters.length)];
+        const randomChef = chefs[Math.floor(Math.random() * chefs.length)];
+        
+        // Random date trong 3 tháng qua
+        const randomDay = Math.floor(Math.random() * totalDays);
+        const orderDate = new Date(threeMonthsAgo);
+        orderDate.setDate(orderDate.getDate() + randomDay);
+        const orderCreatedAt = getRandomTimeInDay(orderDate);
+        const orderUpdatedAt = new Date(orderCreatedAt.getTime() + getRandomInt(30, 120) * 60 * 1000);
+        const paymentTime = new Date(orderCreatedAt.getTime() + getRandomInt(60, 180) * 60 * 1000);
+        
+        const orderItems = await createOrderItemsWithVariableExpense(
+          items,
+          "served",
+          randomChef._id,
+          randomWaiter
+        );
+        
+        const totalAmount = orderItems.reduce((sum, oi) => sum + oi.price * oi.quantity, 0);
+        const paymentMethods = ["card", "cash", "momo"];
+        const paymentMethod = paymentMethods[Math.floor(Math.random() * paymentMethods.length)];
+        
+        const payment = await Payment.create({
+          paymentMethod: paymentMethod,
+          status: "paid",
+          amountPaid: totalAmount,
+          totalAmount: totalAmount,
+          payTime: paymentTime,
+        });
+        
+        const order = await Order.create({
+          userId: vipCustomer._id,
+          servedBy: randomWaiter._id,
+          tableId: randomTable._id,
+          orderItems: orderItems.map((oi) => oi._id),
+          paymentId: payment._id,
+          status: "paid",
+          totalAmount: totalAmount,
+          waiterResponse: { status: "approved", respondedAt: orderCreatedAt },
+          customerConfirmed: true,
+          actions: ["order_created", "waiter_approved", "customer_confirmed"],
+          paid: true,
+          createdAt: orderCreatedAt,
+          updatedAt: orderUpdatedAt,
+        });
+        
+        await OrderItem.updateMany(
+          { _id: { $in: orderItems.map((oi) => oi._id) } },
+          { orderId: order._id }
+        );
+        
+        payment.orderId = order._id;
+        await payment.save();
+        
+        vipOrders.push(order);
+        orderCount++;
+      }
+    }
+    console.log(`✅ Đã tạo ${vipOrders.length} orders cho ${vipCustomers.length} customers VIP.`);
+
+    // I.2. Tạo Orders cho Customer Xấu - customer04, customer05
+    console.log("⚠️ Bắt đầu tạo orders cho customers xấu...");
+    const badCustomers = customers.slice(3, 5); // customer04, customer05
+    const badOrders = [];
+    
+    for (const badCustomer of badCustomers) {
+      const numOrders = 1 + Math.floor(Math.random() * 3); // 1-3 orders mỗi bad customer
+      const numCancelled = Math.floor(numOrders * 0.5); // Khoảng 50% cancelled
+      
+      for (let i = 0; i < numOrders; i++) {
+        const randomTable = tables[Math.floor(Math.random() * tables.length)];
+        const randomWaiter = activeWaiters[Math.floor(Math.random() * activeWaiters.length)];
+        const randomChef = chefs[Math.floor(Math.random() * chefs.length)];
+        
+        // Random date trong 3 tháng qua
+        const randomDay = Math.floor(Math.random() * totalDays);
+        const orderDate = new Date(threeMonthsAgo);
+        orderDate.setDate(orderDate.getDate() + randomDay);
+        const orderCreatedAt = getRandomTimeInDay(orderDate);
+        
+        const isCancelled = i < numCancelled;
+        const orderStatus = isCancelled ? "cancelled" : "paid";
+        
+        const orderItems = await createOrderItems(
+          items,
+          isCancelled ? "pending" : "served",
+          randomChef._id,
+          isCancelled ? null : randomWaiter
+        );
+        
+        const totalAmount = orderItems.reduce((sum, oi) => sum + oi.price * oi.quantity, 0);
+        
+        const payment = await Payment.create({
+          paymentMethod: "cash",
+          status: isCancelled ? "unpaid" : "paid",
+          amountPaid: isCancelled ? 0 : totalAmount,
+          totalAmount: totalAmount,
+          payTime: isCancelled ? null : new Date(orderCreatedAt.getTime() + getRandomInt(60, 180) * 60 * 1000),
+        });
+        
+        const order = await Order.create({
+          userId: badCustomer._id,
+          servedBy: randomWaiter._id,
+          tableId: randomTable._id,
+          orderItems: orderItems.map((oi) => oi._id),
+          paymentId: payment._id,
+          status: orderStatus,
+          totalAmount: totalAmount,
+          waiterResponse: { 
+            status: isCancelled ? "pending" : "approved", 
+            respondedAt: isCancelled ? null : orderCreatedAt 
+          },
+          customerConfirmed: !isCancelled,
+          actions: isCancelled ? ["order_created"] : ["order_created", "waiter_approved", "customer_confirmed"],
+          paid: !isCancelled,
+          createdAt: orderCreatedAt,
+        });
+        
+        await OrderItem.updateMany(
+          { _id: { $in: orderItems.map((oi) => oi._id) } },
+          { orderId: order._id }
+        );
+        
+        payment.orderId = order._id;
+        await payment.save();
+        
+        badOrders.push(order);
+        orderCount++;
+      }
+    }
+    console.log(`✅ Đã tạo ${badOrders.length} orders cho ${badCustomers.length} customers xấu (${badOrders.filter(o => o.status === "cancelled").length} cancelled).`);
+
     // I. cancelled - 3 orders
     for (let i = 15; i < 18; i++) {
       const table = tables[i];
@@ -1448,7 +1929,8 @@ const seedDatabase = async () => {
         
         // Random status: preparing hoặc served
         const orderStatus = orderIdx % 2 === 0 ? "preparing" : "served";
-        const orderItems = await createOrderItems(items, orderStatus, chef._id);
+        const waiterForOrder = activeWaiters[Math.floor(Math.random() * activeWaiters.length)]; // Random waiter
+        const orderItems = await createOrderItems(items, orderStatus, chef._id, orderStatus === "served" ? waiterForOrder : null);
         const totalAmount = orderItems.reduce((sum, oi) => sum + oi.price * oi.quantity, 0);
         
         const payment = await Payment.create({
@@ -1499,291 +1981,104 @@ const seedDatabase = async () => {
       console.log(`✅ Bàn ${table.tableNumber} có ${table.orderNow.length} orders đang hoạt động`);
     }
 
-    // 7️⃣ Purchase Orders - Tạo lô nhập khớp với stockQuantity của từng ingredient
-    // Chia thành nhiều lô với expiryDate khác nhau để test FIFO
-    const purchaseOrders = [];
-    const now = Date.now();
+    // 8️⃣ Feedbacks - Link với paid orders và phản ánh đúng loại customer
+    console.log("💬 Bắt đầu tạo Feedbacks từ paid orders...");
     
-    // Helper function để tạo PurchaseOrder cho một ingredient
-    const createPurchaseOrdersForIngredient = (ingredient, batches) => {
-      // batches = [{ quantity, daysFromNow, price }]
-      let totalQuantity = 0;
-      batches.forEach((batch, index) => {
-        const daysAgo = batch.daysAgo || 0; // Nếu không có daysAgo, mặc định là 0 (hôm nay)
-        const time = new Date(now - daysAgo * 24 * 60 * 60 * 1000);
-        const expiryDate = batch.daysFromNow 
-          ? new Date(now + batch.daysFromNow * 24 * 60 * 60 * 1000)
-          : null;
-        
-        purchaseOrders.push({
-          ingredientId: ingredient._id,
-          quantity: batch.quantity,
-          unit: ingredient.unit,
-          price: batch.price || ingredient.priceNow,
-          time: time,
-          expiryDate: expiryDate,
-          usedQuantity: 0,
-          status: expiryDate && expiryDate < new Date() ? 'expired' : 'valid'
-        });
-        totalQuantity += batch.quantity;
-      });
-      
-      // Kiểm tra xem tổng có khớp với stockQuantity không
-      if (Math.abs(totalQuantity - ingredient.stockQuantity) > 0.01) {
-        console.warn(`⚠️ Cảnh báo: Tổng quantity của PurchaseOrders (${totalQuantity}) không khớp với stockQuantity (${ingredient.stockQuantity}) của ${ingredient.name}`);
-      }
-    };
-
-    // Tạo PurchaseOrders cho từng ingredient, chia thành nhiều lô để test FIFO
-    // Ví dụ: Thịt bò có 50kg -> chia thành 2 lô: 20kg (cũ, hết hạn sớm) và 30kg (mới, hết hạn muộn)
+    // Lấy tất cả paid orders
+    const allPaidOrders = await Order.find({ status: "paid" }).populate("userId");
     
-    // Thịt bò: 50kg
-    createPurchaseOrdersForIngredient(
-      ingredients.find((i) => i.name === "Thịt bò"),
-      [
-        { quantity: 20, daysAgo: 10, daysFromNow: 15, price: 95000 }, // Lô cũ, hết hạn sau 15 ngày
-        { quantity: 30, daysAgo: 2, daysFromNow: 30, price: 105000 }  // Lô mới, hết hạn sau 30 ngày
-      ]
-    );
-
-    // Cá hồi: 30kg
-    createPurchaseOrdersForIngredient(
-      ingredients.find((i) => i.name === "Cá hồi"),
-      [
-        { quantity: 15, daysAgo: 8, daysFromNow: 7, price: 95000 },   // Lô cũ, hết hạn sau 7 ngày
-        { quantity: 15, daysAgo: 1, daysFromNow: 20, price: 105000 } // Lô mới, hết hạn sau 20 ngày
-      ]
-    );
-
-    // Khoai tây: 40kg
-    createPurchaseOrdersForIngredient(
-      ingredients.find((i) => i.name === "Khoai tây"),
-      [
-        { quantity: 20, daysAgo: 15, daysFromNow: 45, price: 19000 },
-        { quantity: 20, daysAgo: 3, daysFromNow: 60, price: 21000 }
-      ]
-    );
-
-    // Rau xà lách: 60 bó
-    createPurchaseOrdersForIngredient(
-      ingredients.find((i) => i.name === "Rau xà lách"),
-      [
-        { quantity: 30, daysAgo: 5, daysFromNow: 3, price: 9500 },  // Lô cũ, hết hạn sau 3 ngày
-        { quantity: 30, daysAgo: 1, daysFromNow: 7, price: 10500 } // Lô mới, hết hạn sau 7 ngày
-      ]
-    );
-
-    // Trứng gà: 100 quả
-    createPurchaseOrdersForIngredient(
-      ingredients.find((i) => i.name === "Trứng gà"),
-      [
-        { quantity: 50, daysAgo: 7, daysFromNow: 14, price: 2900 },
-        { quantity: 50, daysAgo: 2, daysFromNow: 21, price: 3100 }
-      ]
-    );
-
-    // Tôm tươi: 45kg
-    createPurchaseOrdersForIngredient(
-      ingredients.find((i) => i.name === "Tôm tươi"),
-      [
-        { quantity: 20, daysAgo: 6, daysFromNow: 4, price: 95000 },   // Lô cũ, hết hạn sau 4 ngày
-        { quantity: 25, daysAgo: 1, daysFromNow: 15, price: 105000 }  // Lô mới, hết hạn sau 15 ngày
-      ]
-    );
-
-    // Phô mai: 25kg
-    createPurchaseOrdersForIngredient(
-      ingredients.find((i) => i.name === "Phô mai"),
-      [
-        { quantity: 10, daysAgo: 12, daysFromNow: 18, price: 75000 },
-        { quantity: 15, daysAgo: 3, daysFromNow: 30, price: 85000 }
-      ]
-    );
-
-    // Bột mì: 30kg
-    createPurchaseOrdersForIngredient(
-      ingredients.find((i) => i.name === "Bột mì"),
-      [
-        { quantity: 15, daysAgo: 20, daysFromNow: 100, price: 11500 },
-        { quantity: 15, daysAgo: 5, daysFromNow: 120, price: 12500 }
-      ]
-    );
-
-    // Thịt gà: 35kg
-    createPurchaseOrdersForIngredient(
-      ingredients.find((i) => i.name === "Thịt gà"),
-      [
-        { quantity: 15, daysAgo: 10, daysFromNow: 10, price: 68000 },
-        { quantity: 20, daysAgo: 2, daysFromNow: 25, price: 72000 }
-      ]
-    );
-
-    // Thịt heo: 8kg (stock thấp để test)
-    createPurchaseOrdersForIngredient(
-      ingredients.find((i) => i.name === "Thịt heo"),
-      [
-        { quantity: 8, daysAgo: 3, daysFromNow: 5, price: 70000 }
-      ]
-    );
-
-    // Tạo PurchaseOrders cho các nguyên liệu còn lại (đơn giản hóa: 1 lô mỗi ingredient)
-    const remainingIngredients = ingredients.filter(ing => 
-      !['Thịt bò', 'Cá hồi', 'Khoai tây', 'Rau xà lách', 'Trứng gà', 'Tôm tươi', 
-        'Phô mai', 'Bột mì', 'Thịt gà', 'Thịt heo'].includes(ing.name)
-    );
-
-    remainingIngredients.forEach(ingredient => {
-      // Tạo 1-2 lô tùy theo số lượng
-      if (ingredient.stockQuantity > 50) {
-        // Chia thành 2 lô nếu số lượng lớn
-        const qty1 = Math.floor(ingredient.stockQuantity / 2);
-        const qty2 = ingredient.stockQuantity - qty1;
-        createPurchaseOrdersForIngredient(ingredient, [
-          { quantity: qty1, daysAgo: 5, daysFromNow: 30, price: ingredient.priceNow * 0.95 },
-          { quantity: qty2, daysAgo: 1, daysFromNow: 60, price: ingredient.priceNow * 1.05 }
-        ]);
-      } else {
-        // 1 lô nếu số lượng nhỏ
-        createPurchaseOrdersForIngredient(ingredient, [
-          { quantity: ingredient.stockQuantity, daysAgo: 3, daysFromNow: 30, price: ingredient.priceNow }
-        ]);
-      }
-    });
-
-    // Insert tất cả PurchaseOrders
-    // LƯU Ý: Post-save hook của PurchaseOrder sẽ tự động cộng quantity vào stockQuantity
-    // Nhưng vì Ingredient đã có stockQuantity từ trước, nên cần tính lại từ các PurchaseOrders
-    const createdPurchaseOrders = await PurchaseOrder.insertMany(purchaseOrders);
-    console.log(`📦 Đã tạo ${createdPurchaseOrders.length} PurchaseOrders cho ${ingredients.length} nguyên liệu.`);
+    // Chọn 30-40% orders để tạo feedback
+    const feedbackPercentage = 0.3 + Math.random() * 0.1; // 30-40%
+    const numFeedbacks = Math.floor(allPaidOrders.length * feedbackPercentage);
+    const ordersForFeedback = [];
     
-    // Tính lại stockQuantity và priceNow cho mỗi ingredient từ các PurchaseOrders
-    for (const ingredient of ingredients) {
-      const ingredientPurchaseOrders = createdPurchaseOrders.filter(
-        po => po.ingredientId.toString() === ingredient._id.toString()
-      );
-      
-      // Tính tổng quantity và giá trung bình có trọng số
-      let totalQuantity = 0;
-      let totalValue = 0;
-      
-      ingredientPurchaseOrders.forEach(po => {
-        totalQuantity += po.quantity;
-        totalValue += po.quantity * po.price;
-      });
-      
-      // Cập nhật lại stockQuantity và priceNow
-      ingredient.stockQuantity = totalQuantity;
-      ingredient.priceNow = totalQuantity > 0 ? totalValue / totalQuantity : ingredient.priceNow;
-      await ingredient.save();
-      
-      console.log(`✅ Đã cập nhật lại ${ingredient.name}: stockQuantity = ${ingredient.stockQuantity}, priceNow = ${ingredient.priceNow.toFixed(2)}`);
+    // Shuffle và chọn ngẫu nhiên
+    const shuffled = [...allPaidOrders].sort(() => Math.random() - 0.5);
+    for (let i = 0; i < numFeedbacks && i < shuffled.length; i++) {
+      ordersForFeedback.push(shuffled[i]);
     }
+    
+    const feedbacks = [];
+    // Định nghĩa lại vipCustomers và badCustomers để dùng trong feedbacks
+    const vipCustomersForFeedback = customers.slice(0, 3); // customer01, customer02, customer03
+    const badCustomersForFeedback = customers.slice(3, 5); // customer04, customer05
+    const vipCustomerIds = vipCustomersForFeedback.map(c => c._id.toString());
+    const badCustomerIds = badCustomersForFeedback.map(c => c._id.toString());
 
-    // 8️⃣ Feedbacks
-    await Feedback.insertMany([
-      {
-        userId: customers[0]._id,
-        rating: 5,
-        comment: "Đồ ăn rất ngon, phục vụ nhanh!",
-      },
-      {
-        userId: customers[1]._id,
-        rating: 4,
-        comment: "Không gian đẹp, hơi ồn một chút.",
-      },
-      // Thêm feedbacks mới
-      {
-        userId: customers[2]._id,
-        rating: 5,
-        comment: "Món bò bít tết tuyệt vời, sẽ quay lại!",
-      },
-      {
-        userId: customers[3]._id,
-        rating: 3,
-        comment: "Đồ ăn ổn nhưng giá hơi cao.",
-      },
-      {
-        userId: customers[4]._id,
-        rating: 4,
-        comment: "Nhân viên thân thiện, không gian sạch sẽ.",
-      },
-      {
-        userId: customers[5]._id,
-        rating: 5,
-        comment: "Combo gia đình rất đáng giá!",
-      },
-      {
-        userId: customers[6]._id,
-        rating: 2,
-        comment: "Chờ đợi quá lâu, đồ ăn không nóng.",
-      },
-      {
-        userId: customers[7]._id,
-        rating: 4,
-        comment: "Pizza ngon, giá hợp lý.",
-      },
-      {
-        userId: customers[8]._id,
-        rating: 5,
-        comment: "Lẩu hải sản tươi ngon, gia đình rất thích.",
-      },
-      {
-        userId: customers[9]._id,
-        rating: 3,
-        comment: "Đồ uống ngon nhưng hơi ít.",
-      },
-      {
-        userId: customers[0]._id,
-        rating: 4,
-        comment: "Phở bò đậm đà, nước dùng ngon.",
-      },
-      {
-        userId: customers[1]._id,
-        rating: 5,
-        comment: "Bún bò Huế cay vừa phải, rất ngon!",
-      },
-      {
-        userId: customers[2]._id,
-        rating: 4,
-        comment: "Salad tươi ngon, rau củ đa dạng.",
-      },
-      {
-        userId: customers[3]._id,
-        rating: 3,
-        comment: "Không gian đẹp nhưng hơi chật.",
-      },
-      {
-        userId: customers[4]._id,
-        rating: 5,
-        comment: "Đầu bếp nấu rất ngon, sẽ giới thiệu bạn bè.",
-      },
-      {
-        userId: customers[5]._id,
-        rating: 4,
-        comment: "Gà nướng mật ong thơm ngon.",
-      },
-      {
-        userId: customers[6]._id,
-        rating: 2,
-        comment: "Phục vụ chậm, đồ ăn không đúng yêu cầu.",
-      },
-      {
-        userId: customers[7]._id,
-        rating: 4,
-        comment: "Tráng miệng ngon, kem vani mát lạnh.",
-      },
-      {
-        userId: customers[8]._id,
-        rating: 5,
-        comment: "Cá hồi áp chảo tuyệt vời, sẽ quay lại.",
-      },
-      {
-        userId: customers[9]._id,
-        rating: 3,
-        comment: "Giá cả hợp lý nhưng khẩu phần hơi nhỏ.",
-      },
-    ]);
-    console.log("💬 Đã tạo các Feedback mẫu.");
+    // Comments mẫu theo rating
+    const commentsByRating = {
+      5: [
+        "Đồ ăn rất ngon, phục vụ nhanh!",
+        "Món bò bít tết tuyệt vời, sẽ quay lại!",
+        "Lẩu hải sản tươi ngon, gia đình rất thích.",
+        "Cá hồi áp chảo tuyệt vời, sẽ quay lại.",
+        "Đầu bếp nấu rất ngon, sẽ giới thiệu bạn bè.",
+        "Trải nghiệm tuyệt vời, nhà hàng đáng giá 5 sao!",
+      ],
+      4: [
+        "Không gian đẹp, hơi ồn một chút.",
+        "Nhân viên thân thiện, không gian sạch sẽ.",
+        "Pizza ngon, giá hợp lý.",
+        "Phở bò đậm đà, nước dùng ngon.",
+        "Salad tươi ngon, rau củ đa dạng.",
+        "Gà nướng mật ong thơm ngon.",
+        "Tráng miệng ngon, kem vani mát lạnh.",
+      ],
+      3: [
+        "Đồ ăn ổn nhưng giá hơi cao.",
+        "Đồ uống ngon nhưng hơi ít.",
+        "Không gian đẹp nhưng hơi chật.",
+        "Giá cả hợp lý nhưng khẩu phần hơi nhỏ.",
+        "Tổng thể ổn, không có gì đặc biệt.",
+      ],
+      2: [
+        "Chờ đợi quá lâu, đồ ăn không nóng.",
+        "Phục vụ chậm, đồ ăn không đúng yêu cầu.",
+        "Chất lượng không như mong đợi.",
+        "Không gian hơi chật, phục vụ chậm.",
+      ],
+      1: [
+        "Rất thất vọng, sẽ không quay lại.",
+        "Đồ ăn không ngon, phục vụ kém.",
+        "Giá cao nhưng chất lượng không tương xứng.",
+        "Trải nghiệm tồi tệ nhất.",
+      ],
+    };
+    
+    for (const order of ordersForFeedback) {
+      if (!order.userId) continue; // Skip nếu không có userId
+      
+      const customerId = order.userId._id.toString();
+      let rating;
+      let commentPool;
+      
+      // Xác định rating dựa trên loại customer
+      if (vipCustomerIds.includes(customerId)) {
+        // Customer VIP: 4-5 sao
+        rating = Math.random() > 0.3 ? 5 : 4; // 70% 5 sao, 30% 4 sao
+        commentPool = commentsByRating[rating];
+      } else if (badCustomerIds.includes(customerId)) {
+        // Customer xấu: 1-2 sao
+        rating = Math.random() > 0.5 ? 1 : 2; // 50% mỗi loại
+        commentPool = commentsByRating[rating];
+      } else {
+        // Customer bình thường: 3-4 sao ngẫu nhiên
+        rating = Math.random() > 0.5 ? 3 : 4;
+        commentPool = commentsByRating[rating];
+      }
+      
+      const comment = commentPool[Math.floor(Math.random() * commentPool.length)];
+      
+      feedbacks.push({
+        orderId: order._id,
+        userId: order.userId._id,
+        rating: rating,
+        comment: comment,
+      });
+    }
+    
+    await Feedback.insertMany(feedbacks);
+    console.log(`✅ Đã tạo ${feedbacks.length} feedbacks từ ${ordersForFeedback.length} paid orders.`);
 
     // 🧹 Cleanup: đồng bộ lại logic table - order
     const allTables = await Table.find().populate("orderNow");
@@ -1810,6 +2105,54 @@ const seedDatabase = async () => {
       await table.save();
     }
     console.log("✅ Đã đồng bộ bàn và đơn hàng đúng logic mới!");
+
+    // ===============================
+    // 📊 Kiểm tra và verify tồn kho
+    // ===============================
+    console.log("\n📊 Kiểm tra tồn kho sau khi seed...");
+    const allIngredients = await Ingredient.find();
+    const allPurchaseOrders = await PurchaseOrder.find();
+    const allOrderItems = await OrderItem.find();
+    
+    for (const ingredient of allIngredients) {
+      // Tính tổng quantity nhập từ Purchase Orders
+      const totalPurchased = allPurchaseOrders
+        .filter(po => po.ingredientId.toString() === ingredient._id.toString())
+        .reduce((sum, po) => sum + po.quantity, 0);
+      
+      // Tính tổng quantity đã dùng từ OrderItems (từ ingredientUsage)
+      let totalUsed = 0;
+      for (const orderItem of allOrderItems) {
+        if (orderItem.ingredientUsage && Array.isArray(orderItem.ingredientUsage)) {
+          const usedForThisIngredient = orderItem.ingredientUsage
+            .filter(usage => usage.ingredientId && usage.ingredientId.toString() === ingredient._id.toString())
+            .reduce((sum, usage) => sum + (usage.quantity || 0), 0);
+          totalUsed += usedForThisIngredient;
+        }
+      }
+      
+      // Tính stockQuantity lý thuyết
+      const expectedStock = totalPurchased - totalUsed;
+      
+      // So sánh với stockQuantity thực tế
+      const actualStock = ingredient.stockQuantity || 0;
+      const difference = Math.abs(expectedStock - actualStock);
+      
+      if (difference > 0.01) {
+        console.warn(
+          `⚠️ ${ingredient.name}: ` +
+          `Nhập=${totalPurchased}, Đã dùng=${totalUsed}, ` +
+          `Lý thuyết=${expectedStock.toFixed(2)}, Thực tế=${actualStock.toFixed(2)}, ` +
+          `Chênh lệch=${difference.toFixed(2)}`
+        );
+      } else {
+        console.log(
+          `✅ ${ingredient.name}: ` +
+          `Nhập=${totalPurchased}, Đã dùng=${totalUsed}, ` +
+          `Tồn kho=${actualStock.toFixed(2)} (khớp)`
+        );
+      }
+    }
 
     console.log("✅ SEED DATABASE THÀNH CÔNG!");
   } catch (error) {

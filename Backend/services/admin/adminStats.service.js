@@ -1,6 +1,7 @@
 const Order = require("../../models/Order");
 const OrderItem = require("../../models/OrderItem");
 const Item = require("../../models/Item");
+const PurchaseOrder = require("../../models/PurchaseOrder");
 const mongoose = require("mongoose");
 
 const VN_TZ = "Asia/Ho_Chi_Minh";
@@ -107,7 +108,33 @@ exports.getRevenueStats = async ({ type = "daily", from, to }) => {
     statsByTime.set(key, current);
   }
 
-  // 5️⃣ Chuyển map → mảng, tính lợi nhuận
+  // 5️⃣ Tính waste từ các PurchaseOrder đã hết hạn trong khoảng thời gian
+  const expiredPurchaseOrders = await PurchaseOrder.find({
+    status: "expired",
+    expiryDate: { $gte: fromDate, $lte: toDate }, // Dựa trên expiryDate
+  }).select("expiryDate quantity usedQuantity price");
+
+  for (const po of expiredPurchaseOrders) {
+    const remaining = Math.max(po.quantity - po.usedQuantity, 0);
+    const wasteAmount = remaining * (po.price || 0);
+
+    if (wasteAmount > 0 && po.expiryDate) {
+      const timeBucket = truncateDate(po.expiryDate, conf.unit);
+      const key = timeBucket.toISOString();
+
+      const current = statsByTime.get(key) || {
+        time: timeBucket,
+        revenue: 0,
+        cost: 0,
+        waste: 0,
+      };
+
+      current.waste += wasteAmount;
+      statsByTime.set(key, current);
+    }
+  }
+
+  // 6️⃣ Chuyển map → mảng, tính lợi nhuận
   const rows = Array.from(statsByTime.values())
     .sort((a, b) => a.time - b.time)
     .map((row) => {
@@ -122,6 +149,7 @@ exports.getRevenueStats = async ({ type = "daily", from, to }) => {
         profit,
         revenueVND: fmtVND(row.revenue),
         costVND: fmtVND(row.cost),
+        wasteVND: fmtVND(row.waste || 0),
         profitVND: fmtVND(profit),
       };
     });

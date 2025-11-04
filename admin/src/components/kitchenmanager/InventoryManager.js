@@ -13,7 +13,6 @@ export default function InventoryManager({ ingredients, onRefresh }) {
     unit: "",
     stockQuantity: "",
     minStock: "",
-    priceNow: "",
   });
 
   const [loading, setLoading] = useState(false);
@@ -40,7 +39,6 @@ export default function InventoryManager({ ingredients, onRefresh }) {
       ...newIng,
       stockQuantity: Number(newIng.stockQuantity) || 0,
       minStock: Number(newIng.minStock) || 0,
-      priceNow: Number(newIng.priceNow) || 0,
     };
 
     setLoading(true);
@@ -53,7 +51,6 @@ export default function InventoryManager({ ingredients, onRefresh }) {
         unit: "",
         stockQuantity: "",
         minStock: "",
-        priceNow: "",
       });
       if (onRefresh) await onRefresh();
     } catch (err) {
@@ -72,7 +69,7 @@ export default function InventoryManager({ ingredients, onRefresh }) {
     }
 
     const amount = Number(addAmount);
-    let price = Number(selectedIng.priceNow);
+    const price = Number(selectedIng.purchasePrice || 0); // Giá nhập từ form
 
     if (isNaN(amount) || amount <= 0) {
       alert("Vui lòng nhập số lượng hợp lệ!");
@@ -134,7 +131,6 @@ export default function InventoryManager({ ingredients, onRefresh }) {
       await kitchenApi.updateIngredient(editIng._id, {
         name: editIng.name,
         unit: editIng.unit,
-        priceNow: Number(editIng.priceNow) || 0,
         stockQuantity: Number(editIng.stockQuantity) || 0,
         minStock: Number(editIng.minStock) || 0,
       });
@@ -205,7 +201,6 @@ export default function InventoryManager({ ingredients, onRefresh }) {
               <th className="px-4 py-2 text-left">Tên nguyên liệu</th>
               <th className="px-4 py-2 text-left">Đơn vị</th>
               <th className="px-4 py-2 text-left">Tồn kho</th>
-              <th className="px-4 py-2 text-left">💰 Giá nhập / đơn vị</th>
               <th className="px-4 py-2 text-left">Tối thiểu</th>
               <th className="px-4 py-2 text-left">Trạng thái</th>
               <th className="px-4 py-2 text-center">Hành động</th>
@@ -217,11 +212,6 @@ export default function InventoryManager({ ingredients, onRefresh }) {
                 <td className="px-4 py-2 font-medium">{ing.name}</td>
                 <td className="px-4 py-2">{ing.unit}</td>
                 <td className="px-4 py-2">{displayQuantity(ing)}</td>
-                <td className="px-4 py-2">
-                  {ing.priceNow
-                    ? `${ing.priceNow.toLocaleString("vi-VN")} ₫`
-                    : "—"}
-                </td>
                 <td className="px-4 py-2">
                   {ing.minStock.toLocaleString("vi-VN")}
                 </td>
@@ -295,19 +285,20 @@ export default function InventoryManager({ ingredients, onRefresh }) {
               {/* Giá nhập */}
               <div>
                 <label className="block font-semibold text-gray-700 mb-1">
-                  Giá nhập (VNĐ)
+                  Giá nhập (VNĐ) <span className="text-red-500">*</span>
                 </label>
                 <input
                   type="number"
-                  value={selectedIng.priceNow || ""}
+                  value={selectedIng.purchasePrice || ""}
                   onChange={(e) =>
                     setSelectedIng({
                       ...selectedIng,
-                      priceNow: e.target.value,
+                      purchasePrice: e.target.value,
                     })
                   }
                   className="w-full border rounded-lg px-4 py-2 focus:ring-2 focus:ring-blue-400 outline-none"
                   placeholder="Nhập giá nhập mới..."
+                  required
                 />
               </div>
 
@@ -407,7 +398,6 @@ export default function InventoryManager({ ingredients, onRefresh }) {
                 { label: "Đơn vị tính", key: "unit", required: true },
                 { label: "Số lượng ban đầu", key: "stockQuantity" },
                 { label: "Mức tồn tối thiểu", key: "minStock" },
-                { label: "Giá nhập hiện tại (VNĐ)", key: "priceNow" },
               ].map((f) => (
                 <div key={f.key}>
                   <label className="block font-semibold mb-1 text-gray-700">
@@ -483,33 +473,18 @@ export default function InventoryManager({ ingredients, onRefresh }) {
                   className="w-full border rounded-lg px-4 py-2 focus:ring-2 focus:ring-blue-400 outline-none"
                 />
               </div>
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-gray-700 font-semibold mb-1">
-                    Giá nhập (VNĐ)
-                  </label>
-                  <input
-                    type="number"
-                    value={editIng.priceNow}
-                    onChange={(e) =>
-                      setEditIng({ ...editIng, priceNow: e.target.value })
-                    }
-                    className="w-full border rounded-lg px-4 py-2 focus:ring-2 focus:ring-blue-400 outline-none"
-                  />
-                </div>
-                <div>
-                  <label className="block text-gray-700 font-semibold mb-1">
-                    Mức tồn tối thiểu
-                  </label>
-                  <input
-                    type="number"
-                    value={editIng.minStock}
-                    onChange={(e) =>
-                      setEditIng({ ...editIng, minStock: e.target.value })
-                    }
-                    className="w-full border rounded-lg px-4 py-2 focus:ring-2 focus:ring-blue-400 outline-none"
-                  />
-                </div>
+              <div>
+                <label className="block text-gray-700 font-semibold mb-1">
+                  Mức tồn tối thiểu
+                </label>
+                <input
+                  type="number"
+                  value={editIng.minStock}
+                  onChange={(e) =>
+                    setEditIng({ ...editIng, minStock: e.target.value })
+                  }
+                  className="w-full border rounded-lg px-4 py-2 focus:ring-2 focus:ring-blue-400 outline-none"
+                />
               </div>
               <div>
                 <label className="block text-gray-700 font-semibold mb-1">

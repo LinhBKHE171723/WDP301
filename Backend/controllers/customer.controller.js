@@ -477,7 +477,7 @@ exports.addItemsToOrder = async (req, res) => {
     const createdOrderItems = [];
     let additionalAmount = 0;
 
-    const { calculateExpense } = require("../utils/customerHelpers");
+    const { calculateExpenseWithTracking, deductIngredientsFromStock } = require("../utils/customerHelpers");
 
     for (const orderItem of orderItems) {
       let item;
@@ -501,8 +501,10 @@ exports.addItemsToOrder = async (req, res) => {
         }
       }
 
-      // Tính expense tại thời điểm đặt món
-      const expense = await calculateExpense(item, orderItem.type);
+      // Tính expense với tracking (FIFO - giá thực tế)
+      const expenseResult = await calculateExpenseWithTracking(item, orderItem.type, orderItem.quantity);
+      const expense = expenseResult.expense;
+      const allIngredientUsage = expenseResult.ingredientUsage;
 
       // Tạo OrderItem với số lượng được yêu cầu
       const newOrderItemData = {
@@ -512,7 +514,8 @@ exports.addItemsToOrder = async (req, res) => {
         itemType: orderItem.type,
         quantity: orderItem.quantity, // Sử dụng số lượng từ frontend
         price: item.price,
-        expense: expense, // Giá vốn tại thời điểm đặt món
+        expense: expense, // Giá vốn tại thời điểm đặt món (từ giá thực tế)
+        ingredientUsage: allIngredientUsage, // Track từng lô nguyên liệu đã dùng
         status: "pending",
         note: orderItem.note || "",
       };
@@ -540,7 +543,6 @@ exports.addItemsToOrder = async (req, res) => {
       additionalAmount += item.price * orderItem.quantity; // Tính tổng tiền theo số lượng
 
       // Trừ nguyên liệu từ kho khi thêm món vào order
-      const { deductIngredientsFromStock } = require("../utils/customerHelpers");
       try {
         // Xử lý món đơn (itemType === 'item')
         if (orderItem.type === 'item') {

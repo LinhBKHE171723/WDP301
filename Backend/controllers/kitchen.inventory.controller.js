@@ -43,11 +43,7 @@ exports.createPurchaseOrder = async (req, res) => {
       status: 'valid' // Mặc định còn hạn
     });
 
-    // ✅ Tính giá trung bình mới (Weighted Average)
-    const totalOld = ingredient.stockQuantity * (ingredient.priceNow || 0);
-    const totalNew = quantity * price;
-    const newStock = ingredient.stockQuantity + quantity;
-    const newAvgPrice = newStock > 0 ? (totalOld + totalNew) / newStock : price;
+    // ✅ stockQuantity được cập nhật tự động trong PurchaseOrder.post("save")
 
     res.status(201).json({
       message: "✅ Nhập hàng thành công!",
@@ -89,13 +85,12 @@ exports.getPurchaseHistory = async (req, res) => {
 // ✅ Tạo mới nguyên liệu
 exports.createIngredient = async (req, res) => {
   try {
-    const { name, unit, stockQuantity, minStock, priceNow } = req.body;
+    const { name, unit, stockQuantity, minStock } = req.body;
     const ingredient = await Ingredient.create({
       name,
       unit,
       stockQuantity,
       minStock,
-      priceNow,
     });
     res.status(201).json(ingredient);
   } catch (err) {
@@ -108,11 +103,11 @@ exports.createIngredient = async (req, res) => {
 exports.updateIngredient = async (req, res) => {
   try {
     const { id } = req.params;
-    const { name, unit, stockQuantity, minStock, priceNow } = req.body;
+    const { name, unit, stockQuantity, minStock } = req.body;
 
     const updated = await Ingredient.findByIdAndUpdate(
       id,
-      { name, unit, stockQuantity, minStock, priceNow },
+      { name, unit, stockQuantity, minStock },
       { new: true }
     );
 
