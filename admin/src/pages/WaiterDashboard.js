@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState, useRef } from "react";
 import Header from "../components/waiter/Header";
 import OrderCard from "../components/waiter/OrderCard";
 import waiterApi from "../api/waiterApi";
@@ -24,6 +24,9 @@ export default function WaiterDashboard() {
     // hook này thay đổi state mỗi khi có tin nhắn từ server và sẽ làm component cha WaiterDashboard re-render
     // Truyền userId để server biết waiter nào đang kết nối và chỉ gửi thông báo cho waiter đó
     const { connectionState, lastMessage, subscribeToOrders, subscribeToOrder, unsubscribeFromAllOrders } = useWaiterWebSocket(user?.id);
+
+    // Track các đơn đã hiển thị toast để tránh hiển thị trùng lặp
+    const shownNotificationsRef = useRef(new Map()); // Map<orderId, timestamp>
 
     const [availableTables, setAvailableTables] = useState([]);
 
@@ -157,14 +160,34 @@ WaiterDashboard có một useEffect lắng nghe lastMessage → xử lý cập n
                     // Có đơn hàng mới hoặc được sửa đổi cần xác nhận
                     console.log('🆕 Order needs confirmation:', lastMessage.data);
 
+                    const orderId = lastMessage.data._id;
+                    const now = Date.now();
+                    
+                    // Kiểm tra xem đã hiển thị toast cho đơn này trong 2 giây qua chưa (tránh duplicate)
+                    const lastShown = shownNotificationsRef.current.get(orderId);
+                    if (lastShown && (now - lastShown) < 2000) {
+                        console.log('⏭️ Skipping duplicate notification for order:', orderId);
+                        break;
+                    }
+
                     // Subscribe to this order for real-time updates
-                    subscribeToOrder(lastMessage.data._id);
+                    subscribeToOrder(orderId);
 
                     // Kiểm tra xem đây có phải đơn hàng mới hay được sửa đổi
-                    const isExistingOrder = pendingOrders.some(o => o._id === lastMessage.data._id);
+                    const isExistingOrder = pendingOrders.some(o => o._id === orderId);
                     const message = isExistingOrder
                         ? `🔄 Đơn hàng từ bàn ${lastMessage.data.tableId?.tableNumber} đã được sửa đổi và cần xác nhận lại!`
                         : `🆕 Có đơn hàng mới từ bàn ${lastMessage.data.tableId?.tableNumber} cần xác nhận!`;
+
+                    // Đánh dấu đã hiển thị toast cho đơn này
+                    shownNotificationsRef.current.set(orderId, now);
+
+                    // Xóa các đơn đã hiển thị quá 10 giây để tránh memory leak
+                    shownNotificationsRef.current.forEach((timestamp, id) => {
+                        if (now - timestamp > 10000) {
+                            shownNotificationsRef.current.delete(id);
+                        }
+                    });
 
                     toast.info(message);
 

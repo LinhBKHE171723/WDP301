@@ -13,6 +13,7 @@ import {
   Printer,
   Grid3x3,
 } from "lucide-react"
+import { toast } from "react-toastify"
 import "./CashierDashboard.css"
 import UnpaidOrdersList from "./Unpaid-orders-list"
 import TableManagement from "./table-management"
@@ -61,8 +62,6 @@ export default function CashierDashboard({
   const [paymentHistory, setPaymentHistory] = useState([])
   const [unpaidOrdersData, setUnpaidOrdersData] = useState([])
   const [pendingOrdersCount, setPendingOrdersCount] = useState(0)
-  const [notificationOrder, setNotificationOrder] = useState(null)
-  const [showNotificationModal, setShowNotificationModal] = useState(false)
   const pendingOrdersRef = useRef(null)
 
   const updateOrders = useCallback((updater) => {
@@ -110,21 +109,27 @@ export default function CashierDashboard({
   const handleRealtimePreparing = useCallback(
     (order) => {
       if (!order?.id) return
+      const orderId = order.id
+      
+      // Kiểm tra xem đơn có phải là đơn mới không (chưa có trong danh sách)
       let isNewOrder = false
       updateOrders((prev) => {
-        const index = prev.findIndex((item) => item.id === order.id)
+        const index = prev.findIndex((item) => item.id === orderId)
         if (index === -1) {
           isNewOrder = true
           return [...prev, order]
         }
+        // Đơn đã tồn tại - chỉ cập nhật thông tin
         const next = [...prev]
         next[index] = { ...next[index], ...order }
         return next
       })
 
+      // Hiển thị toast notification cho đơn mới
       if (isNewOrder) {
-        setNotificationOrder(order)
-        setShowNotificationModal(true)
+        const tableText = order.tableNumber || "Mang đi"
+        const message = `🆕 Có đơn hàng mới ${order.orderNumber || ""} từ ${tableText} cần thanh toán!`
+        toast.info(message)
       }
     },
     [updateOrders]
@@ -135,57 +140,13 @@ export default function CashierDashboard({
     updateOrders((prev) => prev.filter((item) => item.id !== order.id))
   }, [updateOrders])
 
-  const handleNotificationClose = useCallback(() => {
-    setShowNotificationModal(false)
-    setNotificationOrder(null)
-  }, [])
-
-  const handleNotificationView = useCallback(() => {
-    setShowNotificationModal(false)
-    setNotificationOrder(null)
-    setShowPaymentHistory(false)
-    if (pendingOrdersRef.current) {
-      pendingOrdersRef.current.scrollIntoView({ behavior: "smooth", block: "start" })
-    }
-  }, [pendingOrdersRef])
-
-  const notificationModal =
-    showNotificationModal && notificationOrder ? (
-      <div className="cashier-modal-overlay">
-        <div className="cashier-modal">
-          <div className="cashier-modal-header">
-            <span className="cashier-modal-badge">Đơn mới</span>
-            <button className="cashier-modal-close" onClick={handleNotificationClose} aria-label="Đóng thông báo">
-              ×
-            </button>
-          </div>
-          <div className="cashier-modal-body">
-            <h2 className="cashier-modal-title">{notificationOrder.orderNumber || "Đơn hàng mới"}</h2>
-            <p className="cashier-modal-table">{notificationOrder.tableNumber || "Chưa rõ bàn"}</p>
-            <p className="cashier-modal-info">
-              {notificationOrder.items?.length || 0} món • {formatCurrency(notificationOrder.totalAmount || 0)}
-            </p>
-            <div className="cashier-modal-items">
-              {(notificationOrder.items || []).slice(0, 3).map((item) => (
-                <div key={item.id || item.name} className="cashier-modal-item">
-                  <span className="cashier-modal-item-name">{item.name}</span>
-                  <span className="cashier-modal-item-qty">x{item.quantity}</span>
-                </div>
-              ))}
-              {(notificationOrder.items || []).length > 3 && (
-                <div className="cashier-modal-more">+{(notificationOrder.items || []).length - 3} món khác…</div>
-              )}
-            </div>
-          </div>
-        </div>
-      </div>
-    ) : null
-
   // ====== Tính toán doanh thu dựa trên paymentHistory (để luôn đúng khi thêm đơn mới) ======
   const fetchUnpaidOrders = useCallback(async () => {
     try {
       const res = await Client.get("/cashier/orders/preparing")
-      const orders = Array.isArray(res?.data) ? res.data : res?.orders || []
+      // API trả về { message, data: [...] }, interceptor đã lấy res.data nên res = { message, data }
+      const orders = Array.isArray(res?.data) ? res.data : Array.isArray(res) ? res : []
+      console.log("Fetched unpaid orders:", orders.length, orders)
       updateOrders(orders)
       return orders
     } catch (error) {
@@ -260,7 +221,6 @@ export default function CashierDashboard({
   if (showPaymentHistory) {
     return (
       <div className="dashboard-container">
-        {notificationModal}
         <div className="unpaid-orders-container">
           <div className="unpaid-orders-header">
             <div className="unpaid-orders-header-left">
@@ -421,8 +381,6 @@ export default function CashierDashboard({
   // ====== Màn chính (giao diện giữ nguyên của file cũ, chỉ thêm các nút/khối mới) ======
   return (
     <div className="dashboard-container">
-      {notificationModal}
-
       {/* Header (GIỮ NGUYÊN + thêm 2 nút mới) */}
       <div className="dashboard-header">
         <div className="dashboard-header-content">
