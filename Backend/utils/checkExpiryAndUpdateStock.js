@@ -21,6 +21,8 @@ async function checkExpiryAndUpdateStock() {
 
   for (const po of expiredOrders) {
     const remaining = Math.max(po.quantity - po.usedQuantity, 0);
+    // Tính số tiền thất thoát từ giá mua ban đầu của lô
+    const wasteAmount = remaining * (po.price || 0);
 
     const ing = await Ingredient.findById(po.ingredientId);
     if (ing) {
@@ -29,11 +31,11 @@ async function checkExpiryAndUpdateStock() {
         ing.stockQuantity = Math.max(ing.stockQuantity - remaining, 0);
         await ing.save();
         console.log(
-          `⚠️ ${ing.name}: Lô hết hạn (ngày ${po.expiryDate.toLocaleDateString()}) → trừ ${remaining} ${po.unit} (đã dùng ${po.usedQuantity}/${po.quantity})`
+          `⚠️ ${ing.name}: Lô hết hạn (ngày ${po.expiryDate.toLocaleDateString()}) → trừ ${remaining} ${po.unit} (đã dùng ${po.usedQuantity}/${po.quantity}) → Thất thoát: ${wasteAmount.toLocaleString('vi-VN')}đ`
         );
       } else {
         console.log(
-          `✅ ${ing.name}: Lô hết hạn (ngày ${po.expiryDate.toLocaleDateString()}) → không cần trừ (đã dùng hết ${po.usedQuantity}/${po.quantity})`
+          `✅ ${ing.name}: Lô hết hạn (ngày ${po.expiryDate.toLocaleDateString()}) → không cần trừ (đã dùng hết ${po.usedQuantity}/${po.quantity}) → Không thất thoát`
         );
       }
     }

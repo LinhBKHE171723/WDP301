@@ -21,7 +21,7 @@ const purchaseOrderSchema = new Schema({
   note: { type: String, default: "" },
 });
 
-// ✅ Sau khi lưu PurchaseOrder → cập nhật lại Ingredient
+// ✅ Sau khi lưu PurchaseOrder → cập nhật lại stockQuantity của Ingredient
 purchaseOrderSchema.post("save", async function (doc, next) {
   try {
     const Ingredient = mongoose.model("Ingredient");
@@ -32,27 +32,17 @@ purchaseOrderSchema.post("save", async function (doc, next) {
       return next();
     }
 
-    // ✅ Ép kiểu an toàn để tránh NaN
-    const oldPrice = Number(ingredient.priceNow) || 0;
+    // ✅ Cập nhật stockQuantity (giá thực tế được track qua PurchaseOrder.price)
     const oldQty = Number(ingredient.stockQuantity) || 0;
-    const newPrice = Number(doc.price) || 0;
     const newQty = Number(doc.quantity) || 0;
-
-    // ✅ Tính tổng giá trị kho cũ + mới
-    const totalStockValue = oldPrice * oldQty + newPrice * newQty;
     const totalStockQty = oldQty + newQty;
 
-    // ✅ Tính giá trung bình có kiểm tra an toàn
-    ingredient.priceNow =
-      totalStockQty > 0 ? totalStockValue / totalStockQty : newPrice;
     ingredient.stockQuantity = totalStockQty;
-
     await ingredient.save();
 
     console.log(
       `📦 Đã cập nhật Ingredient "${ingredient.name}": ` +
-        `priceNow = ${ingredient.priceNow.toFixed(2)}, ` +
-        `stockQuantity = ${ingredient.stockQuantity}`
+        `stockQuantity = ${ingredient.stockQuantity} (giá nhập: ${doc.price.toLocaleString('vi-VN')}đ/${doc.unit})`
     );
 
     next();
