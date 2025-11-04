@@ -154,55 +154,161 @@ useEffect(() => {
                 
                 {selectedRole === "waiter" && (
                   <>
-                    <th className="p-4 font-semibold text-gray-600 text-right">Tổng Doanh thu</th>
-                    <th className="p-4 font-semibold text-gray-600 text-center">Số Bàn Phục Vụ</th>
-                    <th className="p-4 font-semibold text-gray-600 text-right">Hóa đơn TB</th>
+                    <th className="p-4 font-semibold text-gray-600 text-center">Số Món Đã Phục Vụ</th>
+                    <th className="p-4 font-semibold text-gray-600 text-right">Món/Giờ</th>
+                    <th className="p-4 font-semibold text-gray-600 text-center">Giờ Làm Việc</th>
+                    <th className="p-4 font-semibold text-gray-600 text-center">Đánh Giá TB</th>
                   </>
                 )}
                 {selectedRole === "chef" && (
-                  <th className="p-4 font-semibold text-gray-600 text-center">Tổng Số Món Nấu</th>
+                  <>
+                    <th className="p-4 font-semibold text-gray-600 text-center">Tổng Số Món Nấu</th>
+                    <th className="p-4 font-semibold text-gray-600 text-right">Món/Giờ</th>
+                    <th className="p-4 font-semibold text-gray-600 text-center">Giờ Làm Việc</th>
+                    <th className="p-4 font-semibold text-gray-600 text-center">Đánh Giá TB</th>
+                  </>
                 )}
 
-                <th className="p-4 font-semibold text-gray-600 text-center">Ngày /công</th>
+                <th className="p-4 font-semibold text-gray-600 text-center">Ngày Công</th>
                 <th className="p-4 font-semibold text-gray-600 text-center">Chi tiết</th>
 
               </tr>
             </thead>
             <tbody>
               {performanceData.length > 0 ? (
-                performanceData.map((item, index) => (
-                  <tr key={item.employee._id} className="border-b hover:bg-gray-50">
-                    <td className="p-4 font-bold text-lg text-center">{index + 1}</td>
-                    <td className="p-4">
-                        <p className="font-semibold text-gray-800">{item.employee.name}</p>
-                        <p className="text-sm text-gray-500">{item.employee.email}</p>
-                    </td>
-                    
-                    {selectedRole === 'waiter' && (
+                performanceData.map((item, index) => {
+                  // Tính toán cảnh báo
+                  const warnings = [];
+                  const lateRate = item.attendance.daysWorked > 0 
+                    ? (item.attendance.lateCount / item.attendance.daysWorked) * 100 
+                    : 0;
+                  const absentRate = item.attendance.daysWorked > 0 
+                    ? (item.attendance.absentCount / item.attendance.daysWorked) * 100 
+                    : 0;
+                  
+                  if (lateRate > 20) warnings.push('Đi muộn > 20%');
+                  if (absentRate > 10) warnings.push('Vắng > 10%');
+                  if (item.performance.averageRating !== null && item.performance.averageRating < 3.0) {
+                    warnings.push('Đánh giá < 3.0');
+                  }
+                  
+                  // Tính hiệu quả trung bình để so sánh
+                  const avgEfficiency = performanceData.length > 0
+                    ? performanceData.reduce((sum, d) => {
+                        const eff = selectedRole === 'waiter' 
+                          ? (d.performance.itemsPerHour || 0)
+                          : (d.performance.itemsPerHour || 0);
+                        return sum + eff;
+                      }, 0) / performanceData.length
+                    : 0;
+                  
+                  const currentEfficiency = selectedRole === 'waiter'
+                    ? (item.performance.itemsPerHour || 0)
+                    : (item.performance.itemsPerHour || 0);
+                  
+                  if (avgEfficiency > 0 && currentEfficiency < avgEfficiency * 0.5) {
+                    warnings.push('Hiệu quả < 50% TB');
+                  }
+                  
+                  return (
+                    <tr key={item.employee._id} className={`border-b hover:bg-gray-50 ${warnings.length > 0 ? 'bg-red-50' : ''}`}>
+                      <td className="p-4 font-bold text-lg text-center">{index + 1}</td>
+                      <td className="p-4">
+                        <div className="flex items-center gap-2">
+                          <div>
+                            <p className="font-semibold text-gray-800">{item.employee.name}</p>
+                            <p className="text-sm text-gray-500">{item.employee.email}</p>
+                          </div>
+                          {warnings.length > 0 && (
+                            <span className="px-2 py-1 text-xs font-medium bg-red-500 text-white rounded-full" title={warnings.join(', ')}>
+                              ⚠️
+                            </span>
+                          )}
+                        </div>
+                      </td>
+                      
+                      {selectedRole === 'waiter' && (
                         <>
-                            <td className="p-4 text-right font-medium text-blue-600">{formatCurrency(item.performance.totalRevenue)}</td>
-                            <td className="p-4 text-center">{item.performance.orderCount}</td>
-                            <td className="p-4 text-right">{formatCurrency(item.performance.averageOrderValue)}</td>
+                          <td className="p-4 text-center font-medium text-blue-600">
+                            {item.performance.itemsServedCount || 0}
+                          </td>
+                          <td className="p-4 text-right">
+                            {item.performance.itemsPerHour ? item.performance.itemsPerHour.toFixed(1) : '0.0'}
+                          </td>
+                          <td className="p-4 text-center">
+                            {item.attendance.totalHours ? item.attendance.totalHours.toFixed(1) : '0.0'}h
+                          </td>
+                          <td className="p-4 text-center">
+                            {item.performance.averageRating != null && 
+                             !isNaN(item.performance.averageRating) && 
+                             item.performance.averageRating > 0 ? (
+                              <span className={`font-semibold ${
+                                item.performance.averageRating >= 4 ? 'text-green-600' :
+                                item.performance.averageRating >= 3 ? 'text-yellow-600' : 'text-red-600'
+                              }`}>
+                                {Number(item.performance.averageRating).toFixed(1)} ⭐
+                                {item.performance.totalRatings > 0 && (
+                                  <span className="text-xs text-gray-500 ml-1">
+                                    ({item.performance.totalRatings})
+                                  </span>
+                                )}
+                              </span>
+                            ) : (
+                              <span className="text-gray-400">-</span>
+                            )}
+                          </td>
                         </>
-                    )}
-                    {selectedRole === 'chef' && (
-                        <td className="p-4 text-center font-medium text-green-600">{item.performance.itemsCookedCount}</td>
-                    )}
-
-                    <td className="p-4 text-center">{item.attendance.daysWorked}</td>
-                    <td className="p-4 text-center">
-  <Link
-    to={`/performance/${item.employee._id}`}
-    className="px-3 py-1 text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 rounded-md transition-all duration-150"
-  >
-    Xem chi tiết
-  </Link>
-</td>
-                  </tr>
-                ))
+                      )}
+                      {selectedRole === 'chef' && (
+                        <>
+                          <td className="p-4 text-center font-medium text-green-600">
+                            {item.performance.itemsCookedCount || 0}
+                          </td>
+                          <td className="p-4 text-right">
+                            {item.performance.itemsPerHour ? item.performance.itemsPerHour.toFixed(1) : '0.0'}
+                          </td>
+                          <td className="p-4 text-center">
+                            {item.attendance.totalHours ? item.attendance.totalHours.toFixed(1) : '0.0'}h
+                          </td>
+                          <td className="p-4 text-center">
+                            {item.performance.averageRating != null && 
+                             !isNaN(item.performance.averageRating) && 
+                             item.performance.averageRating > 0 ? (
+                              <span className={`font-semibold ${
+                                item.performance.averageRating >= 4 ? 'text-green-600' :
+                                item.performance.averageRating >= 3 ? 'text-yellow-600' : 'text-red-600'
+                              }`}>
+                                {Number(item.performance.averageRating).toFixed(1)} ⭐
+                                {item.performance.totalRatings > 0 && (
+                                  <span className="text-xs text-gray-500 ml-1">
+                                    ({item.performance.totalRatings})
+                                  </span>
+                                )}
+                              </span>
+                            ) : (
+                              <span className="text-gray-400">-</span>
+                            )}
+                          </td>
+                        </>
+                      )}
+                      
+                      <td className="p-4 text-center">{item.attendance.daysWorked || 0}</td>
+                      <td className="p-4 text-center">
+                        <Link
+                          to={`/performance/${item.employee._id}`}
+                          className="px-3 py-1 text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 rounded-md transition-all duration-150"
+                        >
+                          Xem chi tiết
+                        </Link>
+                      </td>
+                    </tr>
+                  );
+                })
               ) : (
                 <tr>
-                  <td colSpan="6" className="p-6 text-center text-gray-500">Không có dữ liệu trong khoảng thời gian này.</td>
+                  <td colSpan={selectedRole === 'waiter' ? 9 : 9} className="p-6 text-center text-gray-500">
+                    Không có dữ liệu trong khoảng thời gian này.
+                  </td>
                 </tr>
               )}
             </tbody>

@@ -15,6 +15,7 @@ const {
   updateOrderStatus,
   createFeedback,
   getOrderFeedback,
+  getOrderEmployees,
   canFeedback,
   confirmOrder,
   updateOrderItemStatus,
@@ -72,6 +73,9 @@ router.get("/orders/:orderId/can-feedback", canFeedback);
 
 // 12. Lấy feedback của một order
 router.get("/orders/:orderId/feedback", getOrderFeedback);
+
+// 12.1. Lấy danh sách waiter và chef đã tham gia order (để đánh giá)
+router.get("/orders/:orderId/employees", getOrderEmployees);
 
 // 13. Tạo feedback cho order đã thanh toán
 router.post("/orders/:orderId/feedback", createFeedback);
