@@ -7,8 +7,10 @@ export const API_ENDPOINTS = {
   CUSTOMER: {
     TABLES: `${API_BASE_URL}/customer/table`,
     MENUS: `${API_BASE_URL}/customer/menus`,
+    ALL_MENUS: `${API_BASE_URL}/customer/menus/all`,
     MENU_BY_ID: (id) => `${API_BASE_URL}/customer/menus/${id}`,
     ITEMS: `${API_BASE_URL}/customer/items`,
+    ALL_ITEMS: `${API_BASE_URL}/customer/items/all`,
     ITEM_BY_ID: (id) => `${API_BASE_URL}/customer/items/${id}`,
     ORDERS: `${API_BASE_URL}/customer/orders`,
     ORDER_BY_ID: (id) => `${API_BASE_URL}/customer/orders/${id}`,
@@ -18,7 +20,8 @@ export const API_ENDPOINTS = {
     CONFIRM_ORDER: (id) => `${API_BASE_URL}/customer/orders/${id}/confirm`,
     START_EDIT_ORDER: (id) => `${API_BASE_URL}/customer/orders/${id}/start-edit`,
     ORDER_CAN_FEEDBACK: (id) => `${API_BASE_URL}/customer/orders/${id}/can-feedback`,
-    ORDER_FEEDBACK: (id) => `${API_BASE_URL}/customer/orders/${id}/feedback`
+    ORDER_FEEDBACK: (id) => `${API_BASE_URL}/customer/orders/${id}/feedback`,
+    PREORDERS: `${API_BASE_URL}/customer/preorders`
   },
   
   // Auth endpoints

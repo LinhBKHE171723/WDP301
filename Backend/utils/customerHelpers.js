@@ -3,6 +3,9 @@
 const Item = require("../models/Item");
 const Menu = require("../models/Menu");
 const Ingredient = require("../models/Ingredient");
+const User = require("../models/User");
+const bcrypt = require("bcryptjs");
+const nodemailer = require("nodemailer");
 
 /**
  * Populates order item details by finding items in both Item and Menu collections
@@ -62,6 +65,32 @@ const validateTableAvailability = (table) => {
     success: true,
     message: "Bàn có thể sử dụng"
   };
+};
+
+/**
+ * Kiểm tra xem item có đủ nguyên liệu để làm ít nhất 1 phần không
+ * @param {Object} item - Item object đã populate ingredients.ingredient
+ * @returns {Boolean} true nếu có thể làm được ít nhất 1 phần, false nếu hết hàng
+ */
+const checkItemStock = async (item) => {
+  if (!item || !item.ingredients || item.ingredients.length === 0) {
+    return true; // Không có ingredients → không thể xác định → hiển thị
+  }
+  
+  let minServings = Infinity;
+  for (const ing of item.ingredients) {
+    const ingDoc = ing.ingredient;
+    if (!ingDoc || ingDoc.stockQuantity <= 0 || ing.quantity <= 0) {
+      return false; // Hết hàng
+    }
+    const possible = ingDoc.stockQuantity / ing.quantity;
+    if (possible < minServings) minServings = possible;
+  }
+  
+  // Chỉ hiển thị khi có thể làm được ít nhất 1 phần đầy đủ
+  // Nếu maxServings = 0.1 → Math.floor(0.1) = 0 → không hiển thị
+  // Nếu maxServings = 1.5 → Math.floor(1.5) = 1 → hiển thị (có thể làm 1 phần)
+  return Math.floor(minServings) > 0;
 };
 
 /**
@@ -752,15 +781,97 @@ const updateComboStatusBasedOnComboItems = (orderItem) => {
   return null;
 };
 
+/**
+ * Generate temporary password for new customer accounts
+ * @param {number} length - Password length (default: 10)
+ * @returns {string} Generated password
+ */
+const genTempPassword = (length = 10) => {
+  const chars = "ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz23456789!@#$%^&*";
+  let pwd = "";
+  for (let i = 0; i < length; i++) pwd += chars[Math.floor(Math.random() * chars.length)];
+  return pwd;
+};
+
+/**
+ * Create customer account automatically with temporary password
+ * @param {Object} customerData - Customer information { name, email, phone }
+ * @returns {Object} Created user object
+ */
+const createCustomerAccount = async ({ name, email, phone }) => {
+  // Generate username from email
+  const base = email.split("@")[0];
+  let candidate = base.toLowerCase().replace(/[^a-z0-9_]/g, "_");
+  let i = 1;
+  
+  // Ensure username is unique
+  while (true) {
+    const exists = await User.findOne({ username: candidate });
+    if (!exists) break;
+    candidate = `${base}_${i++}`;
+  }
+  
+  // Generate temporary password
+  const tempPassword = genTempPassword(10);
+  const salt = await bcrypt.genSalt(10);
+  const passwordHash = await bcrypt.hash(tempPassword, salt);
+  
+  // Create user
+  const user = await User.create({
+    name,
+    email,
+    username: candidate,
+    phone: phone || "",
+    password: passwordHash,
+    role: "customer",
+    point: 0,
+    status: "active",
+    accountStatus: "active"
+  });
+  
+  // Send email with temporary password
+  const transporter = nodemailer.createTransport({
+    host: process.env.SMTP_HOST,
+    port: Number(process.env.SMTP_PORT || 587),
+    secure: false,
+    auth: { user: process.env.SMTP_USER, pass: process.env.SMTP_PASS },
+  });
+  
+  const appUrl = process.env.APP_URL || "http://localhost:3000";
+  const html = `
+    <p><b>Tài khoản của bạn đã được tạo</b></p>
+    <p>Cảm ơn bạn đã đặt trước tại nhà hàng của chúng tôi!</p>
+    <p>Email đăng nhập: ${email}<br/>
+    Mật khẩu tạm: <b>${tempPassword}</b></p>
+    <p>Vui lòng đăng nhập tại <a href="${appUrl}">${appUrl}</a> và đổi mật khẩu.</p>
+  `;
+  
+  try {
+    await transporter.sendMail({
+      from: `"Restaurant System" <${process.env.SMTP_USER}>`,
+      to: email,
+      subject: "Tài khoản khách hàng đã được tạo",
+      html,
+    });
+  } catch (error) {
+    console.error("Error sending email:", error);
+    // Don't throw error - account is created, just email failed
+  }
+  
+  return user;
+};
+
 module.exports = {
   populateOrderItemDetails,
   validateTableAvailability,
+  checkItemStock,
   createOrderItemsFromCart,
   calculateExpense,
   calculateExpenseWithTracking,
   deductIngredientsFromStock,
   returnIngredientsToStock,
   returnIngredientsForUnservedItems,
-  updateComboStatusBasedOnComboItems
+  updateComboStatusBasedOnComboItems,
+  createCustomerAccount
 };
 
