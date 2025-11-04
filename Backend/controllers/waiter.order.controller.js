@@ -5,8 +5,6 @@ const User = require("../models/User");
 const mongoose = require("mongoose");
 const { populateOrderItemDetails } = require("../utils/customerHelpers");
 const ExcelJS = require("exceljs");
-const webSocketService = require("../services/websocket.service");
-const { formatOrder } = require("./cashier.controller");
 
 // Helper function để populate assignedChef cho comboItems
 async function populateComboItemsChefs(orderItems) {
@@ -812,12 +810,6 @@ exports.markComboItemServed = async (req, res) => {
     const webSocketService = req.app.get("webSocketService");
     if (webSocketService) {
       webSocketService.broadcastToOrder(populatedOrder._id, "order:updated", populatedOrder);
-      if (webSocketService.broadcastToAllCashiers) {
-        const payload = formatOrder(populatedOrder);
-        if (payload) {
-          webSocketService.broadcastToAllCashiers("cashier.orders.preparing", payload);
-        }
-      }
     }
 
     const comboItemName = orderItem.comboItems[index].itemName || "Món ăn";

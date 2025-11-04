@@ -9,7 +9,6 @@ const kitchenRoutes = require("./routes/kitchen.routes");
 const customerRoutes = require("./routes/customer.routes");
 const authRoutes = require("./routes/auth.route");
 const waiterRoutes = require("./routes/waiter.routes");
-const cashierRoutes = require("./routes/cashier.routes");
 const cloudinary = require("./routes/cloudinary.route");
 const userRoutes = require("./routes/user.route");
 // load env
@@ -53,9 +52,6 @@ app.use("/api/user", userRoutes);
 
 //chef
 app.use("/api/kitchen", kitchenRoutes);
-
-// cashier
-app.use("/api/cashier", cashierRoutes);
 
 //customer
 app.use("/api/customer", customerRoutes);

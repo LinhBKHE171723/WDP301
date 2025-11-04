@@ -263,27 +263,6 @@ class WebSocketService {
   }
 
   // ==================================================
-  // 📢 Broadcast cho tất cả cashier
-  // ==================================================
-  broadcastToAllCashiers(eventType, data) {
-    const message = {
-      type: eventType,
-      data,
-      timestamp: new Date().toISOString(),
-    };
-
-    let sentCount = 0;
-    this.wss?.clients.forEach((ws) => {
-      if (ws.readyState === WebSocket.OPEN && ws.userRole === "cashier") {
-        ws.send(JSON.stringify(message));
-        sentCount++;
-      }
-    });
-
-    console.log(`📡 Broadcasted ${eventType} to ${sentCount} cashier(s)`, data);
-  }
-
-  // ==================================================
   // 📢 Gửi broadcast cho waiter cụ thể (theo waiterId)
   // ==================================================
   broadcastToWaiter(waiterId, eventType, data) {

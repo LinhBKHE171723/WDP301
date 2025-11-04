@@ -3,7 +3,6 @@ const OrderItem = require("../models/OrderItem");
 const Item = require("../models/Item");
 const Table = require("../models/Table");
 const User = require("../models/User");
-const { formatOrder } = require("./cashier.controller");
 
 // Helper function để populate assignedChef cho comboItems
 async function populateComboItemsChefs(orderItems) {
@@ -132,18 +131,12 @@ exports.startPreparingOrder = async (req, res) => {
           { path: "assignedChef", select: "name username" }
         ],
       })
-      .populate("tableId", "tableNumber");
+      .populate("tableId", "number");
 
     // Emit WebSocket event để cập nhật real-time
     const webSocketService = req.app.get("webSocketService");
     if (webSocketService) {
       webSocketService.broadcastToOrder(orderId, "order:updated", updatedOrder);
-      if (webSocketService.broadcastToAllCashiers) {
-        const payload = formatOrder(updatedOrder);
-        if (payload) {
-          webSocketService.broadcastToAllCashiers("cashier.orders.preparing", payload);
-        }
-      }
     }
 
     res.status(200).json({

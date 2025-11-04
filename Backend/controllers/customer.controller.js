@@ -7,7 +7,6 @@ const Payment = require("../models/Payment");
 const Feedback = require("../models/Feedback");
 const User = require("../models/User");
 const { populateOrderItemDetails, validateTableAvailability, checkItemStock, createOrderItemsFromCart, createCustomerAccount } = require("../utils/customerHelpers");
-const { formatOrder } = require("./cashier.controller");
 
 // Lấy thông tin bàn theo số bàn
 exports.getTableByNumber = async (req, res) => {
@@ -1484,12 +1483,6 @@ exports.confirmOrder = async (req, res) => {
       webSocketService.broadcastToOrder(order._id, "order:confirmed", populatedOrder);
       // Broadcast to all kitchen connections
       webSocketService.broadcastToAllKitchen("order:confirmed", populatedOrder);
-      if (webSocketService.broadcastToAllCashiers) {
-        const payload = formatOrder(populatedOrder);
-        if (payload) {
-          webSocketService.broadcastToAllCashiers("cashier.orders.preparing", payload);
-        }
-      }
     }
 
     res.status(200).json({
