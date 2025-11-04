@@ -11,6 +11,7 @@ const orderSchema = new Schema(
       type: String,
       enum: [
         "pending",
+        "preorder",
         "confirmed",
         "preparing",
         "served",
@@ -22,6 +23,7 @@ const orderSchema = new Schema(
     totalAmount: Number,
     discount: Number,
     servedAt: Date,
+    scheduledTime: Date, // Thời gian khách muốn đến ăn (cho đặt trước)
     waiterResponse: {
       status: {
         type: String,

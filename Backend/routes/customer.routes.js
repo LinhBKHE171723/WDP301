@@ -3,10 +3,13 @@ const router = express.Router();
 const { authRequired } = require("../middlewares/auth.middleware");
 const {
   getAvailableMenus,
+  getAllMenus,
   getMenuById,
   getAvailableItems,
+  getAllItems,
   getItemById,
   createOrder,
+  createPreOrder,
   getTableByNumber,
   getOrderById,
   getUserOrders,
@@ -32,17 +35,26 @@ router.get("/table/:tableNumber", getTableByNumber);
 // 2. Lấy danh sách menu có sẵn
 router.get("/menus", getAvailableMenus);
 
+// 2.1. Lấy tất cả menu (không lọc stock - cho preorder)
+router.get("/menus/all", getAllMenus);
+
 // 3. Lấy chi tiết menu
 router.get("/menus/:menuId", getMenuById);
 
 // 4. Lấy danh sách món ăn có sẵn
 router.get("/items", getAvailableItems);
 
+// 4.1. Lấy tất cả món ăn (không lọc stock - cho preorder)
+router.get("/items/all", getAllItems);
+
 // 5. Lấy chi tiết món ăn
 router.get("/items/:itemId", getItemById);
 
 // 6. Tạo đơn hàng mới
 router.post("/orders", createOrder);
+
+// 6.1. Tạo đơn hàng đặt trước (preorder)
+router.post("/preorders", createPreOrder);
 
 // 7. Lấy đơn hàng mới nhất (cho testing) - phải đặt TRƯỚC route /orders/:orderId
 router.get("/orders/latest", getLatestOrder);

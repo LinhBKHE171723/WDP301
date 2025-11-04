@@ -6,6 +6,7 @@ import MenuView from "./components/MenuView"
 import OrderHistory from "./components/OrderHistory"
 import GuestOrderHistory from "./components/GuestOrderHistory"
 import OrderStatus from "./components/OrderStatus"
+import PreOrder from "./components/PreOrder"
 
 import CashierShiftManager from "./components/cashier/CashierShiftManager"
 import CashierDashboard from "./components/cashier/CashierDashboard"
@@ -149,6 +150,12 @@ function App() {
             <Route
               path="/reservation"
               element={<MenuView table={defaultTable} onBack={() => {}} />}
+            />
+
+            {/* Đặt bàn trước */}
+            <Route
+              path="/preorder"
+              element={<PreOrder />}
             />
 
             {/* Lịch sử đơn hàng */}
