@@ -2004,7 +2004,7 @@ const seedDatabase = async () => {
     const badCustomersForFeedback = customers.slice(3, 5); // customer04, customer05
     const vipCustomerIds = vipCustomersForFeedback.map(c => c._id.toString());
     const badCustomerIds = badCustomersForFeedback.map(c => c._id.toString());
-    
+
     // Comments mẫu theo rating
     const commentsByRating = {
       5: [

@@ -15,19 +15,20 @@ exports.getCustomerReport = async (filters = {}) => {
 
   const { fromDate, toDate } = normalizeTimeInputs(filters.from, filters.to);
 
-  // Tìm tất cả đơn hàng đã hoàn thành và có thông tin khách hàng (userId)
-  const completedOrders = await Order.find({
-    status: { $in: ["paid", "served"] },
+  // Lấy TẤT CẢ orders (paid và cancelled) để tính reliability
+  const allOrders = await Order.find({
+    status: { $in: ["paid", "cancelled"] },
     userId: { $ne: null }, // Chỉ lấy đơn có userId
     createdAt: { $gte: fromDate, $lte: toDate },
-  }).populate("userId", "name email phone"); // "Join" để lấy thông tin user
+  }).populate("userId", "name email phone").sort({ createdAt: 1 }); // Sort để tính firstOrderDate và lastOrderDate
 
   // ---- BƯỚC 2: NHÓM VÀ TÍNH TOÁN CÁC CHỈ SỐ BẰNG JAVASCRIPT ----
 
   const customerStats = {}; // Dùng object để nhóm đơn hàng theo userId
+  const now = new Date();
 
-  for (const order of completedOrders) {
-    // Bỏ qua nếu không có thông tin user (dù đã lọc, để chắc chắn)
+  for (const order of allOrders) {
+    // Bỏ qua nếu không có thông tin user
     if (!order.userId) continue;
 
     const userId = order.userId._id.toString();
@@ -39,25 +40,100 @@ exports.getCustomerReport = async (filters = {}) => {
         name: order.userId.name,
         email: order.userId.email,
         phone: order.userId.phone,
+        // Reliability metrics
+        totalOrders: 0,
+        paidOrders: 0,
+        cancelledOrders: 0,
+        // Monetary metrics
         totalSpent: 0,
-        orderCount: 0,
-        lastVisit: new Date(0), // Khởi tạo ngày rất cũ để so sánh
+        // Frequency metrics
+        firstOrderDate: null,
+        lastOrderDate: null,
+        // Recency metrics
+        lastVisit: null,
       };
     }
 
-    // Cộng dồn các chỉ số vào cho khách hàng
     const stats = customerStats[userId];
-    stats.totalSpent += order.totalAmount || 0;
-    stats.orderCount += 1;
-    if (order.createdAt > stats.lastVisit) {
-      stats.lastVisit = order.createdAt;
+
+    // Tính Reliability metrics
+    stats.totalOrders += 1;
+    if (order.status === "paid") {
+      stats.paidOrders += 1;
+      stats.totalSpent += order.totalAmount || 0;
+      
+      // Cập nhật lastVisit (chỉ tính từ paid orders)
+      if (!stats.lastVisit || order.createdAt > stats.lastVisit) {
+        stats.lastVisit = order.createdAt;
+      }
+    } else if (order.status === "cancelled") {
+      stats.cancelledOrders += 1;
+    }
+
+    // Tính Frequency metrics (firstOrderDate và lastOrderDate)
+    if (!stats.firstOrderDate || order.createdAt < stats.firstOrderDate) {
+      stats.firstOrderDate = order.createdAt;
+    }
+    if (!stats.lastOrderDate || order.createdAt > stats.lastOrderDate) {
+      stats.lastOrderDate = order.createdAt;
     }
   }
 
-  // Chuyển object thành mảng để dễ dàng filter và sort
+  // Chuyển object thành mảng để xử lý
   let customerList = Object.values(customerStats);
 
-  // ---- BƯỚC 3: ÁP DỤNG CÁC BỘ LỌC TÙY CHỌN ----
+  // ---- BƯỚC 3: TÍNH TOÁN CÁC METRICS RFM + RELIABILITY ----
+
+  customerList = customerList.map((customer) => {
+    // Reliability: (paidOrders / totalOrders) * 100
+    const reliability = customer.totalOrders > 0
+      ? parseFloat(((customer.paidOrders / customer.totalOrders) * 100).toFixed(1))
+      : 0;
+
+    // Monetary: averageOrderValue
+    const averageOrderValue = customer.paidOrders > 0
+      ? Math.round(customer.totalSpent / customer.paidOrders)
+      : 0;
+
+    // Frequency: frequencyPerMonth
+    let frequencyPerMonth = 0;
+    if (customer.firstOrderDate && customer.lastOrderDate && customer.paidOrders > 0) {
+      const daysDiff = (customer.lastOrderDate - customer.firstOrderDate) / (1000 * 60 * 60 * 24);
+      const monthsDiff = daysDiff / 30;
+      if (monthsDiff > 0) {
+        frequencyPerMonth = parseFloat((customer.paidOrders / monthsDiff).toFixed(1));
+      } else {
+        // Nếu tất cả orders trong cùng ngày, tính frequency = paidOrders
+        frequencyPerMonth = customer.paidOrders;
+      }
+    }
+
+    // Recency: recencyDays
+    const recencyDays = customer.lastVisit
+      ? Math.floor((now - customer.lastVisit) / (1000 * 60 * 60 * 24))
+      : null;
+
+    return {
+      ...customer,
+      // Reliability metrics
+      reliability,
+      // Monetary metrics
+      averageOrderValue,
+      formattedTotalSpent: fmtVND(customer.totalSpent),
+      formattedAverageOrderValue: fmtVND(averageOrderValue),
+      // Frequency metrics
+      frequencyPerMonth,
+      // Recency metrics
+      recencyDays: recencyDays !== null ? recencyDays : null,
+      formattedLastVisit: customer.lastVisit
+        ? customer.lastVisit.toLocaleDateString('vi-VN')
+        : 'Chưa có',
+      // Existing fields
+      orderCount: customer.paidOrders,
+    };
+  });
+
+  // ---- BƯỚC 4: ÁP DỤNG CÁC BỘ LỌC TÙY CHỌN ----
 
   if (filters.minSpent) {
     customerList = customerList.filter(
@@ -66,21 +142,37 @@ exports.getCustomerReport = async (filters = {}) => {
   }
   if (filters.minOrders) {
     customerList = customerList.filter(
-      (c) => c.orderCount >= parseInt(filters.minOrders, 10)
+      (c) => c.paidOrders >= parseInt(filters.minOrders, 10)
     );
   }
 
-  // ---- BƯỚC 4: SẮP XẾP, XẾP HẠNG VÀ TRẢ VỀ KẾT QUẢ ----
+  // ---- BƯỚC 5: SẮP XẾP, XẾP HẠNG VÀ TRẢ VỀ KẾT QUẢ ----
 
-  // Sắp xếp theo tổng chi tiêu từ cao đến thấp
-  customerList.sort((a, b) => b.totalSpent - a.totalSpent);
+  // Sắp xếp theo thứ tự ưu tiên: Reliability > Monetary > Frequency > Recency
+  customerList.sort((a, b) => {
+    // 1. Reliability (từ cao xuống thấp)
+    if (b.reliability !== a.reliability) {
+      return b.reliability - a.reliability;
+    }
+    // 2. Monetary (từ cao xuống thấp)
+    if (b.totalSpent !== a.totalSpent) {
+      return b.totalSpent - a.totalSpent;
+    }
+    // 3. Frequency (từ cao xuống thấp)
+    if (b.frequencyPerMonth !== a.frequencyPerMonth) {
+      return b.frequencyPerMonth - a.frequencyPerMonth;
+    }
+    // 4. Recency (từ gần đến xa - recencyDays nhỏ hơn = gần hơn)
+    if (a.recencyDays === null && b.recencyDays === null) return 0;
+    if (a.recencyDays === null) return 1;
+    if (b.recencyDays === null) return -1;
+    return a.recencyDays - b.recencyDays;
+  });
 
-  // Thêm hạng và định dạng lại dữ liệu
+  // Thêm hạng và trả về kết quả
   return customerList.map((customer, index) => ({
     ...customer,
     rank: `Hạng ${index + 1}`,
-    formattedTotalSpent: fmtVND(customer.totalSpent),
-    formattedLastVisit: customer.lastVisit.toLocaleDateString('vi-VN'),
   }));
 };
 
