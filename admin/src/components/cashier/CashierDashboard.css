@@ -209,3 +209,4 @@
 .page-btn:disabled { opacity: .5; cursor: not-allowed; }
 .page-btn.active { background: var(--primary); color: var(--destructive-foreground); border-color: var(--primary); }
 .page-ellipsis { padding: 0 .25rem; color: var(--muted-foreground); }
+

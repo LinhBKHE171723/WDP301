@@ -22,6 +22,8 @@ export default function LoginPage() {
       // Redirect dựa trên role
       if (res.user.role === "admin") {
         navigate("/admin");
+      } else if (res.user.role === "cashier") {
+        navigate("/admin/cashier/dashboard");
       } else if (res.user.role === "kitchen_manager") {
         navigate("/kitchen/dashboard");
       } else if (res.user.role === "waiter") {

@@ -211,68 +211,66 @@ export default function CashierDashboard({
         </div>
       </div>
 
-      {/* Revenue Cards (GIỮ NGUYÊN layout, tính số liệu từ paymentHistory để luôn đúng) */}
-      {paymentHistory.length > 0 && (
-        <div className="revenue-grid">
-          <div className="revenue-card revenue-card-total">
-            <div className="revenue-card-header">
-              <div className="revenue-icon-wrapper revenue-icon-total">
-                <DollarSign className="revenue-icon" />
-              </div>
-              <span className="revenue-label">Tổng Doanh Thu</span>
+      {/* Revenue Cards (luôn hiển thị để truy cập Đơn Chờ dù chưa có giao dịch) */}
+      <div className="revenue-grid">
+        <div className="revenue-card revenue-card-total">
+          <div className="revenue-card-header">
+            <div className="revenue-icon-wrapper revenue-icon-total">
+              <DollarSign className="revenue-icon" />
             </div>
-            <div className="revenue-amount revenue-amount-total">{formatCurrency(totalRevenue)}</div>
-            <div className="revenue-footer">
-              <span className="revenue-count">{completedOrdersCount} đơn hoàn thành</span>
-            </div>
+            <span className="revenue-label">Tổng Doanh Thu</span>
           </div>
-
-          <div className="revenue-card revenue-card-cash">
-            <div className="revenue-card-header">
-              <div className="revenue-icon-wrapper revenue-icon-cash">
-                <Banknote className="revenue-icon" />
-              </div>
-              <span className="revenue-label">Tiền Mặt</span>
-            </div>
-            <div className="revenue-amount revenue-amount-cash">{formatCurrency(cashRevenue)}</div>
-            <div className="revenue-footer">
-              <span className="revenue-percentage">
-                {totalRevenue > 0 ? ((cashRevenue / totalRevenue) * 100).toFixed(0) : 0}% tổng doanh thu
-              </span>
-            </div>
-          </div>
-
-          <div className="revenue-card revenue-card-card">
-            <div className="revenue-card-header">
-              <div className="revenue-icon-wrapper revenue-icon-card">
-                <CreditCard className="revenue-icon" />
-              </div>
-              <span className="revenue-label">Thẻ</span>
-            </div>
-            <div className="revenue-amount revenue-amount-card">{formatCurrency(cardRevenue)}</div>
-            <div className="revenue-footer">
-              <span className="revenue-percentage">
-                {totalRevenue > 0 ? ((cardRevenue / totalRevenue) * 100).toFixed(0) : 0}% tổng doanh thu
-              </span>
-            </div>
-          </div>
-
-          <div className="revenue-card revenue-card-pending">
-            <div className="revenue-card-header">
-              <div className="revenue-icon-wrapper revenue-icon-pending">
-                <ShoppingCart className="revenue-icon" />
-              </div>
-              <span className="revenue-label">Đơn Chờ</span>
-            </div>
-            <div className="revenue-amount revenue-amount-pending">{pendingOrdersCount}</div>
-            <div className="revenue-footer">
-              <button className="button button-view-orders" onClick={() => setShowUnpaidOrders(true)}>
-                Xem danh sách đơn
-              </button>
-            </div>
+          <div className="revenue-amount revenue-amount-total">{formatCurrency(totalRevenue)}</div>
+          <div className="revenue-footer">
+            <span className="revenue-count">{completedOrdersCount} đơn hoàn thành</span>
           </div>
         </div>
-      )}
+
+        <div className="revenue-card revenue-card-cash">
+          <div className="revenue-card-header">
+            <div className="revenue-icon-wrapper revenue-icon-cash">
+              <Banknote className="revenue-icon" />
+            </div>
+            <span className="revenue-label">Tiền Mặt</span>
+          </div>
+          <div className="revenue-amount revenue-amount-cash">{formatCurrency(cashRevenue)}</div>
+          <div className="revenue-footer">
+            <span className="revenue-percentage">
+              {totalRevenue > 0 ? ((cashRevenue / totalRevenue) * 100).toFixed(0) : 0}% tổng doanh thu
+            </span>
+          </div>
+        </div>
+
+        <div className="revenue-card revenue-card-card">
+          <div className="revenue-card-header">
+            <div className="revenue-icon-wrapper revenue-icon-card">
+              <CreditCard className="revenue-icon" />
+            </div>
+            <span className="revenue-label">Thẻ</span>
+          </div>
+          <div className="revenue-amount revenue-amount-card">{formatCurrency(cardRevenue)}</div>
+          <div className="revenue-footer">
+            <span className="revenue-percentage">
+              {totalRevenue > 0 ? ((cardRevenue / totalRevenue) * 100).toFixed(0) : 0}% tổng doanh thu
+            </span>
+          </div>
+        </div>
+
+        <div className="revenue-card revenue-card-pending">
+          <div className="revenue-card-header">
+            <div className="revenue-icon-wrapper revenue-icon-pending">
+              <ShoppingCart className="revenue-icon" />
+            </div>
+            <span className="revenue-label">Đơn Chờ</span>
+          </div>
+          <div className="revenue-amount revenue-amount-pending">{pendingOrdersCount}</div>
+          <div className="revenue-footer">
+            <button className="button button-view-orders" onClick={() => setShowUnpaidOrders(true)}>
+              Xem danh sách đơn
+            </button>
+          </div>
+        </div>
+      </div>
 
       {/* Payment History (GIỮ NGUYÊN + phân trang cũ) */}
       {paymentHistory.length > 0 ? (
@@ -407,7 +405,7 @@ export default function CashierDashboard({
             <span className="history-date">{formatDate(shiftInfo.startTime)}</span>
           </div>
           <div className="empty-state" style={{ padding: '1.25rem', color: 'var(--muted-foreground)' }}>
-            Chưa có giao dịch trong ca này. Vào “Đơn Chờ” để thanh toán đơn đầu tiên.
+            Chưa có giao dịch trong ca này. Vào "Đơn Chờ" để thanh toán đơn đầu tiên.
           </div>
         </div>
       )}
@@ -477,7 +475,7 @@ export default function CashierDashboard({
               </div>
             </div>
           </div>
-        )} */}
+        ) */}
 
       {/* Tổng hợp nhanh */}
       {/* <div className="petty-cash-summary">
@@ -538,3 +536,4 @@ export default function CashierDashboard({
     </div>
   )
 }
+

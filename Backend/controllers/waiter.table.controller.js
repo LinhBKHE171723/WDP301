@@ -15,11 +15,13 @@ const waiterTableController = {
         .populate({
           path: "orderNow",
           populate: [
-            { path: "servedBy", select: "name email" },
             { path: "userId", select: "name email" },
             {
               path: "orderItems",
-              populate: { path: "itemId", select: "name price" },
+              populate: [
+                { path: "itemId", select: "name price" },
+                { path: "servedBy", select: "name email" },
+              ],
             },
           ],
         })
@@ -45,11 +47,13 @@ const waiterTableController = {
         .populate({
           path: "orderNow",
           populate: [
-            { path: "servedBy", select: "name email" },
             { path: "userId", select: "name email" },
             {
               path: "orderItems",
-              populate: { path: "itemId", select: "name price" },
+              populate: [
+                { path: "itemId", select: "name price" },
+                { path: "servedBy", select: "name email" },
+              ],
             },
             { path: "paymentId", select: "status amountPaid paymentMethod" },
           ],

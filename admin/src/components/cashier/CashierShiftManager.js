@@ -645,3 +645,4 @@ export default function CashierShiftManager() {
     </div>
   )
 }
+
