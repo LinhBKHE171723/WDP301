@@ -3,6 +3,7 @@ const router = express.Router();
 
 const userCtrl = require("../controllers/admin/user.controller");
 const feedbackController = require("../controllers/admin/feedback.controller");
+const preorderController = require("../controllers/admin/preorder.controller");
 const statsCtrl = require("../controllers/admin/adminStats.controller");
 const performanceController = require("../controllers/admin/performance.controller");
 const itemCtrl = require("../controllers/admin/item.controller");
@@ -26,6 +27,10 @@ router.delete("/users/:id", userCtrl.remove);
 router.get("/feedbacks", feedbackController.getAll);
 router.get("/feedbacks/:id", feedbackController.getOne);
 router.delete("/feedbacks/:id", feedbackController.remove);
+
+// --- PREORDER ROUTES (/api/admin/preorders) ---
+router.get("/preorders", preorderController.getPreOrders);
+router.get("/customers/:userId/info", preorderController.getCustomerInfo);
 
 // =======================================================
 // NHÓM 2: CÁC ROUTE THỐNG KÊ & BÁO CÁO

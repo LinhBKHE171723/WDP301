@@ -15,9 +15,12 @@ async function classifyCustomer(userId, options = {}) {
   
   // 1. Lấy tất cả orders của khách hàng
   const orderQuery = {
-    userId: userId,
-    createdAt: fromDate && toDate ? { $gte: fromDate, $lte: toDate } : {}
+    userId: userId
   };
+  // Chỉ thêm filter createdAt nếu có cả fromDate và toDate
+  if (fromDate && toDate) {
+    orderQuery.createdAt = { $gte: fromDate, $lte: toDate };
+  }
   const allOrders = await Order.find(orderQuery).sort({ createdAt: 1 });
   
   if (allOrders.length < minOrders) {
@@ -142,9 +145,12 @@ async function classifyAllCustomers(options = {}) {
   const { fromDate, toDate } = options;
   
   const orderQuery = {
-    userId: { $ne: null },
-    createdAt: fromDate && toDate ? { $gte: fromDate, $lte: toDate } : {}
+    userId: { $ne: null }
   };
+  // Chỉ thêm filter createdAt nếu có cả fromDate và toDate
+  if (fromDate && toDate) {
+    orderQuery.createdAt = { $gte: fromDate, $lte: toDate };
+  }
   
   // Lấy tất cả userId có orders
   const orders = await Order.find(orderQuery).distinct('userId');

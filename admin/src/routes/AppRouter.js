@@ -22,6 +22,7 @@ import ItemReportPage from "../pages/admin/ItemReportPage";
 import CustomerReportPage from "../pages/admin/CustomerReportPage";
 import PerformancePage from "../pages/admin/PerformancePage";
 import PerformanceDetailPage from "../pages/admin/PerformancePageDetail";
+import PreOrderPage from "../pages/admin/PreOrderPage";
 
 // auth 
 import ForgotPassword from "../pages/ForgotPassword";
@@ -107,6 +108,7 @@ export default function AppRouter() {
                     <div className="container-page">
                       <Routes>
                         <Route path="/" element={<DashboardPage />} />
+                        <Route path="/preorders" element={<PreOrderPage />} />
                         <Route path="/analytics" element={<AnalyticsPage />} />
                         <Route path="/item-report" element={<ItemReportPage />} />
                         <Route path="/item-analytics/:itemId" element={<AnalyticsPage2 />} />
