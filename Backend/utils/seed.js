@@ -31,100 +31,24 @@ const seedDatabase = async () => {
     console.log("🧹 Đã xoá toàn bộ dữ liệu cũ.");
 
     // 2️⃣ Tạo user mẫu (dùng for để trigger pre-save hash)
+    // Helper function để tạo tên ngẫu nhiên
+    const firstNames = ["Nguyễn", "Trần", "Lê", "Phạm", "Hoàng", "Vũ", "Đỗ", "Bùi", "Đinh", "Ngô", "Võ", "Dương", "Lý", "Phan", "Tạ", "Hồ", "Đặng", "Bạch", "Lương", "Chu"];
+    const middleNames = ["Văn", "Thị", "Đức", "Minh", "Hùng", "Lan", "Mai", "Tuấn", "Hoa", "Linh", "Anh", "Dũng", "Hương", "Quang", "Thảo", "Nam", "Hải", "Phương", "Long", "Tâm"];
+    const lastNames = ["An", "Bình", "Chi", "Dũng", "Giang", "Hoa", "Hùng", "Khanh", "Linh", "Mai", "Nam", "Phong", "Quang", "Sơn", "Thảo", "Tuấn", "Vinh", "Yến", "Đức", "Hương"];
+    
+    const generateRandomName = () => {
+      const firstName = firstNames[Math.floor(Math.random() * firstNames.length)];
+      const middleName = middleNames[Math.floor(Math.random() * middleNames.length)];
+      const lastName = lastNames[Math.floor(Math.random() * lastNames.length)];
+      return `${firstName} ${middleName} ${lastName}`;
+    };
+    
+    const generatePhoneNumber = (index) => {
+      const base = 1000000000 + index;
+      return `0${base.toString().slice(-9)}`;
+    };
+    
     const userData = [
-      // Customers - VIP (thân thiết)
-      {
-        name: "Nguyễn Văn Khách",
-        username: "customer01",
-        password: "customer123",
-        email: "customer@example.com",
-        phone: "0123456789",
-        role: "customer",
-        point: 750, // VIP: điểm cao
-      },
-      {
-        name: "Trần Thị Minh",
-        username: "customer02",
-        password: "customer123",
-        email: "customer02@example.com",
-        phone: "0123456790",
-        role: "customer",
-        point: 950, // VIP: điểm cao
-      },
-      {
-        name: "Lê Văn Hùng",
-        username: "customer03",
-        password: "customer123",
-        email: "customer03@example.com",
-        phone: "0123456791",
-        role: "customer",
-        point: 600, // VIP: điểm cao
-      },
-      // Customers - Xấu
-      {
-        name: "Phạm Thị Lan",
-        username: "customer04",
-        password: "customer123",
-        email: "customer04@example.com",
-        phone: "0123456792",
-        role: "customer",
-        point: 10, // Xấu: điểm thấp
-      },
-      {
-        name: "Hoàng Văn Nam",
-        username: "customer05",
-        password: "customer123",
-        email: "customer05@example.com",
-        phone: "0123456793",
-        role: "customer",
-        point: 5, // Xấu: điểm thấp
-      },
-      // Customers - Bình thường
-      {
-        name: "Ngô Thị Mai",
-        username: "customer06",
-        password: "customer123",
-        email: "customer06@example.com",
-        phone: "0123456794",
-        role: "customer",
-        point: 200,
-      },
-      {
-        name: "Đỗ Văn Tuấn",
-        username: "customer07",
-        password: "customer123",
-        email: "customer07@example.com",
-        phone: "0123456795",
-        role: "customer",
-        point: 120,
-      },
-      {
-        name: "Vũ Thị Hoa",
-        username: "customer08",
-        password: "customer123",
-        email: "customer08@example.com",
-        phone: "0123456796",
-        role: "customer",
-        point: 180,
-      },
-      {
-        name: "Bùi Văn Đức",
-        username: "customer09",
-        password: "customer123",
-        email: "customer09@example.com",
-        phone: "0123456797",
-        role: "customer",
-        point: 90,
-      },
-      {
-        name: "Đinh Thị Linh",
-        username: "customer10",
-        password: "customer123",
-        email: "customer10@example.com",
-        phone: "0123456798",
-        role: "customer",
-        point: 220,
-      },
       // Waiters (chỉ waiter01 và waiter02 active, còn lại inactive)
       {
         name: "Trần Thị Phục Vụ 1",
@@ -231,7 +155,79 @@ const seedDatabase = async () => {
       console.log(`✅ Tạo user: ${user.username}`);
     }
 
-    const customers = users.filter((u) => u.role === "customer");
+    // 2.1️⃣ Tạo nhiều customers với các loại khác nhau
+    console.log("👥 Bắt đầu tạo customers với các loại khác nhau...");
+    const TOTAL_CUSTOMERS = 400; // Tổng số customers
+    const customerTypes = {
+      VIP: { count: 30, minOrders: 15, maxOrders: 25, minPoints: 500, maxPoints: 1000, cancelRate: 0.05 }, // VIP: nhiều orders, điểm cao, ít cancel
+      BAD: { count: 20, minOrders: 1, maxOrders: 4, minPoints: 0, maxPoints: 50, cancelRate: 0.45 }, // Bad: ít orders, điểm thấp, nhiều cancel
+      FREQUENT_HIGH_VALUE: { count: 50, minOrders: 10, maxOrders: 18, minPoints: 200, maxPoints: 400, cancelRate: 0.1 }, // Thường xuyên, giá trị cao
+      FREQUENT_LOW_VALUE: { count: 50, minOrders: 8, maxOrders: 15, minPoints: 100, maxPoints: 250, cancelRate: 0.15 }, // Thường xuyên, giá trị thấp
+      INFREQUENT_HIGH_VALUE: { count: 50, minOrders: 3, maxOrders: 8, minPoints: 150, maxPoints: 300, cancelRate: 0.2 }, // Không thường xuyên, giá trị cao
+      INFREQUENT_LOW_VALUE: { count: 50, minOrders: 1, maxOrders: 5, minPoints: 50, maxPoints: 150, cancelRate: 0.25 }, // Không thường xuyên, giá trị thấp
+      REGULAR: { count: 150, minOrders: 2, maxOrders: 10, minPoints: 80, maxPoints: 200, cancelRate: 0.15 } // Bình thường
+    };
+    
+    const allCustomers = [];
+    let customerIndex = 1;
+    
+    for (const [type, config] of Object.entries(customerTypes)) {
+      for (let i = 0; i < config.count; i++) {
+        const name = generateRandomName();
+        const username = `customer${customerIndex.toString().padStart(3, '0')}`;
+        const phone = generatePhoneNumber(customerIndex);
+        
+        allCustomers.push({
+          name,
+          username,
+          password: "customer123",
+          email: `${username}@example.com`,
+          phone,
+          role: "customer",
+          point: Math.floor(Math.random() * (config.maxPoints - config.minPoints + 1)) + config.minPoints,
+          customerType: type,
+          expectedOrders: Math.floor(Math.random() * (config.maxOrders - config.minOrders + 1)) + config.minOrders,
+          cancelRate: config.cancelRate
+        });
+        
+        customerIndex++;
+      }
+    }
+    
+    // Lưu customerType và expectedOrders trước khi tạo (vì không phải field trong schema)
+    const customerMetadata = new Map(); // Map userId -> { customerType, expectedOrders, cancelRate }
+    
+    // Tạo customers trong database
+    const createdCustomers = [];
+    for (const customerData of allCustomers) {
+      const { customerType, expectedOrders, cancelRate, ...userData } = customerData;
+      const user = await User.create(userData);
+      
+      // Lưu metadata
+      customerMetadata.set(user._id.toString(), { customerType, expectedOrders, cancelRate });
+      
+      createdCustomers.push(user);
+      if (createdCustomers.length % 50 === 0) {
+        console.log(`  ✅ Đã tạo ${createdCustomers.length}/${TOTAL_CUSTOMERS} customers...`);
+      }
+    }
+    
+    console.log(`✅ Đã tạo ${createdCustomers.length} customers với các loại khác nhau.`);
+    
+    // Lưu thông tin customer types để dùng sau
+    const customersByType = {};
+    for (const customer of createdCustomers) {
+      const metadata = customerMetadata.get(customer._id.toString());
+      if (metadata) {
+        const type = metadata.customerType;
+        if (!customersByType[type]) {
+          customersByType[type] = [];
+        }
+        customersByType[type].push(customer);
+      }
+    }
+
+    const customers = createdCustomers;
     const waiters = users.filter((u) => u.role === "waiter");
     const chefs = users.filter((u) => u.role === "chef");
     const kitchenManagers = users.filter((u) => u.role === "kitchen_manager");
@@ -1410,6 +1406,78 @@ const seedDatabase = async () => {
       return selectedItems;
     };
 
+    // Helper function để tạo order items với giá trị cao (cho customers ăn nhiều)
+    const createHighValueOrderItems = async (items, status, assignedChef = null, waiter = null) => {
+      const selectedItems = [];
+      // Chỉ chọn các món có giá cao (>= 200000)
+      const highValueItems = items.filter(item => item.price >= 200000);
+      const numItems = getRandomInt(2, 5); // 2-5 items, nhiều hơn
+      
+      for (let j = 0; j < numItems; j++) {
+        const randomItem = highValueItems[Math.floor(Math.random() * highValueItems.length)];
+        
+        const populatedItem = await Item.findById(randomItem._id).populate('ingredients.ingredient');
+        if (!populatedItem) continue;
+        
+        const quantity = getRandomInt(1, 3); // 1-3 quantity
+        
+        const ingredientUsage = await deductIngredientsFromStock(populatedItem, quantity);
+        const expense = ingredientUsage.reduce((sum, usage) => sum + (usage.quantity * usage.price), 0);
+        const servedBy = (status === "served" || status === "paid") && waiter ? waiter._id : null;
+        
+        const orderItem = await OrderItem.create({
+          itemId: randomItem._id,
+          itemName: randomItem.name,
+          itemType: "item",
+          quantity: quantity,
+          price: randomItem.price,
+          expense: expense,
+          ingredientUsage: ingredientUsage,
+          assignedChef,
+          servedBy,
+          status,
+        });
+        selectedItems.push(orderItem);
+      }
+      return selectedItems;
+    };
+
+    // Helper function để tạo order items với giá trị thấp (cho customers ăn ít)
+    const createLowValueOrderItems = async (items, status, assignedChef = null, waiter = null) => {
+      const selectedItems = [];
+      // Chỉ chọn các món có giá thấp (< 150000)
+      const lowValueItems = items.filter(item => item.price < 150000);
+      const numItems = getRandomInt(1, 3); // 1-3 items, ít hơn
+      
+      for (let j = 0; j < numItems; j++) {
+        const randomItem = lowValueItems[Math.floor(Math.random() * lowValueItems.length)];
+        
+        const populatedItem = await Item.findById(randomItem._id).populate('ingredients.ingredient');
+        if (!populatedItem) continue;
+        
+        const quantity = getRandomInt(1, 2); // 1-2 quantity, ít hơn
+        
+        const ingredientUsage = await deductIngredientsFromStock(populatedItem, quantity);
+        const expense = ingredientUsage.reduce((sum, usage) => sum + (usage.quantity * usage.price), 0);
+        const servedBy = (status === "served" || status === "paid") && waiter ? waiter._id : null;
+        
+        const orderItem = await OrderItem.create({
+          itemId: randomItem._id,
+          itemName: randomItem.name,
+          itemType: "item",
+          quantity: quantity,
+          price: randomItem.price,
+          expense: expense,
+          ingredientUsage: ingredientUsage,
+          assignedChef,
+          servedBy,
+          status,
+        });
+        selectedItems.push(orderItem);
+      }
+      return selectedItems;
+    };
+
     // ===============================
     // 📌 Cập nhật table theo order
     // ===============================
@@ -1619,218 +1687,95 @@ const seedDatabase = async () => {
       orderCount++;
     }
 
-    // I. Tạo nhiều paid orders phân bố trong 3 tháng với expense biến động
-    console.log("🔄 Bắt đầu tạo paid orders phân bố trong 3 tháng...");
+    // I. Tạo orders cho tất cả customers dựa trên customerType và expectedOrders
+    console.log("🔄 Bắt đầu tạo orders cho tất cả customers dựa trên loại...");
     const threeMonthsAgo = new Date();
     threeMonthsAgo.setMonth(threeMonthsAgo.getMonth() - 3);
     const today = new Date();
-    
-    let bulkOrderCount = 0;
     const totalDays = Math.floor((today - threeMonthsAgo) / (1000 * 60 * 60 * 24));
     
-    // Tạo orders cho mỗi ngày trong 90 ngày
-    for (let day = 0; day < totalDays; day++) {
-      const currentDate = new Date(threeMonthsAgo);
-      currentDate.setDate(currentDate.getDate() + day);
+    // Helper function để tạo orders cho một customer
+    const createOrdersForCustomer = async (customer, customerType) => {
+      const customerOrders = [];
+      const metadata = customerMetadata.get(customer._id.toString());
+      const expectedOrders = metadata?.expectedOrders || customerTypes[customerType].minOrders;
+      const cancelRate = metadata?.cancelRate || customerTypes[customerType].cancelRate;
+      const numCancelled = Math.floor(expectedOrders * cancelRate);
       
-      // Mỗi ngày tạo 15-25 orders ngẫu nhiên
-      const ordersPerDay = getRandomInt(15, 25);
+      // Tạo danh sách ngày để phân bổ orders (tần suất cao = phân bố đều, tần suất thấp = tập trung)
+      const isFrequent = customerType.includes('FREQUENT') || customerType === 'VIP';
+      const orderDays = [];
       
-      for (let i = 0; i < ordersPerDay; i++) {
-        const randomTable = tables[getRandomInt(0, tables.length - 1)];
-        const randomCustomer = customers[getRandomInt(0, customers.length - 1)];
-        const randomWaiter = activeWaiters[Math.floor(Math.random() * activeWaiters.length)]; // Random active waiter
-        const randomChef = chefs[getRandomInt(0, chefs.length - 1)];
-        
-        // Tạo order items với expense biến động
-        const orderItems = await createOrderItemsWithVariableExpense(
-          items,
-          "served",
-          randomChef._id,
-          randomWaiter
-        );
-        
-        const totalAmount = orderItems.reduce(
-          (sum, oi) => sum + oi.price * oi.quantity,
-          0
-        );
-        
-        // Random time trong ngày
-        const orderCreatedAt = getRandomTimeInDay(currentDate);
-        const orderUpdatedAt = new Date(orderCreatedAt.getTime() + getRandomInt(30, 120) * 60 * 1000); // 30-120 phút sau
-        const paymentTime = new Date(orderCreatedAt.getTime() + getRandomInt(60, 180) * 60 * 1000); // Thanh toán sau 60-180 phút
-        
-        // Random payment method
-        const paymentMethods = ["cash", "card", "momo", "zaloPay"];
-        const paymentMethod = paymentMethods[getRandomInt(0, paymentMethods.length - 1)];
-        
-        // Tạo payment
-        const payment = await Payment.create({
-          paymentMethod: paymentMethod,
-          status: "paid",
-          amountPaid: totalAmount,
-          totalAmount: totalAmount,
-          payTime: paymentTime,
-        });
-        
-        // Tạo order với createdAt và updatedAt cụ thể
-        const order = await Order.create({
-          userId: randomCustomer._id,
-          servedBy: randomWaiter._id,
-          tableId: randomTable._id,
-          orderItems: orderItems.map((oi) => oi._id),
-          paymentId: payment._id,
-          status: "paid",
-          totalAmount: totalAmount,
-          waiterResponse: { status: "approved", respondedAt: orderCreatedAt },
-          customerConfirmed: true,
-          actions: ["order_created", "waiter_approved", "customer_confirmed"],
-          paid: true,
-          createdAt: orderCreatedAt,
-          updatedAt: orderUpdatedAt,
-        });
-        
-        // Update order items với orderId
-        await OrderItem.updateMany(
-          { _id: { $in: orderItems.map((oi) => oi._id) } },
-          { orderId: order._id }
-        );
-        
-        // Update payment với orderId
-        payment.orderId = order._id;
-        await payment.save();
-        
-        // Không update table vì orders đã paid (không còn active)
-        
-        bulkOrderCount++;
-        
-        // Log tiến độ mỗi 100 orders
-        if (bulkOrderCount % 100 === 0) {
-          console.log(`  ✅ Đã tạo ${bulkOrderCount} paid orders...`);
+      if (isFrequent) {
+        // Phân bố đều trong 3 tháng
+        const daysPerOrder = Math.floor(totalDays / expectedOrders);
+        for (let i = 0; i < expectedOrders; i++) {
+          const dayOffset = i * daysPerOrder + Math.floor(Math.random() * daysPerOrder);
+          orderDays.push(Math.min(dayOffset, totalDays - 1));
+        }
+      } else {
+        // Tập trung trong một số ngày nhất định
+        const clusterDays = Math.floor(totalDays * 0.3); // 30% số ngày
+        for (let i = 0; i < expectedOrders; i++) {
+          orderDays.push(Math.floor(Math.random() * clusterDays));
         }
       }
       
-      // Log tiến độ mỗi 10 ngày
-      if (day % 10 === 0 && day > 0) {
-        console.log(`  📅 Đã tạo orders cho ${day}/${totalDays} ngày (${bulkOrderCount} orders tổng cộng)...`);
-      }
-    }
-    
-    orderCount += bulkOrderCount;
-    console.log(`✅ Đã tạo ${bulkOrderCount} paid orders phân bố trong ${totalDays} ngày.`);
-
-    // I.1. Tạo Orders cho Customer VIP (thân thiết) - customer01, customer02, customer03
-    console.log("⭐ Bắt đầu tạo orders cho customers VIP...");
-    const vipCustomers = customers.slice(0, 3); // customer01, customer02, customer03
-    const vipOrders = [];
-    
-    for (const vipCustomer of vipCustomers) {
-      const numOrders = 15 + Math.floor(Math.random() * 6); // 15-20 orders mỗi VIP customer
-      
-      for (let i = 0; i < numOrders; i++) {
+      for (let i = 0; i < expectedOrders; i++) {
         const randomTable = tables[Math.floor(Math.random() * tables.length)];
         const randomWaiter = activeWaiters[Math.floor(Math.random() * activeWaiters.length)];
         const randomChef = chefs[Math.floor(Math.random() * chefs.length)];
         
-        // Random date trong 3 tháng qua
-        const randomDay = Math.floor(Math.random() * totalDays);
+        const dayOffset = orderDays[i];
         const orderDate = new Date(threeMonthsAgo);
-        orderDate.setDate(orderDate.getDate() + randomDay);
+        orderDate.setDate(orderDate.getDate() + dayOffset);
         const orderCreatedAt = getRandomTimeInDay(orderDate);
         const orderUpdatedAt = new Date(orderCreatedAt.getTime() + getRandomInt(30, 120) * 60 * 1000);
         const paymentTime = new Date(orderCreatedAt.getTime() + getRandomInt(60, 180) * 60 * 1000);
         
-        const orderItems = await createOrderItemsWithVariableExpense(
-          items,
-          "served",
-          randomChef._id,
-          randomWaiter
-        );
-        
-        const totalAmount = orderItems.reduce((sum, oi) => sum + oi.price * oi.quantity, 0);
-        const paymentMethods = ["card", "cash", "momo"];
-        const paymentMethod = paymentMethods[Math.floor(Math.random() * paymentMethods.length)];
-        
-        const payment = await Payment.create({
-          paymentMethod: paymentMethod,
-          status: "paid",
-          amountPaid: totalAmount,
-          totalAmount: totalAmount,
-          payTime: paymentTime,
-        });
-        
-        const order = await Order.create({
-          userId: vipCustomer._id,
-          servedBy: randomWaiter._id,
-          tableId: randomTable._id,
-          orderItems: orderItems.map((oi) => oi._id),
-          paymentId: payment._id,
-          status: "paid",
-          totalAmount: totalAmount,
-          waiterResponse: { status: "approved", respondedAt: orderCreatedAt },
-          customerConfirmed: true,
-          actions: ["order_created", "waiter_approved", "customer_confirmed"],
-          paid: true,
-          createdAt: orderCreatedAt,
-          updatedAt: orderUpdatedAt,
-        });
-        
-        await OrderItem.updateMany(
-          { _id: { $in: orderItems.map((oi) => oi._id) } },
-          { orderId: order._id }
-        );
-        
-        payment.orderId = order._id;
-        await payment.save();
-        
-        vipOrders.push(order);
-        orderCount++;
-      }
-    }
-    console.log(`✅ Đã tạo ${vipOrders.length} orders cho ${vipCustomers.length} customers VIP.`);
-
-    // I.2. Tạo Orders cho Customer Xấu - customer04, customer05
-    console.log("⚠️ Bắt đầu tạo orders cho customers xấu...");
-    const badCustomers = customers.slice(3, 5); // customer04, customer05
-    const badOrders = [];
-    
-    for (const badCustomer of badCustomers) {
-      const numOrders = 1 + Math.floor(Math.random() * 3); // 1-3 orders mỗi bad customer
-      const numCancelled = Math.floor(numOrders * 0.5); // Khoảng 50% cancelled
-      
-      for (let i = 0; i < numOrders; i++) {
-        const randomTable = tables[Math.floor(Math.random() * tables.length)];
-        const randomWaiter = activeWaiters[Math.floor(Math.random() * activeWaiters.length)];
-        const randomChef = chefs[Math.floor(Math.random() * chefs.length)];
-        
-        // Random date trong 3 tháng qua
-        const randomDay = Math.floor(Math.random() * totalDays);
-        const orderDate = new Date(threeMonthsAgo);
-        orderDate.setDate(orderDate.getDate() + randomDay);
-        const orderCreatedAt = getRandomTimeInDay(orderDate);
-        
         const isCancelled = i < numCancelled;
         const orderStatus = isCancelled ? "cancelled" : "paid";
         
-        const orderItems = await createOrderItems(
-          items,
-          isCancelled ? "pending" : "served",
-          randomChef._id,
-          isCancelled ? null : randomWaiter
-        );
+        // Chọn helper function dựa trên customerType
+        let orderItems;
+        if (customerType.includes('HIGH_VALUE') || customerType === 'VIP') {
+          orderItems = await createHighValueOrderItems(
+            items,
+            isCancelled ? "pending" : "served",
+            randomChef._id,
+            isCancelled ? null : randomWaiter
+          );
+        } else if (customerType.includes('LOW_VALUE')) {
+          orderItems = await createLowValueOrderItems(
+            items,
+            isCancelled ? "pending" : "served",
+            randomChef._id,
+            isCancelled ? null : randomWaiter
+          );
+        } else {
+          orderItems = await createOrderItemsWithVariableExpense(
+            items,
+            isCancelled ? "pending" : "served",
+            randomChef._id,
+            isCancelled ? null : randomWaiter
+          );
+        }
         
         const totalAmount = orderItems.reduce((sum, oi) => sum + oi.price * oi.quantity, 0);
         
+        const paymentMethods = ["cash", "card", "momo", "zaloPay"];
+        const paymentMethod = paymentMethods[getRandomInt(0, paymentMethods.length - 1)];
+        
         const payment = await Payment.create({
-          paymentMethod: "cash",
+          paymentMethod: paymentMethod,
           status: isCancelled ? "unpaid" : "paid",
           amountPaid: isCancelled ? 0 : totalAmount,
           totalAmount: totalAmount,
-          payTime: isCancelled ? null : new Date(orderCreatedAt.getTime() + getRandomInt(60, 180) * 60 * 1000),
+          payTime: isCancelled ? null : paymentTime,
         });
         
         const order = await Order.create({
-          userId: badCustomer._id,
+          userId: customer._id,
           servedBy: randomWaiter._id,
           tableId: randomTable._id,
           orderItems: orderItems.map((oi) => oi._id),
@@ -1845,6 +1790,7 @@ const seedDatabase = async () => {
           actions: isCancelled ? ["order_created"] : ["order_created", "waiter_approved", "customer_confirmed"],
           paid: !isCancelled,
           createdAt: orderCreatedAt,
+          updatedAt: orderUpdatedAt,
         });
         
         await OrderItem.updateMany(
@@ -1855,16 +1801,34 @@ const seedDatabase = async () => {
         payment.orderId = order._id;
         await payment.save();
         
-        badOrders.push(order);
-        orderCount++;
+        customerOrders.push(order);
       }
+      
+      return customerOrders;
+    };
+    
+    // Tạo orders cho tất cả customers
+    let totalOrdersCreated = 0;
+    for (const [type, customerList] of Object.entries(customersByType)) {
+      console.log(`  📦 Đang tạo orders cho ${customerList.length} customers loại ${type}...`);
+      for (const customer of customerList) {
+        const orders = await createOrdersForCustomer(customer, type);
+        totalOrdersCreated += orders.length;
+        orderCount += orders.length;
+        
+        if (totalOrdersCreated % 50 === 0) {
+          console.log(`    ✅ Đã tạo ${totalOrdersCreated} orders...`);
+        }
+      }
+      console.log(`  ✅ Đã tạo orders cho ${customerList.length} customers loại ${type}`);
     }
-    console.log(`✅ Đã tạo ${badOrders.length} orders cho ${badCustomers.length} customers xấu (${badOrders.filter(o => o.status === "cancelled").length} cancelled).`);
+    
+    console.log(`✅ Đã tạo tổng cộng ${totalOrdersCreated} orders cho ${customers.length} customers.`);
 
-    // I. cancelled - 3 orders
-    for (let i = 15; i < 18; i++) {
+    // I. cancelled - 3 orders (sample cancelled orders không liên kết với customers cụ thể)
+    for (let i = 15; i < 18 && i < tables.length; i++) {
       const table = tables[i];
-      const customer = customers[i % customers.length];
+      const customer = customers[Math.floor(Math.random() * customers.length)];
       const waiter = waiters[i % waiters.length];
 
       const orderItems = await createOrderItems(items, "pending");
@@ -2000,8 +1964,8 @@ const seedDatabase = async () => {
     
     const feedbacks = [];
     // Định nghĩa lại vipCustomers và badCustomers để dùng trong feedbacks
-    const vipCustomersForFeedback = customers.slice(0, 3); // customer01, customer02, customer03
-    const badCustomersForFeedback = customers.slice(3, 5); // customer04, customer05
+    const vipCustomersForFeedback = customersByType['VIP'] || [];
+    const badCustomersForFeedback = customersByType['BAD'] || [];
     const vipCustomerIds = vipCustomersForFeedback.map(c => c._id.toString());
     const badCustomerIds = badCustomersForFeedback.map(c => c._id.toString());
 
