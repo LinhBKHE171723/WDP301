@@ -6,7 +6,6 @@ export default function AnalyticsPage2() {
   const { itemId } = useParams();
   const location = useLocation();
 
-  // Lấy tên món từ state khi điều hướng, fallback an toàn
   const itemName = location.state?.name || "Chi Tiết Món Ăn";
 
   return (

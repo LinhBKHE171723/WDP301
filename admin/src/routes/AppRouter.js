@@ -219,7 +219,7 @@ export default function AppRouter() {
                         <Route path="/preorders" element={<PreOrderPage />} />
                         <Route path="/analytics" element={<AnalyticsPage />} />
                         <Route path="/item-report" element={<ItemReportPage />} />
-                        <Route path="/item-analytics/:itemId" element={<AnalyticsPage2 />} />
+                        <Route path="item-analytics/:itemId" element={<AnalyticsPage2 />} />
                         <Route path="/accounts" element={<AccountsPage />} />
                         <Route path="/feedback" element={<FeedbackPage />} />
                         <Route path="/settings" element={<SettingsPage />} />

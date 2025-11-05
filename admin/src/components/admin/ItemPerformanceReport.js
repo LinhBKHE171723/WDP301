@@ -539,7 +539,7 @@ const ItemPerformanceReport = () => {
                       <td style={{ padding: "1rem", textAlign: "right", fontWeight: "bold", color: "#f59e0b" }}>{formatCurrency(item.totalProfit)}</td>
 
                       <td style={{ padding: "1rem", textAlign: "center" }}>
-                        <Link to={`/item-analytics/${item._id}`} state={{ name: item.name }} style={{ color: "#2563eb", textDecoration: "none", display: "inline-flex", alignItems: "center" }}>
+                       <Link to={`/admin/item-analytics/${item._id}`} state={{ name: item.name }} style={{ color: "#2563eb", textDecoration: "none", display: "inline-flex", alignItems: "center" }}>
                           Xem <ChevronRight size={20} />
                         </Link>
                       </td>
