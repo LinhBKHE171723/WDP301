@@ -485,9 +485,9 @@ export default function CashierDashboard({
             <div className="revenue-icon-wrapper revenue-icon-pending">
               <ShoppingCart className="revenue-icon" />
             </div>
-            <span className="revenue-label">Đơn Chờ</span>
+            <span className="revenue-label">Đơn đã thanh toán</span>
           </div>
-          <div className="revenue-amount revenue-amount-pending">{pendingOrdersCount}</div>
+          <div className="revenue-amount revenue-amount-pending">{completedOrdersCount}</div>
           <div className="revenue-footer">
             <button className="button button-view-orders" onClick={() => setShowPaymentHistory(true)}>
               Xem lịch sử thanh toán

@@ -11,6 +11,7 @@ const paymentSchema = new Schema({
   },
   status: { type: String, enum: ["paid", "unpaid"], default: "unpaid" },
   amountPaid: Number,
+  cashierId: { type: Schema.Types.ObjectId, ref: "User" },
 });
 
 module.exports = mongoose.model("Payment", paymentSchema);
