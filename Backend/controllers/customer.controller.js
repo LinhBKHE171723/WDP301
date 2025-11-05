@@ -1469,12 +1469,19 @@ exports.confirmOrder = async (req, res) => {
     const populatedOrder = await Order.findById(order._id)
       .populate({
         path: "orderItems",
-        populate: {
-          path: "assignedChef",
-          select: "name username"
-        }
+        select: "itemName itemId quantity price note status assignedChef",
+        populate: [
+          {
+            path: "itemId",
+            select: "name"
+          },
+          {
+            path: "assignedChef",
+            select: "name username"
+          }
+        ]
       })
-      .populate("tableId")
+      .populate("tableId", "tableNumber number")
       .populate("paymentId");
 
     // Emit WebSocket event để thông báo kitchen có đơn hàng mới
@@ -1483,6 +1490,15 @@ exports.confirmOrder = async (req, res) => {
       webSocketService.broadcastToOrder(order._id, "order:confirmed", populatedOrder);
       // Broadcast to all kitchen connections
       webSocketService.broadcastToAllKitchen("order:confirmed", populatedOrder);
+      
+      // Broadcast to cashiers để hiển thị đơn chờ thanh toán ngay khi customer confirm
+      if (webSocketService.broadcastToAllCashiers) {
+        const { formatOrder } = require("./cashier.controller");
+        const payload = formatOrder(populatedOrder);
+        if (payload) {
+          webSocketService.broadcastToAllCashiers("cashier.orders.preparing", payload);
+        }
+      }
     }
 
     res.status(200).json({

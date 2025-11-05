@@ -1,5 +1,6 @@
-import { useMemo, useState } from "react"
+import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import {
+  ArrowLeft,
   Clock,
   DollarSign,
   ShoppingCart,
@@ -12,9 +13,12 @@ import {
   Printer,
   Grid3x3,
 } from "lucide-react"
+import { toast } from "react-toastify"
 import "./CashierDashboard.css"
 import UnpaidOrdersList from "./Unpaid-orders-list"
 import TableManagement from "./table-management"
+import Client from "../../api/Client"
+import useCashierSocket from "../../hooks/useCashierSocket"
 
 /**
  * Props hỗ trợ cả phiên bản cũ và mới:
@@ -30,7 +34,7 @@ export default function CashierDashboard({
   onPrintXReport,
 }) {
   // ====== Điều hướng màn con (từ file mới) ======
-  const [showUnpaidOrders, setShowUnpaidOrders] = useState(false)
+  const [showPaymentHistory, setShowPaymentHistory] = useState(false)
   const [showTableManagement, setShowTableManagement] = useState(false)
 
   // ====== Phiếu thu/chi (từ file mới) ======
@@ -56,6 +60,18 @@ export default function CashierDashboard({
 
   // ====== Lịch sử thanh toán (dùng từ file cũ + bổ sung onPaymentComplete từ UnpaidOrdersList) ======
   const [paymentHistory, setPaymentHistory] = useState([])
+  const [unpaidOrdersData, setUnpaidOrdersData] = useState([])
+  const [pendingOrdersCount, setPendingOrdersCount] = useState(0)
+  const pendingOrdersRef = useRef(null)
+
+  const updateOrders = useCallback((updater) => {
+    setUnpaidOrdersData((prev) => {
+      const next = typeof updater === "function" ? updater(prev) : updater
+      const normalized = Array.isArray(next) ? next : []
+      setPendingOrdersCount(normalized.length)
+      return normalized
+    })
+  }, [])
 
   // === Pagination state (GIỮ NGUYÊN từ file cũ) ===
   const [page, setPage] = useState(1)
@@ -86,12 +102,73 @@ export default function CashierDashboard({
     setPendingOrdersCount((c) => Math.max(0, c - 1))
   }
 
+  const handleOrdersUpdate = useCallback((orders) => {
+    updateOrders(orders)
+  }, [updateOrders])
+
+  const handleRealtimePreparing = useCallback(
+    (order) => {
+      if (!order?.id) return
+      const orderId = order.id
+      
+      // Kiểm tra xem đơn có phải là đơn mới không (chưa có trong danh sách)
+      let isNewOrder = false
+      updateOrders((prev) => {
+        const index = prev.findIndex((item) => item.id === orderId)
+        if (index === -1) {
+          isNewOrder = true
+          return [...prev, order]
+        }
+        // Đơn đã tồn tại - chỉ cập nhật thông tin
+        const next = [...prev]
+        next[index] = { ...next[index], ...order }
+        return next
+      })
+
+      // Hiển thị toast notification cho đơn mới
+      if (isNewOrder) {
+        const tableText = order.tableNumber || "Mang đi"
+        const message = `🆕 Có đơn hàng mới ${order.orderNumber || ""} từ ${tableText} cần thanh toán!`
+        toast.info(message)
+      }
+    },
+    [updateOrders]
+  )
+
+  const handleRealtimePaid = useCallback((order) => {
+    if (!order?.id) return
+    updateOrders((prev) => prev.filter((item) => item.id !== order.id))
+  }, [updateOrders])
+
   // ====== Tính toán doanh thu dựa trên paymentHistory (để luôn đúng khi thêm đơn mới) ======
-  const cashRevenue = paymentHistory.filter((p) => p.method === "Tiền mặt").reduce((s, p) => s + p.amount, 0)
-  const cardRevenue = paymentHistory.filter((p) => p.method === "Thẻ" || p.method === "QR Code").reduce((s, p) => s + p.amount, 0)
-  const totalRevenue = cashRevenue + cardRevenue
-  const completedOrdersCount = paymentHistory.length
-  const [pendingOrdersCount, setPendingOrdersCount] = useState(3)
+  const fetchUnpaidOrders = useCallback(async () => {
+    try {
+      const res = await Client.get("/cashier/orders/preparing")
+      // API trả về { message, data: [...] }, interceptor đã lấy res.data nên res = { message, data }
+      const orders = Array.isArray(res?.data) ? res.data : Array.isArray(res) ? res : []
+      console.log("Fetched unpaid orders:", orders.length, orders)
+      updateOrders(orders)
+      return orders
+    } catch (error) {
+      console.error("Không thể tải danh sách đơn chờ:", error)
+      updateOrders([])
+      return []
+    }
+  }, [updateOrders])
+
+  useEffect(() => {
+    fetchUnpaidOrders()
+  }, [fetchUnpaidOrders])
+
+  useCashierSocket({
+    onOrderPreparing: handleRealtimePreparing,
+    onOrderPaid: handleRealtimePaid,
+  })
+
+ const cashRevenue = paymentHistory.filter((p) => p.method === "Tiền mặt").reduce((s, p) => s + p.amount, 0)
+ const cardRevenue = paymentHistory.filter((p) => p.method === "Thẻ" || p.method === "QR Code").reduce((s, p) => s + p.amount, 0)
+ const totalRevenue = cashRevenue + cardRevenue
+ const completedOrdersCount = paymentHistory.length
 
   const currentShiftDuration = Math.floor((Date.now() - new Date(shiftInfo.startTime).getTime()) / (1000 * 60))
 
@@ -141,12 +218,159 @@ export default function CashierDashboard({
   const goTo = (p) => setPage(Math.min(totalPages, Math.max(1, p)))
 
   // ====== Điều hướng sang các màn con (mới) ======
-  if (showUnpaidOrders) {
+  if (showPaymentHistory) {
     return (
-      <UnpaidOrdersList
-        onBack={() => setShowUnpaidOrders(false)}
-        onPaymentComplete={handlePaymentCompleteFromUnpaid}
-      />
+      <div className="dashboard-container">
+        <div className="unpaid-orders-container">
+          <div className="unpaid-orders-header">
+            <div className="unpaid-orders-header-left">
+              <button onClick={() => setShowPaymentHistory(false)} className="back-button">
+                <ArrowLeft className="back-icon" />
+              </button>
+              <div className="header-content">
+                <h1 className="header-title">Lịch Sử Thanh Toán</h1>
+                <p className="header-subtitle">{paymentHistory.length} giao dịch trong ca</p>
+              </div>
+            </div>
+          </div>
+
+          {paymentHistory.length > 0 ? (
+            <div className="history-section">
+              <div className="history-header">
+                <h2 className="history-title">Danh sách thanh toán</h2>
+                <span className="history-date">{formatDate(shiftInfo.startTime)}</span>
+              </div>
+
+              <div className="history-toolbar">
+                <div className="history-toolbar-left">
+                  <span className="history-total">
+                    Hiển thị <b>{Math.min(end, total)}</b>/<b>{total}</b> đơn
+                  </span>
+                </div>
+                <div className="history-toolbar-right">
+                  <label className="page-size">
+                    <span>Dòng/trang:</span>
+                    <select
+                      value={pageSize}
+                      onChange={(e) => {
+                        setPage(1)
+                        setPageSize(Number(e.target.value))
+                      }}
+                    >
+                      <option value={5}>5</option>
+                      <option value={10}>10</option>
+                      <option value={20}>20</option>
+                    </select>
+                  </label>
+                </div>
+              </div>
+
+              <div className="history-table-wrapper">
+                <table className="history-table">
+                  <thead className="history-table-head">
+                    <tr>
+                      <th className="history-table-header">Mã đơn</th>
+                      <th className="history-table-header">Số tiền</th>
+                      <th className="history-table-header">Phương thức</th>
+                      <th className="history-table-header">Thời gian</th>
+                    </tr>
+                  </thead>
+                  <tbody className="history-table-body">
+                    {pageItems.map((payment) => (
+                      <tr key={payment.id} className="history-table-row">
+                        <td className="history-table-cell history-order-number">{payment.orderNumber}</td>
+                        <td className="history-table-cell history-amount">{formatCurrency(payment.amount)}</td>
+                        <td className="history-table-cell">
+                          <span
+                            className={`payment-method-badge ${
+                              payment.method === "Tiền mặt" ? "payment-method-cash" : "payment-method-card"
+                            }`}
+                          >
+                            {payment.method === "Tiền mặt" ? (
+                              <Banknote className="payment-method-icon" />
+                            ) : (
+                              <CreditCard className="payment-method-icon" />
+                            )}
+                            {payment.method}
+                          </span>
+                        </td>
+                        <td className="history-table-cell history-time">{formatTime(payment.time)}</td>
+                      </tr>
+                    ))}
+                    {pageItems.length === 0 && (
+                      <tr>
+                        <td
+                          className="history-table-cell"
+                          colSpan={4}
+                          style={{ textAlign: "center", color: "var(--muted-foreground)" }}
+                        >
+                          Không có dữ liệu
+                        </td>
+                      </tr>
+                    )}
+                  </tbody>
+                </table>
+              </div>
+
+              <div className="pagination">
+                <button className="page-btn" disabled={currentPage === 1} onClick={() => goTo(1)} aria-label="Trang đầu">
+                  «
+                </button>
+                <button
+                  className="page-btn"
+                  disabled={currentPage === 1}
+                  onClick={() => goTo(currentPage - 1)}
+                  aria-label="Trước"
+                >
+                  ←
+                </button>
+
+                {Array.from({ length: totalPages }, (_, i) => i + 1)
+                  .filter((p, _, arr) => p === 1 || p === totalPages || Math.abs(p - currentPage) <= 2)
+                  .map((p, idx, arr) => (
+                    <span key={p}>
+                      {idx > 0 && p - arr[idx - 1] > 1 && <span className="page-ellipsis">…</span>}
+                      <button
+                        className={`page-btn ${p === currentPage ? "active" : ""}`}
+                        onClick={() => goTo(p)}
+                        aria-current={p === currentPage ? "page" : undefined}
+                      >
+                        {p}
+                      </button>
+                    </span>
+                  ))}
+
+                <button
+                  className="page-btn"
+                  disabled={currentPage === totalPages}
+                  onClick={() => goTo(currentPage + 1)}
+                  aria-label="Sau"
+                >
+                  →
+                </button>
+                <button
+                  className="page-btn"
+                  disabled={currentPage === totalPages}
+                  onClick={() => goTo(totalPages)}
+                  aria-label="Trang cuối"
+                >
+                  »
+                </button>
+              </div>
+            </div>
+          ) : (
+            <div className="history-section">
+              <div className="history-header">
+                <h2 className="history-title">Danh sách thanh toán</h2>
+                <span className="history-date">{formatDate(shiftInfo.startTime)}</span>
+              </div>
+              <div className="empty-state" style={{ padding: "1.25rem", color: "var(--muted-foreground)" }}>
+                Chưa có giao dịch trong ca này. Quay lại để tiếp tục nhận đơn chờ.
+              </div>
+            </div>
+          )}
+        </div>
+      </div>
     )
   }
 
@@ -211,206 +435,77 @@ export default function CashierDashboard({
         </div>
       </div>
 
-      {/* Revenue Cards (GIỮ NGUYÊN layout, tính số liệu từ paymentHistory để luôn đúng) */}
-      {paymentHistory.length > 0 && (
-        <div className="revenue-grid">
-          <div className="revenue-card revenue-card-total">
-            <div className="revenue-card-header">
-              <div className="revenue-icon-wrapper revenue-icon-total">
-                <DollarSign className="revenue-icon" />
-              </div>
-              <span className="revenue-label">Tổng Doanh Thu</span>
+      {/* Revenue Cards (luôn hiển thị để truy cập Đơn Chờ dù chưa có giao dịch) */}
+      <div className="revenue-grid">
+        <div className="revenue-card revenue-card-total">
+          <div className="revenue-card-header">
+            <div className="revenue-icon-wrapper revenue-icon-total">
+              <DollarSign className="revenue-icon" />
             </div>
-            <div className="revenue-amount revenue-amount-total">{formatCurrency(totalRevenue)}</div>
-            <div className="revenue-footer">
-              <span className="revenue-count">{completedOrdersCount} đơn hoàn thành</span>
-            </div>
+            <span className="revenue-label">Tổng Doanh Thu</span>
           </div>
-
-          <div className="revenue-card revenue-card-cash">
-            <div className="revenue-card-header">
-              <div className="revenue-icon-wrapper revenue-icon-cash">
-                <Banknote className="revenue-icon" />
-              </div>
-              <span className="revenue-label">Tiền Mặt</span>
-            </div>
-            <div className="revenue-amount revenue-amount-cash">{formatCurrency(cashRevenue)}</div>
-            <div className="revenue-footer">
-              <span className="revenue-percentage">
-                {totalRevenue > 0 ? ((cashRevenue / totalRevenue) * 100).toFixed(0) : 0}% tổng doanh thu
-              </span>
-            </div>
-          </div>
-
-          <div className="revenue-card revenue-card-card">
-            <div className="revenue-card-header">
-              <div className="revenue-icon-wrapper revenue-icon-card">
-                <CreditCard className="revenue-icon" />
-              </div>
-              <span className="revenue-label">Thẻ</span>
-            </div>
-            <div className="revenue-amount revenue-amount-card">{formatCurrency(cardRevenue)}</div>
-            <div className="revenue-footer">
-              <span className="revenue-percentage">
-                {totalRevenue > 0 ? ((cardRevenue / totalRevenue) * 100).toFixed(0) : 0}% tổng doanh thu
-              </span>
-            </div>
-          </div>
-
-          <div className="revenue-card revenue-card-pending">
-            <div className="revenue-card-header">
-              <div className="revenue-icon-wrapper revenue-icon-pending">
-                <ShoppingCart className="revenue-icon" />
-              </div>
-              <span className="revenue-label">Đơn Chờ</span>
-            </div>
-            <div className="revenue-amount revenue-amount-pending">{pendingOrdersCount}</div>
-            <div className="revenue-footer">
-              <button className="button button-view-orders" onClick={() => setShowUnpaidOrders(true)}>
-                Xem danh sách đơn
-              </button>
-            </div>
+          <div className="revenue-amount revenue-amount-total">{formatCurrency(totalRevenue)}</div>
+          <div className="revenue-footer">
+            <span className="revenue-count">{completedOrdersCount} đơn hoàn thành</span>
           </div>
         </div>
-      )}
 
-      {/* Payment History (GIỮ NGUYÊN + phân trang cũ) */}
-      {paymentHistory.length > 0 ? (
-        <div className="history-section">
-          <div className="history-header">
-            <h2 className="history-title">Lịch Sử Thanh Toán</h2>
-            <span className="history-date">{formatDate(shiftInfo.startTime)}</span>
-          </div>
-
-          {/* Toolbar giữ phong cách hiện tại */}
-          <div className="history-toolbar">
-            <div className="history-toolbar-left">
-              <span className="history-total">
-                Hiển thị <b>{Math.min(end, total)}</b>/<b>{total}</b> đơn
-              </span>
+        <div className="revenue-card revenue-card-cash">
+          <div className="revenue-card-header">
+            <div className="revenue-icon-wrapper revenue-icon-cash">
+              <Banknote className="revenue-icon" />
             </div>
-            <div className="history-toolbar-right">
-              <label className="page-size">
-                <span>Dòng/trang:</span>
-                <select
-                  value={pageSize}
-                  onChange={(e) => {
-                    setPage(1)
-                    setPageSize(Number(e.target.value))
-                  }}
-                >
-                  <option value={5}>5</option>
-                  <option value={10}>10</option>
-                  <option value={20}>20</option>
-                </select>
-              </label>
+            <span className="revenue-label">Tiền Mặt</span>
+          </div>
+          <div className="revenue-amount revenue-amount-cash">{formatCurrency(cashRevenue)}</div>
+          <div className="revenue-footer">
+            <span className="revenue-percentage">
+              {totalRevenue > 0 ? ((cashRevenue / totalRevenue) * 100).toFixed(0) : 0}% tổng doanh thu
+            </span>
+          </div>
+        </div>
+
+        <div className="revenue-card revenue-card-card">
+          <div className="revenue-card-header">
+            <div className="revenue-icon-wrapper revenue-icon-card">
+              <CreditCard className="revenue-icon" />
             </div>
+            <span className="revenue-label">Thẻ</span>
           </div>
-
-          <div className="history-table-wrapper">
-            <table className="history-table">
-              <thead className="history-table-head">
-                <tr>
-                  <th className="history-table-header">Mã đơn</th>
-                  <th className="history-table-header">Số tiền</th>
-                  <th className="history-table-header">Phương thức</th>
-                  <th className="history-table-header">Thời gian</th>
-                </tr>
-              </thead>
-              <tbody className="history-table-body">
-                {pageItems.map((payment) => (
-                  <tr key={payment.id} className="history-table-row">
-                    <td className="history-table-cell history-order-number">{payment.orderNumber}</td>
-                    <td className="history-table-cell history-amount">{formatCurrency(payment.amount)}</td>
-                    <td className="history-table-cell">
-                      <span
-                        className={`payment-method-badge ${payment.method === "Tiền mặt" ? "payment-method-cash" : "payment-method-card"
-                          }`}
-                      >
-                        {payment.method === "Tiền mặt" ? (
-                          <Banknote className="payment-method-icon" />
-                        ) : (
-                          <CreditCard className="payment-method-icon" />
-                        )}
-                        {payment.method}
-                      </span>
-                    </td>
-                    <td className="history-table-cell history-time">{formatTime(payment.time)}</td>
-                  </tr>
-                ))}
-                {pageItems.length === 0 && (
-                  <tr>
-                    <td
-                      className="history-table-cell"
-                      colSpan={4}
-                      style={{ textAlign: "center", color: "var(--muted-foreground)" }}
-                    >
-                      Không có dữ liệu
-                    </td>
-                  </tr>
-                )}
-              </tbody>
-            </table>
+          <div className="revenue-amount revenue-amount-card">{formatCurrency(cardRevenue)}</div>
+          <div className="revenue-footer">
+            <span className="revenue-percentage">
+              {totalRevenue > 0 ? ((cardRevenue / totalRevenue) * 100).toFixed(0) : 0}% tổng doanh thu
+            </span>
           </div>
+        </div>
 
-          {/* Pagination buttons (GIỮ NGUYÊN) */}
-          <div className="pagination">
-            <button className="page-btn" disabled={currentPage === 1} onClick={() => goTo(1)} aria-label="Trang đầu">
-              «
-            </button>
-            <button
-              className="page-btn"
-              disabled={currentPage === 1}
-              onClick={() => goTo(currentPage - 1)}
-              aria-label="Trước"
-            >
-              ←
-            </button>
-
-            {Array.from({ length: totalPages }, (_, i) => i + 1)
-              .filter((p, _, arr) => p === 1 || p === totalPages || Math.abs(p - currentPage) <= 2)
-              .map((p, idx, arr) => (
-                <span key={p}>
-                  {idx > 0 && p - arr[idx - 1] > 1 && <span className="page-ellipsis">…</span>}
-                  <button
-                    className={`page-btn ${p === currentPage ? "active" : ""}`}
-                    onClick={() => goTo(p)}
-                    aria-current={p === currentPage ? "page" : undefined}
-                  >
-                    {p}
-                  </button>
-                </span>
-              ))}
-
-            <button
-              className="page-btn"
-              disabled={currentPage === totalPages}
-              onClick={() => goTo(currentPage + 1)}
-              aria-label="Sau"
-            >
-              →
-            </button>
-            <button
-              className="page-btn"
-              disabled={currentPage === totalPages}
-              onClick={() => goTo(totalPages)}
-              aria-label="Trang cuối"
-            >
-              »
+        <div className="revenue-card revenue-card-pending">
+          <div className="revenue-card-header">
+            <div className="revenue-icon-wrapper revenue-icon-pending">
+              <ShoppingCart className="revenue-icon" />
+            </div>
+            <span className="revenue-label">Đơn Chờ</span>
+          </div>
+          <div className="revenue-amount revenue-amount-pending">{pendingOrdersCount}</div>
+          <div className="revenue-footer">
+            <button className="button button-view-orders" onClick={() => setShowPaymentHistory(true)}>
+              Xem lịch sử thanh toán
             </button>
           </div>
         </div>
-      ) : (
-        <div className="history-section">
-          <div className="history-header">
-            <h2 className="history-title">Lịch Sử Thanh Toán</h2>
-            <span className="history-date">{formatDate(shiftInfo.startTime)}</span>
-          </div>
-          <div className="empty-state" style={{ padding: '1.25rem', color: 'var(--muted-foreground)' }}>
-            Chưa có giao dịch trong ca này. Vào “Đơn Chờ” để thanh toán đơn đầu tiên.
-          </div>
-        </div>
-      )}
+      </div>
+
+      <div className="pending-orders-wrapper" ref={pendingOrdersRef}>
+        <UnpaidOrdersList
+          variant="embedded"
+          showBackButton={false}
+          onPaymentComplete={handlePaymentCompleteFromUnpaid}
+          fetchOrders={fetchUnpaidOrders}
+          onOrdersUpdate={handleOrdersUpdate}
+          initialOrders={unpaidOrdersData}
+        />
+      </div>
       {/* ===== Khối PHIẾU THU/CHI (thêm từ file mới, UI hòa hợp style hiện tại) ===== */}
       {/* <div className="petty-cash-section">
         <div className="petty-cash-header">
@@ -477,7 +572,7 @@ export default function CashierDashboard({
               </div>
             </div>
           </div>
-        )} */}
+        ) */}
 
       {/* Tổng hợp nhanh */}
       {/* <div className="petty-cash-summary">
@@ -538,3 +633,4 @@ export default function CashierDashboard({
     </div>
   )
 }
+

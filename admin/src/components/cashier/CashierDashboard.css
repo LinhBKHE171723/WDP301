@@ -50,6 +50,34 @@
   line-height: 1;
 }
 
+.button-secondary {
+  gap: 0.5rem;
+  padding: 0.625rem 1.25rem;
+  border-radius: 0.5rem;
+  font-size: 0.875rem;
+  background-color: var(--muted);
+  color: var(--foreground);
+  transition: all 0.2s;
+}
+.button-secondary:hover {
+  background-color: color-mix(in srgb, var(--foreground) 10%, var(--muted));
+  transform: translateY(-1px);
+}
+
+.button-success {
+  gap: 0.5rem;
+  padding: 0.625rem 1.25rem;
+  border-radius: 0.5rem;
+  font-size: 0.875rem;
+  background-color: var(--success);
+  color: #ffffff;
+  transition: all 0.2s;
+}
+.button-success:hover {
+  background-color: color-mix(in srgb, var(--success) 85%, black);
+  transform: translateY(-1px);
+}
+
 /* ===========================
    🧭 DASHBOARD LAYOUT
    =========================== */
@@ -158,6 +186,10 @@
 }
 .button-view-orders:hover { background-color: #d48806; background-color: color-mix(in oklch, var(--warning), black 10%); }
 
+.pending-orders-wrapper {
+  margin-top: 1.5rem;
+}
+
 /* ===========================
    🧾 PAYMENT HISTORY
    =========================== */
@@ -209,3 +241,123 @@
 .page-btn:disabled { opacity: .5; cursor: not-allowed; }
 .page-btn.active { background: var(--primary); color: var(--destructive-foreground); border-color: var(--primary); }
 .page-ellipsis { padding: 0 .25rem; color: var(--muted-foreground); }
+
+/* ===========================
+   🔔 CASHIER NOTIFICATION MODAL
+   =========================== */
+.cashier-modal-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(15, 23, 42, 0.45);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 1.5rem;
+  z-index: 1000;
+}
+
+.cashier-modal {
+  background: var(--card);
+  border-radius: 1rem;
+  box-shadow: 0 25px 70px rgba(15, 23, 42, 0.25);
+  border: 1px solid var(--border);
+  max-width: 420px;
+  width: 100%;
+  overflow: hidden;
+  animation: cashierModalIn 0.2s ease-out;
+}
+
+.cashier-modal-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 1rem 1.25rem 0.5rem;
+}
+
+.cashier-modal-badge {
+  padding: 0.35rem 0.75rem;
+  border-radius: 999px;
+  font-size: 0.75rem;
+  font-weight: 600;
+  background: color-mix(in srgb, var(--primary) 20%, transparent);
+  color: var(--primary);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.cashier-modal-close {
+  background: transparent;
+  border: none;
+  font-size: 1.5rem;
+  line-height: 1;
+  cursor: pointer;
+  color: var(--muted-foreground);
+}
+.cashier-modal-close:hover { color: var(--foreground); }
+
+.cashier-modal-body {
+  padding: 0 1.25rem 1.25rem;
+}
+
+.cashier-modal-title {
+  margin: 0.25rem 0 0;
+  font-size: 1.5rem;
+  font-weight: 700;
+  color: var(--foreground);
+}
+
+.cashier-modal-table {
+  margin: 0.25rem 0;
+  color: var(--muted-foreground);
+  font-weight: 500;
+}
+
+.cashier-modal-info {
+  margin: 0.5rem 0 1rem;
+  font-weight: 600;
+  color: var(--foreground);
+}
+
+.cashier-modal-items {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  background: color-mix(in srgb, var(--muted) 50%, transparent);
+  padding: 0.75rem;
+  border-radius: 0.75rem;
+}
+
+.cashier-modal-item {
+  display: flex;
+  justify-content: space-between;
+  font-size: 0.9375rem;
+  color: var(--foreground);
+}
+
+.cashier-modal-item-name { font-weight: 500; }
+.cashier-modal-item-qty { color: var(--muted-foreground); font-weight: 600; }
+.cashier-modal-more { font-size: 0.8125rem; color: var(--muted-foreground); font-style: italic; }
+
+.cashier-modal-actions {
+  display: flex;
+  gap: 0.75rem;
+  padding: 1.25rem;
+  background: color-mix(in srgb, var(--muted) 60%, transparent);
+  border-top: 1px solid var(--border);
+}
+
+.cashier-modal-button {
+  flex: 1;
+}
+
+@keyframes cashierModalIn {
+  from {
+    opacity: 0;
+    transform: translateY(12px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+

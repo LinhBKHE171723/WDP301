@@ -1,51 +1,72 @@
 import { ArrowLeft, Clock, Users } from "lucide-react"
 import "./unpaid-orders-list.css"
-import { useState } from "react"
+import { useEffect, useState } from "react"
 import OrderPayment from "./order-payment"
+import Client from "../../api/Client"
 
-function UnpaidOrdersList({ onBack, onPaymentComplete }) {
+const PAYMENT_METHOD_LABELS = {
+  cash: "Tiền mặt",
+  qr: "QR Code",
+  card: "Thẻ",
+}
+
+const ORDER_STATUS_LABELS = {
+  confirmed: "Đã xác nhận",
+  preparing: "Đang chuẩn bị",
+  served: "Đã phục vụ",
+}
+
+function UnpaidOrdersList({
+  onBack,
+  onPaymentComplete,
+  fetchOrders,
+  onOrdersUpdate,
+  initialOrders = [],
+  showBackButton = true,
+  variant = "standalone",
+}) {
   const [selectedOrder, setSelectedOrder] = useState(null)
-  const [unpaidOrders, setUnpaidOrders] = useState([
-    {
-      id: 1,
-      orderNumber: "ĐH-006",
-      tableNumber: "Bàn 5",
-      items: [
-        { id: 1, name: "Phở Bò Đặc Biệt", quantity: 2, price: 85000 },
-        { id: 2, name: "Gỏi Cuốn", quantity: 1, price: 45000 },
-        { id: 3, name: "Trà Đá", quantity: 2, price: 10000 },
-      ],
-      totalAmount: 225000,
-      orderTime: new Date(Date.now() - 15 * 60000).toISOString(),
-      waitTime: 15,
-    },
-    {
-      id: 2,
-      orderNumber: "ĐH-007",
-      tableNumber: "Bàn 12",
-      items: [
-        { id: 4, name: "Cơm Gà Xối Mỡ", quantity: 1, price: 65000 },
-        { id: 5, name: "Canh Chua", quantity: 1, price: 55000 },
-        { id: 6, name: "Nước Chanh", quantity: 1, price: 20000 },
-      ],
-      totalAmount: 140000,
-      orderTime: new Date(Date.now() - 8 * 60000).toISOString(),
-      waitTime: 8,
-    },
-    {
-      id: 3,
-      orderNumber: "ĐH-008",
-      tableNumber: "Bàn 3",
-      items: [
-        { id: 7, name: "Bún Chả Hà Nội", quantity: 3, price: 75000 },
-        { id: 8, name: "Nem Rán", quantity: 2, price: 40000 },
-        { id: 9, name: "Trà Chanh", quantity: 3, price: 25000 },
-      ],
-      totalAmount: 380000,
-      orderTime: new Date(Date.now() - 22 * 60000).toISOString(),
-      waitTime: 22,
-    },
-  ])
+  const [unpaidOrders, setUnpaidOrders] = useState(initialOrders)
+  const [loading, setLoading] = useState(false)
+  const [error, setError] = useState("")
+
+  const containerClassName = [
+    "unpaid-orders-container",
+    variant === "embedded" ? "unpaid-orders-container--embedded" : "",
+  ]
+    .filter(Boolean)
+    .join(" ")
+
+  useEffect(() => {
+    setUnpaidOrders(initialOrders)
+  }, [initialOrders])
+
+  useEffect(() => {
+    let ignore = false
+    const loadOrders = async () => {
+      if (!fetchOrders) return
+      setLoading(true)
+      setError("")
+      try {
+        const orders = await fetchOrders()
+        if (ignore) return
+        setUnpaidOrders(orders)
+        onOrdersUpdate?.(orders)
+      } catch (err) {
+        if (ignore) return
+        console.error("fetchOrders error", err)
+        setError("Không thể tải danh sách đơn chờ. Vui lòng thử lại.")
+      } finally {
+        if (!ignore) setLoading(false)
+      }
+    }
+
+    loadOrders()
+
+    return () => {
+      ignore = true
+    }
+  }, [fetchOrders, onOrdersUpdate])
 
   const formatCurrency = (amount) =>
     new Intl.NumberFormat("vi-VN", { style: "currency", currency: "VND" }).format(amount)
@@ -53,24 +74,37 @@ function UnpaidOrdersList({ onBack, onPaymentComplete }) {
   const formatTime = (dateString) =>
     new Intl.DateTimeFormat("vi-VN", { hour: "2-digit", minute: "2-digit" }).format(new Date(dateString))
 
-  const handlePaymentComplete = (orderId, paymentMethod) => {
+  const handlePaymentComplete = async (orderId, paymentMethod) => {
     const paidOrder = unpaidOrders.find((order) => order.id === orderId)
     if (paidOrder) {
       const VAT_RATE = 0.1
       const subtotal = paidOrder.items.reduce((sum, item) => sum + item.price * item.quantity, 0)
       const total = subtotal * (1 + VAT_RATE)
 
-      // XÓA ĐƠN KHỎI LIST NGAY LẬP TỨC
-      setUnpaidOrders((prev) => prev.filter((order) => order.id !== orderId))
+      try {
+        const methodToSend = paymentMethod || "cash"
+        await Client.post(`/cashier/orders/${orderId}/pay`, {
+          paymentMethod: methodToSend,
+        })
 
-      // Báo về Dashboard để trừ “Đơn Chờ” và ghi lịch sử
+        setUnpaidOrders((prev) => {
+          const updated = prev.filter((order) => order.id !== orderId)
+          onOrdersUpdate?.(updated)
+          return updated
+        })
+
       if (onPaymentComplete) {
         onPaymentComplete({
           orderNumber: paidOrder.orderNumber,
           amount: total,
-          method: paymentMethod === "cash" ? "Tiền mặt" : "QR Code",
+            method: PAYMENT_METHOD_LABELS[methodToSend] || "Tiền mặt",
           time: new Date().toISOString(),
         })
+        }
+      } catch (err) {
+        console.error("Hoàn tất thanh toán thất bại", err)
+        setError("Thanh toán không thành công. Vui lòng thử lại.")
+        return
       }
     }
 
@@ -89,17 +123,46 @@ function UnpaidOrdersList({ onBack, onPaymentComplete }) {
   }
 
   return (
-    <div className="unpaid-orders-container">
+    <div className={containerClassName}>
       {/* Header */}
       <div className="unpaid-orders-header">
+        <div className="unpaid-orders-header-left">
+          {showBackButton && onBack && (
         <button onClick={onBack} className="back-button">
           <ArrowLeft className="back-icon" />
         </button>
+          )}
         <div className="header-content">
           <h1 className="header-title">Đơn Chờ Thanh Toán</h1>
           <p className="header-subtitle">{unpaidOrders.length} đơn hàng đang chờ</p>
         </div>
       </div>
+      </div>
+
+      {error && (
+        <div
+          style={{
+            marginBottom: "1rem",
+            padding: "0.75rem 1rem",
+            borderRadius: "0.5rem",
+            backgroundColor: "rgba(239,68,68,0.1)",
+            color: "#b91c1c",
+            fontWeight: 600,
+          }}
+        >
+          {error}
+        </div>
+      )}
+
+      {loading && unpaidOrders.length === 0 && (
+        <div className="empty-state">
+          <div className="empty-icon">
+            <Users />
+          </div>
+          <h3 className="empty-title">Đang tải dữ liệu...</h3>
+          <p className="empty-description">Vui lòng chờ trong giây lát.</p>
+        </div>
+      )}
 
       {/* Orders List */}
       <div className="orders-list">
@@ -124,11 +187,21 @@ function UnpaidOrdersList({ onBack, onPaymentComplete }) {
                     <Clock className="meta-icon" />
                     <span className="meta-text">{formatTime(order.orderTime)}</span>
                   </div>
+                      {order.status && (
+                        <>
+                          <div className="meta-divider"></div>
+                          <div className="meta-item">
+                            <span className="status-badge">
+                              {ORDER_STATUS_LABELS[order.status] || order.status}
+                            </span>
+                          </div>
+                        </>
+                      )}
                 </div>
               </div>
               <div className="wait-time-badge">
                 <Clock className="wait-time-icon" />
-                <span className="wait-time-text">{order.waitTime} phút</span>
+                <span className="wait-time-text">{order.waitTime ?? 0} phút</span>
               </div>
             </div>
 
@@ -168,7 +241,7 @@ function UnpaidOrdersList({ onBack, onPaymentComplete }) {
       </div>
 
       {/* Empty State */}
-      {unpaidOrders.length === 0 && (
+      {unpaidOrders.length === 0 && !loading && (
         <div className="empty-state">
           <div className="empty-icon">
             <Users />
@@ -176,6 +249,12 @@ function UnpaidOrdersList({ onBack, onPaymentComplete }) {
           <h3 className="empty-title">Không có đơn chờ thanh toán</h3>
           <p className="empty-description">Tất cả đơn hàng đã được thanh toán</p>
         </div>
+      )}
+
+      {loading && unpaidOrders.length > 0 && (
+        <p style={{ marginTop: "1rem", color: "var(--muted-foreground)", textAlign: "center" }}>
+          Đang cập nhật dữ liệu...
+        </p>
       )}
     </div>
   )

@@ -17,10 +17,11 @@ function CashierDashboardPage() {
   }, [])
 
   const handleCloseShift = () => {
-    navigate("/cashier/shift")
+    navigate("/admin/cashier/shift")
   }
 
   return <CashierDashboard shiftInfo={shiftInfo} onCloseShift={handleCloseShift} />
 }
 
 export default CashierDashboardPage
+
