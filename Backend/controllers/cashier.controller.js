@@ -188,6 +188,7 @@ exports.completeOrderPayment = async (req, res) => {
           status: "paid",
           amountPaid: amount,
           payTime: new Date(),
+          cashierId: req.user.id,
         },
       },
       { new: true, upsert: true, setDefaultsOnInsert: true }
