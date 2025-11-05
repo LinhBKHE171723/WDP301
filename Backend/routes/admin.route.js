@@ -1,5 +1,6 @@
 const express = require("express");
 const router = express.Router();
+const { authRequired, roleRequired } = require("../middlewares/auth.middleware");
 
 const userCtrl = require("../controllers/admin/user.controller");
 const feedbackController = require("../controllers/admin/feedback.controller");
@@ -29,8 +30,18 @@ router.get("/feedbacks/:id", feedbackController.getOne);
 router.delete("/feedbacks/:id", feedbackController.remove);
 
 // --- PREORDER ROUTES (/api/admin/preorders) ---
-router.get("/preorders", preorderController.getPreOrders);
-router.get("/customers/:userId/info", preorderController.getCustomerInfo);
+router.get("/preorders", authRequired, roleRequired("admin"), preorderController.getPreOrders);
+router.get("/customers/:userId/info", authRequired, roleRequired("admin"), preorderController.getCustomerInfo);
+router.patch("/preorders/:orderId/approve", authRequired, roleRequired("admin"), preorderController.approvePreOrder);
+router.patch("/preorders/:orderId/cancel", authRequired, roleRequired("admin"), preorderController.cancelPreOrder);
+router.post("/preorders/:orderId/deposit", authRequired, roleRequired("admin"), preorderController.recordDeposit);
+router.patch("/preorders/:orderId/items", authRequired, roleRequired("admin"), preorderController.modifyPreOrderItems);
+router.patch("/preorders/:orderId", authRequired, roleRequired("admin"), preorderController.updatePreOrder);
+router.post("/preorders/:orderId/notes", authRequired, roleRequired("admin"), preorderController.addAdminNote);
+router.delete("/preorders/:orderId/notes/:noteId", authRequired, roleRequired("admin"), preorderController.deleteAdminNote);
+router.patch("/preorders/:orderId/notes/:noteId", authRequired, roleRequired("admin"), preorderController.updateAdminNote);
+router.get("/preorders/export", authRequired, roleRequired("admin"), preorderController.exportPreOrders);
+router.post("/preorders/bulk-action", authRequired, roleRequired("admin"), preorderController.bulkActionPreOrders);
 
 // =======================================================
 // NHÓM 2: CÁC ROUTE THỐNG KÊ & BÁO CÁO

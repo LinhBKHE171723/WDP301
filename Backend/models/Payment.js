@@ -12,6 +12,8 @@ const paymentSchema = new Schema({
   status: { type: String, enum: ["paid", "unpaid"], default: "unpaid" },
   amountPaid: Number,
   cashierId: { type: Schema.Types.ObjectId, ref: "User" },
+  isDeposit: { type: Boolean, default: false }, // true = tiền cọc, false = thanh toán cuối
 });
 
 module.exports = mongoose.model("Payment", paymentSchema);
+

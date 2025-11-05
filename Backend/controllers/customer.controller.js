@@ -358,7 +358,8 @@ exports.createOrder = async (req, res) => {
     const order = new Order({
       tableId: finalTableId,
       orderItems: createdOrderItems,
-      paymentId: payment._id,
+      paymentId: payment._id, // Backward compatibility
+      paymentIds: [payment._id], // Multiple payments support
       status: "pending",
       totalAmount: totalAmount,
       discount: 0,
@@ -575,7 +576,8 @@ exports.createPreOrder = async (req, res) => {
     const order = new Order({
       tableId: null, // Chưa có bàn khi đặt trước
       orderItems: createdOrderItems,
-      paymentId: payment._id,
+      paymentId: payment._id, // Backward compatibility
+      paymentIds: [payment._id], // Multiple payments support
       status: "preorder",
       scheduledTime: scheduledDate,
       totalAmount: totalAmount,

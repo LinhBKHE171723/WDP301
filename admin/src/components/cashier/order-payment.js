@@ -10,7 +10,11 @@ function OrderPayment({ order, onBack, onPaymentComplete }) {
   const VAT_RATE = 0.1
   const subtotal = order.items.reduce((sum, item) => sum + item.price * item.quantity, 0)
   const vat = subtotal * VAT_RATE
-  const total = subtotal + vat
+  const totalAmount = subtotal + vat // Tổng tiền đơn hàng
+  
+  // Sử dụng remainingAmount từ backend (đã trừ tiền cọc nếu có)
+  const remainingAmount = order.remainingAmount ?? totalAmount
+  const totalPaid = order.totalPaid ?? 0 // Tiền cọc đã thanh toán (nếu có)
 
   const formatCurrency = (amount) =>
     new Intl.NumberFormat("vi-VN", { style: "currency", currency: "VND" }).format(amount)
@@ -140,9 +144,19 @@ function OrderPayment({ order, onBack, onPaymentComplete }) {
               <span className="receipt-summary-label">VAT (10%):</span>
               <span className="receipt-summary-value">{formatCurrency(vat)}</span>
             </div>
+            <div className="receipt-summary-row">
+              <span className="receipt-summary-label">Tổng đơn:</span>
+              <span className="receipt-summary-value">{formatCurrency(totalAmount)}</span>
+            </div>
+            {totalPaid > 0 && (
+              <div className="receipt-summary-row">
+                <span className="receipt-summary-label">Đã cọc:</span>
+                <span className="receipt-summary-value">-{formatCurrency(totalPaid)}</span>
+              </div>
+            )}
             <div className="receipt-summary-row receipt-total-row">
               <span className="receipt-total-label">TỔNG CỘNG:</span>
-              <span className="receipt-total-value">{formatCurrency(total)}</span>
+              <span className="receipt-total-value">{formatCurrency(remainingAmount)}</span>
             </div>
           </div>
 
@@ -244,10 +258,25 @@ function OrderPayment({ order, onBack, onPaymentComplete }) {
               <span className="summary-label">VAT (10%):</span>
               <span className="summary-value">{formatCurrency(vat)}</span>
             </div>
+            <div className="summary-row">
+              <span className="summary-label">Tổng đơn:</span>
+              <span className="summary-value">{formatCurrency(totalAmount)}</span>
+            </div>
+            {totalPaid > 0 && (
+              <>
+                <div className="summary-divider"></div>
+                <div className="summary-row">
+                  <span className="summary-label">Đã cọc:</span>
+                  <span className="summary-value" style={{ color: '#3b82f6' }}>
+                    -{formatCurrency(totalPaid)}
+                  </span>
+                </div>
+              </>
+            )}
             <div className="summary-divider"></div>
             <div className="summary-row summary-total">
-              <span className="summary-total-label">Tổng cộng:</span>
-              <span className="summary-total-value">{formatCurrency(total)}</span>
+              <span className="summary-total-label">Còn lại:</span>
+              <span className="summary-total-value">{formatCurrency(remainingAmount)}</span>
             </div>
           </div>
         </div>
@@ -277,7 +306,7 @@ function OrderPayment({ order, onBack, onPaymentComplete }) {
         <div className="payment-action">
           <button onClick={handlePayment} disabled={!paymentMethod} className="payment-submit-button">
             <CheckCircle className="button-icon" />
-            Thanh toán {formatCurrency(total)}
+            Thanh toán {formatCurrency(remainingAmount)}
           </button>
         </div>
       </div>
