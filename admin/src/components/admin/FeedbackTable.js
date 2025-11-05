@@ -199,6 +199,7 @@ export function FeedbackTable() {
                                         Số lượng
                                       </th>
                                       <th className="text-left p-2">Đầu bếp</th>
+                                      <th className="text-left p-2">Phục vụ</th>
                                     </tr>
                                   </thead>
                                   <tbody>
@@ -213,7 +214,18 @@ export function FeedbackTable() {
                                           {item?.quantity || 1}
                                         </td>
                                         <td className="p-2">
-                                          {item?.assignedChef ? "Đã gán" : "Chưa gán"}
+                                          {item?.assignedChef?.name
+                                            ? `${item.assignedChef.name} (${
+                                                item.assignedChef.role || ""
+                                              })`
+                                            : "Chưa gán"}
+                                        </td>
+                                        <td className="p-2">
+                                          {item?.servedBy?.name
+                                            ? `${item.servedBy.name} (${
+                                                item.servedBy.role || "waiter"
+                                              })`
+                                            : "Không rõ"}
                                         </td>
                                       </tr>
                                     ))}
