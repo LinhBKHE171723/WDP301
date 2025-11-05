@@ -121,10 +121,24 @@ const OrderStatus = React.memo(({ orderId, onBack }) => {
   // Cập nhật displayOrderItems khi order hoặc pendingChanges thay đổi
   useEffect(() => {
     if (order && order.orderItems) {
+      // Debug: Log để kiểm tra
+      console.log('🔄 Updating displayOrderItems, orderItems:', order.orderItems);
+      console.log('🔄 orderItems length:', order.orderItems?.length);
+      
       // Lấy các món không bị xóa
       const itemsToKeep = order.orderItems.filter(item => 
         !pendingChanges.itemsToRemove.includes(item._id)
       );
+      
+      console.log('🔄 itemsToKeep:', itemsToKeep);
+      if (itemsToKeep.length > 0) {
+        console.log('🔄 First itemToKeep:', {
+          _id: itemsToKeep[0]._id,
+          itemName: itemsToKeep[0].itemName,
+          quantity: itemsToKeep[0].quantity,
+          price: itemsToKeep[0].price
+        });
+      }
       
       // Thêm các món mới vào cuối danh sách
       const newItems = pendingChanges.itemsToAdd.map(change => ({
@@ -196,6 +210,19 @@ const OrderStatus = React.memo(({ orderId, onBack }) => {
         
         // Set canEditOrder dựa trên trạng thái order
         const order = data.data;
+        
+        // Debug: Log orderItems để kiểm tra
+        console.log('📦 Frontend received orderItems:', order.orderItems);
+        if (order.orderItems && order.orderItems.length > 0) {
+          console.log('📦 First orderItem:', {
+            _id: order.orderItems[0]._id,
+            itemName: order.orderItems[0].itemName,
+            quantity: order.orderItems[0].quantity,
+            price: order.orderItems[0].price,
+            itemId: order.orderItems[0].itemId
+          });
+        }
+        
         const isRejected = order.waiterResponse && order.waiterResponse.status === 'rejected';
         const isApproved = order.waiterResponse && order.waiterResponse.status === 'approved' && !order.customerConfirmed;
         
