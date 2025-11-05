@@ -445,6 +445,14 @@ exports.createOrder = async (req, res) => {
     console.log(`🍪 Updated cookie with ${activeOrderIds.length} orders: ${JSON.stringify(activeOrderIds)}`);
     console.log(`🍪 Cookie options: httpOnly=true, secure=${process.env.NODE_ENV === 'production'}, sameSite=lax, maxAge=24h`);
 
+    // Populate thông tin item trong orderItems
+    await populateOrderItemDetails(populatedOrder.orderItems);
+
+    // Gộp các OrderItem đã bị tách lại thành 1 dòng khi gửi cho customer qua WebSocket
+    const { groupSplitOrderItemsForCustomer } = require("../utils/customerHelpers");
+    const groupedOrderItems = groupSplitOrderItemsForCustomer(populatedOrder.orderItems);
+    populatedOrder.orderItems = groupedOrderItems;
+
     // Emit WebSocket event để thông báo waiter có đơn hàng mới cần xác nhận
     const webSocketService = req.app.get("webSocketService");
     if (webSocketService) {
@@ -623,6 +631,14 @@ exports.createPreOrder = async (req, res) => {
       // Không throw error - order đã tạo thành công, chỉ là email không gửi được
     }
 
+    // Populate thông tin item trong orderItems
+    await populateOrderItemDetails(populatedOrder.orderItems);
+
+    // Gộp các OrderItem đã bị tách lại thành 1 dòng khi gửi cho customer qua WebSocket
+    const { groupSplitOrderItemsForCustomer } = require("../utils/customerHelpers");
+    const groupedOrderItems = groupSplitOrderItemsForCustomer(populatedOrder.orderItems);
+    populatedOrder.orderItems = groupedOrderItems;
+
     // Emit WebSocket event để thông báo waiter có đơn đặt trước mới
     const webSocketService = req.app.get("webSocketService");
     if (webSocketService) {
@@ -655,9 +671,12 @@ exports.getUserOrders = async (req, res) => {
       .populate('paymentId')
       .sort({ createdAt: -1 }); // Sắp xếp theo thời gian tạo mới nhất
 
-    // Populate thông tin item trong orderItems
+    // Populate thông tin item trong orderItems và gộp các OrderItem đã bị tách
+    const { groupSplitOrderItemsForCustomer } = require("../utils/customerHelpers");
     for (const order of orders) {
       await populateOrderItemDetails(order.orderItems);
+      // Gộp các OrderItem đã bị tách lại thành 1 dòng khi hiển thị cho customer
+      order.orderItems = groupSplitOrderItemsForCustomer(order.orderItems);
     }
 
     res.status(200).json({
@@ -697,9 +716,66 @@ exports.getOrderById = async (req, res) => {
     // Populate thông tin item trong orderItems
     await populateOrderItemDetails(order.orderItems);
 
+    // Gộp các OrderItem đã bị tách lại thành 1 dòng khi hiển thị cho customer
+    const { groupSplitOrderItemsForCustomer } = require("../utils/customerHelpers");
+    const groupedOrderItems = groupSplitOrderItemsForCustomer(order.orderItems);
+    
+    // Đảm bảo groupedOrderItems là plain objects (convert từ Mongoose documents nếu cần)
+    const plainOrderItems = groupedOrderItems.map(item => {
+      // Nếu là Mongoose document, convert sang plain object
+      if (item && typeof item.toObject === 'function') {
+        return item.toObject({ getters: true, flattenMaps: true });
+      }
+      // Nếu đã là plain object, dùng trực tiếp
+      return item;
+    });
+    
+    // Gán plainOrderItems vào order (không phải Mongoose documents)
+    order.orderItems = plainOrderItems;
+
+    // Debug: log để kiểm tra groupedOrderItems có đầy đủ field không
+    if (plainOrderItems.length > 0) {
+      console.log(`📦 Grouped orderItems for response:`, plainOrderItems.map(item => ({
+        _id: item._id,
+        itemName: item.itemName,
+        quantity: item.quantity,
+        price: item.price,
+        itemId: item.itemId
+      })));
+    }
+
+    // Convert order sang plain object để đảm bảo serialize đúng
+    // Đặc biệt quan trọng: order.orderItems phải là plain objects, không phải Mongoose documents
+    let orderToSend;
+    if (order && typeof order.toObject === 'function') {
+      // Nếu order là Mongoose document, convert sang plain object
+      orderToSend = order.toObject({ getters: true, flattenMaps: true });
+      // Đảm bảo orderItems là plainOrderItems (đã convert ở trên)
+      orderToSend.orderItems = plainOrderItems;
+    } else {
+      // Nếu đã là plain object, chỉ cần serialize
+      orderToSend = JSON.parse(JSON.stringify(order));
+      // Đảm bảo orderItems là plainOrderItems
+      orderToSend.orderItems = plainOrderItems;
+    }
+    
+    // Debug: Kiểm tra orderToSend.orderItems
+    console.log(`📦 orderToSend.orderItems type:`, Array.isArray(orderToSend.orderItems) ? 'array' : typeof orderToSend.orderItems);
+    console.log(`📦 orderToSend.orderItems length:`, orderToSend.orderItems?.length);
+    if (orderToSend.orderItems && orderToSend.orderItems.length > 0) {
+      console.log(`📦 orderToSend.orderItems[0]:`, {
+        _id: orderToSend.orderItems[0]._id,
+        itemName: orderToSend.orderItems[0].itemName,
+        quantity: orderToSend.orderItems[0].quantity,
+        price: orderToSend.orderItems[0].price,
+        isString: typeof orderToSend.orderItems[0] === 'string',
+        keys: Object.keys(orderToSend.orderItems[0] || {})
+      });
+    }
+    
     res.status(200).json({
       success: true,
-      data: order
+      data: orderToSend
     });
   } catch (error) {
     res.status(500).json({
@@ -862,6 +938,14 @@ exports.addItemsToOrder = async (req, res) => {
       .populate("tableId")
       .populate("paymentId");
 
+    // Populate thông tin item trong orderItems
+    await populateOrderItemDetails(populatedOrder.orderItems);
+
+    // Gộp các OrderItem đã bị tách lại thành 1 dòng khi gửi cho customer qua WebSocket
+    const { groupSplitOrderItemsForCustomer } = require("../utils/customerHelpers");
+    const groupedOrderItems = groupSplitOrderItemsForCustomer(populatedOrder.orderItems);
+    populatedOrder.orderItems = groupedOrderItems;
+
     // Emit WebSocket event để cập nhật real-time
     const webSocketService = req.app.get("webSocketService");
     if (webSocketService) {
@@ -951,6 +1035,14 @@ exports.cancelOrderItem = async (req, res) => {
       .populate("orderItems")
       .populate("tableId")
       .populate("paymentId");
+
+    // Populate thông tin item trong orderItems
+    await populateOrderItemDetails(populatedOrder.orderItems);
+
+    // Gộp các OrderItem đã bị tách lại thành 1 dòng khi gửi cho customer qua WebSocket
+    const { groupSplitOrderItemsForCustomer } = require("../utils/customerHelpers");
+    const groupedOrderItems = groupSplitOrderItemsForCustomer(populatedOrder.orderItems);
+    populatedOrder.orderItems = groupedOrderItems;
 
     // Emit WebSocket event để cập nhật real-time
     const webSocketService = req.app.get("webSocketService");
@@ -1110,6 +1202,14 @@ exports.updateOrderStatus = async (req, res) => {
       .populate("orderItems")
       .populate("tableId")
       .populate("paymentId");
+    
+    // Populate thông tin item trong orderItems
+    await populateOrderItemDetails(updatedOrder.orderItems);
+
+    // Gộp các OrderItem đã bị tách lại thành 1 dòng khi gửi cho customer qua WebSocket
+    const { groupSplitOrderItemsForCustomer } = require("../utils/customerHelpers");
+    const groupedOrderItems = groupSplitOrderItemsForCustomer(updatedOrder.orderItems);
+    updatedOrder.orderItems = groupedOrderItems;
     
     // Emit WebSocket với order đã cập nhật payment
     const webSocketService = req.app.get("webSocketService");
@@ -1465,6 +1565,16 @@ exports.confirmOrder = async (req, res) => {
 
     await order.save();
 
+    // Chia OrderItem lớn thành nhiều OrderItem nhỏ hơn để phân bổ workload cho waiter
+    const { splitLargeOrderItems } = require("../utils/customerHelpers");
+    const splitCount = await splitLargeOrderItems(order._id);
+    if (splitCount > 0) {
+      console.log(`✅ Đã chia ${splitCount} OrderItem lớn thành nhiều OrderItem nhỏ hơn sau khi customer confirm`);
+    }
+
+    // Reload order sau khi chia để có OrderItem mới
+    await order.populate("orderItems");
+    
     // Populate để trả về thông tin đầy đủ
     const populatedOrder = await Order.findById(order._id)
       .populate({
@@ -1483,6 +1593,14 @@ exports.confirmOrder = async (req, res) => {
       })
       .populate("tableId", "tableNumber number")
       .populate("paymentId");
+
+    // Populate thông tin item trong orderItems
+    await populateOrderItemDetails(populatedOrder.orderItems);
+
+    // Gộp các OrderItem đã bị tách lại thành 1 dòng khi hiển thị cho customer
+    const { groupSplitOrderItemsForCustomer } = require("../utils/customerHelpers");
+    const groupedOrderItems = groupSplitOrderItemsForCustomer(populatedOrder.orderItems);
+    populatedOrder.orderItems = groupedOrderItems;
 
     // Emit WebSocket event để thông báo kitchen có đơn hàng mới
     const webSocketService = req.app.get("webSocketService");
@@ -1804,6 +1922,14 @@ exports.testUpdateOrderItemStatus = async (req, res) => {
       .populate("tableId")
       .populate("paymentId");
 
+    // Populate thông tin item trong orderItems
+    await populateOrderItemDetails(updatedOrder.orderItems);
+
+    // Gộp các OrderItem đã bị tách lại thành 1 dòng khi gửi cho customer qua WebSocket
+    const { groupSplitOrderItemsForCustomer } = require("../utils/customerHelpers");
+    const groupedOrderItems = groupSplitOrderItemsForCustomer(updatedOrder.orderItems);
+    updatedOrder.orderItems = groupedOrderItems;
+
     // Emit WebSocket event để cập nhật real-time
     const webSocketService = req.app.get("webSocketService");
     if (webSocketService) {
@@ -1847,6 +1973,11 @@ exports.getLatestOrder = async (req, res) => {
 
     // Populate thông tin item trong orderItems
     await populateOrderItemDetails(latestOrder.orderItems);
+
+    // Gộp các OrderItem đã bị tách lại thành 1 dòng khi hiển thị cho customer
+    const { groupSplitOrderItemsForCustomer } = require("../utils/customerHelpers");
+    const groupedOrderItems = groupSplitOrderItemsForCustomer(latestOrder.orderItems);
+    latestOrder.orderItems = groupedOrderItems;
 
     res.status(200).json({
       success: true,
