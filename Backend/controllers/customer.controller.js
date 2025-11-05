@@ -644,6 +644,7 @@ exports.createPreOrder = async (req, res) => {
     if (webSocketService) {
       webSocketService.broadcastToOrder(order._id, "preorder:created", populatedOrder);
       webSocketService.broadcastToAllWaiters("preorder:needs_waiter_confirm", populatedOrder);
+      webSocketService.broadcastToAllAdmins("preorder:new", populatedOrder);
     }
 
     res.status(201).json({

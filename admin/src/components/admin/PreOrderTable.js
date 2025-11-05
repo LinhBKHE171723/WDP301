@@ -12,6 +12,7 @@ import {
 } from "../ui/admin/dialog";
 import { Button } from "../ui/admin/button";
 import adminApi from "../../api/adminApi";
+import useAdminWebSocket from "../../hooks/useAdminWebSocket";
 
 const formatDate = (iso) => {
   if (!iso) return "-";
@@ -41,6 +42,9 @@ export function PreOrderTable() {
   const [customerInfo, setCustomerInfo] = useState(null);
   const [loadingCustomerInfo, setLoadingCustomerInfo] = useState(false);
 
+  // WebSocket connection for real-time preorder updates
+  const { lastMessage } = useAdminWebSocket();
+
   // Fetch preorders from API
   useEffect(() => {
     const fetchPreOrders = async () => {
@@ -59,6 +63,40 @@ export function PreOrderTable() {
 
     fetchPreOrders();
   }, []);
+
+  // Listen for new preorders via WebSocket to update the list
+  // Note: Toast notifications are handled by AdminPreOrderNotification component
+  useEffect(() => {
+    if (!lastMessage) return;
+
+    // Handle new preorder event
+    if (lastMessage.type === 'preorder:new' || lastMessage.type === 'preorder:needs_waiter_confirm') {
+      const newPreorder = lastMessage.data;
+      
+      if (newPreorder && newPreorder._id) {
+        const preorderId = String(newPreorder._id);
+
+        setPreorders((prevPreorders) => {
+          // Check if preorder already exists (avoid duplicates)
+          const exists = prevPreorders.some(
+            (order) => String(order._id) === preorderId
+          );
+          
+          if (exists) {
+            // Update existing preorder if it already exists
+            return prevPreorders.map((order) =>
+              String(order._id) === preorderId ? newPreorder : order
+            );
+          } else {
+            // Add new preorder to the beginning of the list
+            return [newPreorder, ...prevPreorders];
+          }
+        });
+        
+        console.log('✅ New preorder received via WebSocket:', preorderId);
+      }
+    }
+  }, [lastMessage]);
 
   // Filter preorders based on search
   const filtered = useMemo(() => {
@@ -198,7 +236,7 @@ export function PreOrderTable() {
                             Xem chi tiết
                           </Button>
                         </DialogTrigger>
-                        <DialogContent className="max-w-6xl max-h-[85vh] overflow-y-auto">
+                        <DialogContent className="max-w-[95vw] w-full max-h-[90vh] overflow-y-auto">
                           <DialogHeader>
                             <DialogTitle>Chi tiết đơn đặt trước</DialogTitle>
                             <DialogDescription>
