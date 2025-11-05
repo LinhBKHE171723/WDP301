@@ -886,14 +886,71 @@ const groupSplitOrderItemsForCustomer = (orderItems) => {
   const groupedMap = new Map();
 
   orderItems.forEach((item) => {
+    // Bỏ qua nếu item null/undefined
+    if (!item) {
+      return;
+    }
+    
+    // Bỏ qua nếu là buffer
+    if (Buffer.isBuffer(item)) {
+      console.warn(`⚠️ Skipping buffer item`);
+      return;
+    }
+    
+    // Bỏ qua nếu là string (ObjectId string)
+    if (typeof item === 'string') {
+      console.warn(`⚠️ Skipping string ObjectId:`, item);
+      return;
+    }
+    
+    // Bỏ qua nếu không phải object
+    if (typeof item !== 'object') {
+      console.warn(`⚠️ Skipping non-object item:`, typeof item);
+      return;
+    }
+    
+    // Kiểm tra xem có phải là OrderItem document không
+    // Nếu có các field của OrderItem (quantity, price, itemId, status, itemName), thì là OrderItem
+    // Nếu chỉ có _id và không có field nào khác, có thể là ObjectId
+    const hasOrderItemFields = item.quantity !== undefined || 
+                               item.price !== undefined || 
+                               item.itemId !== undefined || 
+                               item.status !== undefined ||
+                               item.itemName !== undefined ||
+                               item.toObject !== undefined; // Mongoose document có toObject
+    
+    if (!hasOrderItemFields) {
+      // Nếu không có field nào của OrderItem, có thể là ObjectId
+      const mongoose = require('mongoose');
+      if (mongoose.Types.ObjectId.isValid(item) && item.constructor?.name === 'ObjectId') {
+        console.warn(`⚠️ Skipping pure ObjectId:`, item);
+        return;
+      }
+      // Nếu vẫn không phải ObjectId và không có field nào, bỏ qua
+      if (!item._id || Object.keys(item).length <= 1) {
+        console.warn(`⚠️ Skipping item without OrderItem fields:`, Object.keys(item));
+        return;
+      }
+    }
+    
     // Convert Mongoose document sang plain object để đảm bảo có tất cả field
     let plainItem;
     if (item && typeof item.toObject === 'function') {
       // Nếu là Mongoose document, dùng toObject() với getters để có tất cả field
       plainItem = item.toObject({ getters: true, flattenMaps: true });
-    } else {
+    } else if (item && typeof item === 'object' && !Buffer.isBuffer(item)) {
       // Nếu đã là plain object, dùng trực tiếp
       plainItem = item;
+    } else {
+      // Bỏ qua nếu không phải object hợp lệ
+      console.warn(`⚠️ Skipping invalid item type:`, typeof item);
+      return;
+    }
+    
+    // Đảm bảo có các field cần thiết (ít nhất phải có _id hoặc quantity để xác định là OrderItem)
+    if (!plainItem || (!plainItem._id && !plainItem.quantity)) {
+      console.warn(`⚠️ PlainItem missing required fields:`, plainItem ? Object.keys(plainItem) : 'null');
+      return;
     }
     
     // Đảm bảo itemName và price có giá trị (fallback nếu thiếu)

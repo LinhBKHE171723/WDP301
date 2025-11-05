@@ -1,6 +1,7 @@
 const Order = require("../models/Order");
 const Payment = require("../models/Payment");
 const webSocketService = require("../services/websocket.service");
+const { groupSplitOrderItemsForCustomer, populateOrderItemDetails } = require("../utils/customerHelpers");
 
 function calculateWaitTime(createdAt) {
   if (!createdAt) return 0;
@@ -21,7 +22,27 @@ function buildOrderNumber(order) {
 function formatOrder(order) {
   if (!order) return null;
 
-  const items = (order.orderItems || []).map((item) => {
+  // orderItems đã được populate và group trong getPreparingOrders
+  // Chỉ cần lọc bỏ các items không hợp lệ và format
+  let orderItemsToFormat = order.orderItems || [];
+  
+  if (orderItemsToFormat.length > 0) {
+    // Lọc bỏ các items không hợp lệ (buffer, ObjectId chưa populate)
+    orderItemsToFormat = orderItemsToFormat.filter(item => {
+      if (!item) return false;
+      if (Buffer.isBuffer(item)) return false;
+      if (typeof item === 'string') return false;
+      if (typeof item !== 'object') return false;
+      // Kiểm tra xem có phải là ObjectId không
+      const mongoose = require('mongoose');
+      if (mongoose.Types.ObjectId.isValid(item) && item.constructor?.name === 'ObjectId') {
+        return false; // Skip pure ObjectId
+      }
+      return true;
+    });
+  }
+
+  const items = orderItemsToFormat.map((item) => {
     const price = item.price ?? 0;
     return {
       id: item._id ? item._id.toString() : undefined,
@@ -65,12 +86,54 @@ exports.getPreparingOrders = async (_req, res) => {
   try {
     const orders = await Order.find({ status: { $in: ["confirmed", "preparing", "served"] } })
       .sort({ createdAt: 1 })
-      .populate("tableId", "tableNumber")
-      .populate({
-        path: "orderItems",
-        select: "itemName itemId quantity price note status",
-        populate: { path: "itemId", select: "name" },
-      });
+      .populate("tableId", "tableNumber");
+
+    // Populate orderItems một cách rõ ràng và đảm bảo có đầy đủ field
+    const OrderItem = require("../models/OrderItem");
+    
+    for (let i = 0; i < orders.length; i++) {
+      const order = orders[i];
+      if (order.orderItems && order.orderItems.length > 0) {
+        // Lấy OrderItem IDs (có thể là ObjectIds hoặc strings)
+        const orderItemIds = order.orderItems.map(item => {
+          if (typeof item === 'object' && item._id) {
+            return item._id;
+          }
+          return item;
+        }).filter(id => id);
+        
+        // Fetch OrderItems với đầy đủ field
+        const populatedOrderItems = await OrderItem.find({ _id: { $in: orderItemIds } })
+          .populate({ path: 'itemId', select: 'name' });
+        
+        // Debug: log để kiểm tra
+        if (populatedOrderItems.length > 0 && populatedOrderItems.length !== orderItemIds.length) {
+          console.log(`⚠️ Fetched ${populatedOrderItems.length} OrderItems but expected ${orderItemIds.length}`);
+        }
+        
+        // Populate orderItemDetails
+        await populateOrderItemDetails(populatedOrderItems);
+        
+        // Group orderItems - đảm bảo populatedOrderItems là array hợp lệ
+        if (populatedOrderItems && populatedOrderItems.length > 0) {
+          const groupedItems = groupSplitOrderItemsForCustomer(populatedOrderItems);
+          // Convert order sang plain object và gán orderItems
+          const orderPlain = order.toObject ? order.toObject({ getters: true }) : { ...order };
+          orderPlain.orderItems = groupedItems;
+          // Thay thế order trong array bằng plain object
+          orders[i] = orderPlain;
+        } else {
+          const orderPlain = order.toObject ? order.toObject({ getters: true }) : { ...order };
+          orderPlain.orderItems = [];
+          orders[i] = orderPlain;
+        }
+      } else {
+        // Convert order sang plain object ngay cả khi không có orderItems
+        if (order.toObject) {
+          orders[i] = order.toObject({ getters: true });
+        }
+      }
+    }
 
     return res.status(200).json({
       message: "Lấy danh sách đơn đang chuẩn bị thành công",
@@ -142,6 +205,12 @@ exports.completeOrderPayment = async (req, res) => {
         select: "itemName itemId quantity price note status",
         populate: { path: "itemId", select: "name" },
       });
+
+    // Populate orderItemDetails và group orderItems
+    if (populatedOrder.orderItems && populatedOrder.orderItems.length > 0) {
+      await populateOrderItemDetails(populatedOrder.orderItems);
+      populatedOrder.orderItems = groupSplitOrderItemsForCustomer(populatedOrder.orderItems);
+    }
 
     if (webSocketService?.broadcastToAllCashiers) {
       const payload = formatOrder(populatedOrder);
