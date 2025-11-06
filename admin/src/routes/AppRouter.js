@@ -225,7 +225,7 @@ export default function AppRouter() {
                         <Route path="/settings" element={<SettingsPage />} />
                         <Route path="/customers" element={<CustomerReportPage />} />
                         <Route path="/performance" element={<PerformancePage />} />
-                        <Route path="/performance/:userId" element={<PerformanceDetailPage />} />
+                        <Route path="performance/:userId" element={<PerformanceDetailPage />} />
                       </Routes>
                     </div>
                   </main>

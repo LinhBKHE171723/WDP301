@@ -1,25 +1,36 @@
 const Shift = require("../../models/Shift");
+const WorkShift = require("../../models/WorkShift");
+const mongoose = require("mongoose");
 
-/**
- * ✅ Lấy toàn bộ ca làm việc của 1 nhân viên
- * Trả về danh sách các shift, không kèm thông tin user để nhẹ dữ liệu
- */
-exports.getAllShiftsByUser = async (userId) => {
-  if (!userId) throw new Error("Thiếu userId");
 
-  const shifts = await Shift.find({ userId }).sort({ date: -1 }); // sắp xếp mới nhất trước
+exports.getUserMonthlySummary = async (userId, from, to) => {
+  const startDate = from ? new Date(from) : new Date(new Date().getFullYear(), new Date().getMonth(), 1);
+  const endDate = to ? new Date(to) : new Date();
 
-  return shifts.map((s) => ({
-    _id: s._id,
-    date: s.date,
-    startTime: s.startTime,
-    endTime: s.endTime,
-    duration: s.duration,
-    status: s.status,
-    createdAt: s.createdAt,
-    updatedAt: s.updatedAt,
-    formattedDuration: s.duration
-      ? `${Math.floor(s.duration / 60)}h ${s.duration % 60}p`
-      : "0 phút",
-  }));
+  const shifts = await Shift.find({
+    userId,
+    date: { $gte: startDate, $lte: endDate },
+  }).populate("workShiftId", "name startTime endTime");
+
+  let totalShifts = shifts.length;
+  let totalWorkedMinutes = 0;
+  let totalLate = 0;
+  let totalEarly = 0;
+  let absentCount = 0;
+
+  for (const s of shifts) {
+    totalWorkedMinutes += s.totalWorkedMinutes || 0;
+    totalLate += s.lateMinutes || 0;
+    totalEarly += s.earlyLeaveMinutes || 0;
+    if (s.status === "pending" || s.status === "absent") absentCount++;
+  }
+
+  return {
+    totalShifts,
+    totalWorkedMinutes,
+    totalLate,
+    totalEarly,
+    absentCount,
+    shifts, 
+  };
 };

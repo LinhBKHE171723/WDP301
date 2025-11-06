@@ -294,8 +294,7 @@ useEffect(() => {
                       
                       <td className="p-4 text-center">{item.attendance.daysWorked || 0}</td>
                       <td className="p-4 text-center">
-                        <Link
-                          to={`/performance/${item.employee._id}`}
+                        <Link to={`/admin/performance/${item.employee._id}`}
                           className="px-3 py-1 text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 rounded-md transition-all duration-150"
                         >
                           Xem chi tiết

@@ -83,6 +83,6 @@ router.post("/test/reassign-stale-items", async (req, res) => {
 router.get("/chefs", performanceController.getChefStats);
 router.get("/cashiers", performanceController.getCashierStats);
 // ca lam viec
-router.get("/performance/shifts/:userId", performanceDetailCtrl.getShiftDetailsByUser);
+router.get("/performance/shifts/:userId", performanceDetailCtrl.getUserShifts);
 
 module.exports = router;
