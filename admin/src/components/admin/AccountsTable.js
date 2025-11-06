@@ -233,6 +233,7 @@ export function AccountsTable() {
                   <option value="chef">Bếp trưởng</option>
                   <option value="cashier">Thu ngân</option>
                 </select>
+                
               </div>
             </div>
 
@@ -414,20 +415,24 @@ export function AccountsTable() {
                     <Input value={editData.phone} disabled />
                   </div>
 
-                  <div>
-                    <Label>Vai trò</Label>
-                    <select
-                      value={editData.role}
-                      onChange={(e) =>
-                        setEditData((s) => ({ ...s, role: e.target.value }))
-                      }
-                      className="w-full border rounded px-2 py-2"
-                    >
-                      <option value="waiter">Phục vụ</option>
-                      <option value="chef">Bếp trưởng</option>
-                      <option value="cashier">Thu ngân</option>
-                    </select>
-                  </div>
+                  {/* Ẩn ô Vai trò nếu là admin hoặc customer */}
+{editData && !["admin", "customer"].includes(editData.role) && (
+  <div>
+    <Label>Vai trò</Label>
+    <select
+      value={editData.role}
+      onChange={(e) =>
+        setEditData((s) => ({ ...s, role: e.target.value }))
+      }
+      className="w-full border rounded px-2 py-2"
+    >
+      <option value="waiter">Phục vụ</option>
+      <option value="chef">Bếp trưởng</option>
+      <option value="cashier">Thu ngân</option>
+    </select>
+  </div>
+)}
+
 
                   <div>
                     <Label>Trạng thái tài khoản</Label>
