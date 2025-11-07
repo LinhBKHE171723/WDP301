@@ -95,7 +95,6 @@ if (!isValidEmail) {
     }
 
     const tempPassword = genTempPassword(10);
-    const passwordHash = await bcrypt.hash(tempPassword, SALT_ROUNDS);
 
     const user = await User.create({
       name,
@@ -104,7 +103,7 @@ if (!isValidEmail) {
       phone: phone || "",
       role: role || "waiter",
       status: "inactive",
-      password: passwordHash, 
+      password: tempPassword, 
     });
 
     const html = `
