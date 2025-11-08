@@ -17,6 +17,7 @@ import waiterApi from "../../api/waiterApi";
 import useAdminWebSocket from "../../hooks/useAdminWebSocket";
 import { useAuth } from "../../context/AuthContext";
 import { toast } from "react-toastify";
+import "./PreOrderTable.css";
 
 const formatDate = (iso) => {
   if (!iso) return "-";
@@ -341,39 +342,43 @@ export function PreOrderTable() {
 
   if (loading) {
     return (
-      <div className="space-y-4">
-        <div className="text-2xl font-semibold">Đơn đặt trước</div>
-        <Card>
-          <div className="p-6 text-center text-gray-500">Đang tải...</div>
+      <div className="preorder-container">
+        <div className="preorder-header">
+          <h1 className="preorder-title">Đơn đặt trước</h1>
+        </div>
+        <Card className="preorder-card">
+          <div className="preorder-loading">
+            <div className="preorder-loading-spinner"></div>
+          </div>
         </Card>
       </div>
     );
   }
 
   return (
-    <div className="space-y-4">
-      <div className="flex items-center justify-between">
-        <div className="text-2xl font-semibold">Đơn đặt trước</div>
+    <div className="preorder-container">
+      <div className="preorder-header">
+        <h1 className="preorder-title">Đơn đặt trước</h1>
         {isAdmin && (
-          <span className="px-3 py-1 bg-blue-100 text-blue-800 rounded-full text-sm font-medium">
+          <span className="preorder-badge admin">
             Đơn lớn (Admin)
           </span>
         )}
         {isCashier && (
-          <span className="px-3 py-1 bg-green-100 text-green-800 rounded-full text-sm font-medium">
+          <span className="preorder-badge cashier">
             Đơn nhỏ (Cashier)
           </span>
         )}
       </div>
 
-      <Card>
+      <Card className="preorder-card">
         {/* Search */}
-        <div className="flex items-center gap-3 p-4">
+        <div className="preorder-search-container">
           <Input
             placeholder="Tìm theo tên, email, SĐT, mã đơn..."
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            className="flex-1"
+            className="preorder-search-input"
           />
           <Button
             variant="outline"
@@ -389,12 +394,14 @@ export function PreOrderTable() {
               setFilterBy("createdAt");
               setSearchParams({}, { replace: true }); // Clear URL params
             }}
+            className="preorder-filter-btn"
           >
             Xóa bộ lọc
           </Button>
           <Button
             variant="outline"
             onClick={() => setShowFilters(!showFilters)}
+            className="preorder-filter-btn"
           >
             {showFilters ? "Ẩn bộ lọc" : "Hiện bộ lọc"}
           </Button>
@@ -402,17 +409,14 @@ export function PreOrderTable() {
 
         {/* Advanced Filters */}
         {showFilters && (
-          <div className="border-t p-4 space-y-4 bg-gray-50">
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+          <div className="preorder-filters">
+            <div className="preorder-filters-grid">
               {/* Waiter Response Status */}
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Trạng thái waiter
-                </label>
+              <div className="preorder-filter-group">
+                <label>Trạng thái waiter</label>
                 <select
                   value={waiterResponseStatus}
                   onChange={(e) => setWaiterResponseStatus(e.target.value)}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm"
                 >
                   <option value="">Tất cả</option>
                   <option value="pending">Chờ xác nhận</option>
@@ -422,66 +426,51 @@ export function PreOrderTable() {
               </div>
 
               {/* Date Range */}
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Từ ngày
-                </label>
+              <div className="preorder-filter-group">
+                <label>Từ ngày</label>
                 <Input
                   type="date"
                   value={fromDate}
                   onChange={(e) => setFromDate(e.target.value)}
-                  className="w-full"
                 />
               </div>
 
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Đến ngày
-                </label>
+              <div className="preorder-filter-group">
+                <label>Đến ngày</label>
                 <Input
                   type="date"
                   value={toDate}
                   onChange={(e) => setToDate(e.target.value)}
-                  className="w-full"
                 />
               </div>
 
               {/* Amount Range */}
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Số tiền tối thiểu (₫)
-                </label>
+              <div className="preorder-filter-group">
+                <label>Số tiền tối thiểu (₫)</label>
                 <Input
                   type="number"
                   placeholder="0"
                   value={minAmount}
                   onChange={(e) => setMinAmount(e.target.value)}
-                  className="w-full"
                 />
               </div>
 
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Số tiền tối đa (₫)
-                </label>
+              <div className="preorder-filter-group">
+                <label>Số tiền tối đa (₫)</label>
                 <Input
                   type="number"
                   placeholder="Không giới hạn"
                   value={maxAmount}
                   onChange={(e) => setMaxAmount(e.target.value)}
-                  className="w-full"
                 />
               </div>
 
               {/* Sort By */}
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Sắp xếp theo
-                </label>
+              <div className="preorder-filter-group">
+                <label>Sắp xếp theo</label>
                 <select
                   value={sortBy}
                   onChange={(e) => setSortBy(e.target.value)}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm"
                 >
                   <option value="createdAt">Ngày tạo</option>
                   <option value="totalAmount">Tổng tiền</option>
@@ -490,14 +479,11 @@ export function PreOrderTable() {
               </div>
 
               {/* Sort Order */}
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Thứ tự
-                </label>
+              <div className="preorder-filter-group">
+                <label>Thứ tự</label>
                 <select
                   value={sortOrder}
                   onChange={(e) => setSortOrder(e.target.value)}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm"
                 >
                   <option value="desc">Giảm dần</option>
                   <option value="asc">Tăng dần</option>
@@ -508,18 +494,18 @@ export function PreOrderTable() {
         )}
 
         {/* Table */}
-        <div className="overflow-x-auto">
-          <table className="w-full">
+        <div className="preorder-table-wrapper">
+          <table className="preorder-table">
             <thead>
-              <tr className="border-b bg-gray-50 text-left text-sm text-gray-700">
-                <th className="p-3">Mã đơn</th>
-                <th className="p-3">Khách hàng</th>
-                <th className="p-3">Email</th>
-                <th className="p-3">Số điện thoại</th>
-                <th className="p-3">Thời gian đặt</th>
-                <th className="p-3">Tổng tiền</th>
-                <th className="p-3">Trạng thái waiter</th>
-                <th className="p-3">Chi tiết</th>
+              <tr>
+                <th>Mã đơn</th>
+                <th>Khách hàng</th>
+                <th>Email</th>
+                <th>Số điện thoại</th>
+                <th>Thời gian đặt</th>
+                <th>Tổng tiền</th>
+                <th>Trạng thái waiter</th>
+                <th>Chi tiết</th>
               </tr>
             </thead>
             <tbody>
@@ -541,9 +527,9 @@ export function PreOrderTable() {
                 // Badge cho waiter response status
                 const getWaiterStatusBadge = (status) => {
                   const badges = {
-                    pending: "bg-yellow-100 text-yellow-800",
-                    approved: "bg-green-100 text-green-800",
-                    rejected: "bg-red-100 text-red-800"
+                    pending: "preorder-status-badge pending",
+                    approved: "preorder-status-badge approved",
+                    rejected: "preorder-status-badge rejected"
                   };
                   const labels = {
                     pending: "Chờ xác nhận",
@@ -558,26 +544,29 @@ export function PreOrderTable() {
                 };
 
                 return (
-                  <tr
-                    key={orderId}
-                    className="border-b last:border-0 hover:bg-gray-50"
-                  >
-                    <td className="p-3 text-sm font-mono text-gray-600">
-                      {orderShort}
+                  <tr key={orderId}>
+                    <td>
+                      <span className="preorder-id">{orderShort}</span>
                     </td>
-                    <td className="p-3 font-medium">{customerName}</td>
-                    <td className="p-3 text-sm text-gray-600">{customerEmail}</td>
-                    <td className="p-3 text-sm text-gray-600">{customerPhone}</td>
-                    <td className="p-3 text-sm text-gray-600">
+                    <td>
+                      <span className="preorder-customer-name">{customerName}</span>
+                    </td>
+                    <td>
+                      <span className="preorder-customer-email">{customerEmail}</span>
+                    </td>
+                    <td>
+                      <span className="preorder-customer-phone">{customerPhone}</span>
+                    </td>
+                    <td>
                       {scheduledTime ? formatDate(scheduledTime) : "-"}
                     </td>
-                    <td className="p-3 text-sm font-semibold">
-                      {formatCurrency(totalAmount)}
+                    <td>
+                      <span className="preorder-amount">{formatCurrency(totalAmount)}</span>
                     </td>
-                    <td className="p-3">
+                    <td>
                       {getWaiterStatusBadge(waiterResponseStatus)}
                     </td>
-                    <td className="p-3">
+                    <td>
                       <Dialog
                         open={openRow === orderId}
                         onOpenChange={(v) => {
@@ -589,8 +578,7 @@ export function PreOrderTable() {
                       >
                         <DialogTrigger asChild>
                           <Button
-                            variant="outline"
-                            size="sm"
+                            className="preorder-action-btn view"
                             onClick={async () => {
                               setOpenRow(orderId);
                               // Fetch customer info when opening dialog
@@ -1160,10 +1148,12 @@ export function PreOrderTable() {
 
               {filtered.length === 0 && (
                 <tr>
-                  <td className="p-6 text-center text-gray-500" colSpan={8}>
-                    {preorders.length === 0
-                      ? "Chưa có đơn đặt trước nào."
-                      : "Không tìm thấy đơn đặt trước phù hợp."}
+                  <td colSpan={8} className="preorder-empty">
+                    <div className="preorder-empty-text">
+                      {preorders.length === 0
+                        ? "Chưa có đơn đặt trước nào."
+                        : "Không tìm thấy đơn đặt trước phù hợp."}
+                    </div>
                   </td>
                 </tr>
               )}

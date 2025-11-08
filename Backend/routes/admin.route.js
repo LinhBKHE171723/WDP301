@@ -12,6 +12,7 @@ const itemTrendCtrl = require("../controllers/admin/itemTrend.controller");
 const performanceDetailCtrl = require("../controllers/admin/performanceDetail.controller");
 const customerReportCtrl = require("../controllers/admin/customerReport.controller");
 const settingsController = require("../controllers/admin/settings.controller");
+const workShiftController = require("../controllers/admin/workShift.controller");
 const { checkPreOrderPermission } = require("../middlewares/preorderPermission.middleware");
 
 // =======================================================
@@ -36,6 +37,13 @@ router.get("/settings", authRequired, roleRequired("admin"), settingsController.
 router.get("/settings/preorder", authRequired, roleRequired("admin"), settingsController.getPreOrderSettings);
 router.get("/settings/:key", authRequired, roleRequired("admin"), settingsController.getSetting);
 router.put("/settings/:key", authRequired, roleRequired("admin"), settingsController.updateSetting);
+
+// --- WORK SHIFT ROUTES (/api/admin/work-shifts) ---
+router.get("/work-shifts", authRequired, roleRequired("admin"), workShiftController.getWorkShifts);
+router.get("/work-shifts/:id", authRequired, roleRequired("admin"), workShiftController.getWorkShift);
+router.post("/work-shifts", authRequired, roleRequired("admin"), workShiftController.createWorkShift);
+router.put("/work-shifts/:id", authRequired, roleRequired("admin"), workShiftController.updateWorkShift);
+router.delete("/work-shifts/:id", authRequired, roleRequired("admin"), workShiftController.deleteWorkShift);
 
 // --- PREORDER ROUTES (/api/admin/preorders) ---
 router.get("/preorders", authRequired, roleRequired("admin", "cashier"), preorderController.getPreOrders);
