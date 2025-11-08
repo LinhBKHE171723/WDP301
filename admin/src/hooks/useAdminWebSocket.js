@@ -1,13 +1,16 @@
 import { useEffect, useRef, useState } from 'react';
+import { useAuth } from '../context/AuthContext';
 
 /**
  * ✅ useAdminWebSocket Hook
- * Dùng cho giao diện Admin để:
+ * Dùng cho giao diện Admin/Cashier để:
  *  - Kết nối tới WebSocket server
  *  - Nhận message real-time về preorder mới
- *  - Authenticate với role 'admin'
+ *  - Authenticate với role 'admin' hoặc 'cashier'
  */
 const useAdminWebSocket = () => {
+  const { user } = useAuth();
+  const userRole = user?.role || 'admin';
   // -------------------------------
   // 🧠 State lưu trạng thái kết nối & message
   // -------------------------------
@@ -36,22 +39,24 @@ const useAdminWebSocket = () => {
 
       // Khi kết nối thành công
       ws.onopen = () => {
-        console.log('🔌 Admin WebSocket connected');
+        console.log(`🔌 ${userRole === 'admin' ? 'Admin' : 'Cashier'} WebSocket connected`);
         setConnectionState('connected');
         reconnectAttempts.current = 0; // Reset bộ đếm reconnect
 
-        // Gửi message xác thực để server biết đây là admin
-        ws.send(JSON.stringify({
+        // Gửi message xác thực để server biết role
+        const authMessage = {
           type: 'auth',
-          role: 'admin'
-        }));
+          role: userRole
+        };
+        console.log(`🔐 Sending WebSocket auth:`, authMessage);
+        ws.send(JSON.stringify(authMessage));
       };
 
       // Khi nhận được message từ server
       ws.onmessage = (event) => {
         try {
           const message = JSON.parse(event.data);
-          console.log('📨 Admin WebSocket message:', message);
+          console.log(`📨 ${userRole === 'admin' ? 'Admin' : 'Cashier'} WebSocket message received:`, message.type, message);
           setLastMessage(message); // Lưu message mới vào state
         } catch (error) {
           console.error('❌ Error parsing WebSocket message:', error);
@@ -60,7 +65,7 @@ const useAdminWebSocket = () => {
 
       // Khi kết nối bị đóng (do lỗi, mất mạng,...)
       ws.onclose = () => {
-        console.log('🔌 Admin WebSocket disconnected');
+        console.log(`🔌 ${userRole === 'admin' ? 'Admin' : 'Cashier'} WebSocket disconnected`);
         setConnectionState('disconnected');
 
         // Nếu chưa vượt quá giới hạn reconnect → thử lại
@@ -78,7 +83,7 @@ const useAdminWebSocket = () => {
 
       // Khi gặp lỗi
       ws.onerror = (error) => {
-        console.error('❌ Admin WebSocket error:', error);
+        console.error(`❌ ${userRole === 'admin' ? 'Admin' : 'Cashier'} WebSocket error:`, error);
         setConnectionState('disconnected');
       };
 
@@ -110,7 +115,7 @@ const useAdminWebSocket = () => {
     return () => {
       disconnect(); // Cleanup khi component bị huỷ
     };
-  }, []);
+  }, [userRole]); // Reconnect khi role thay đổi
 
   // -------------------------------
   // 📤 Trả về các hàm & state cho component dùng

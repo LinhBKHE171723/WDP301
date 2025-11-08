@@ -7,6 +7,7 @@ const ExcelJS = require("exceljs");
 const { success, error } = require("../../utils/response");
 const { classifyCustomer } = require("../../utils/customerClassification");
 const { addPaymentToOrder, ensurePaymentIdsSync } = require("../../utils/paymentHelpers");
+const { getLargeOrderThreshold } = require("../../utils/preorderHelpers");
 
 // Helper function: Tự động fill itemName từ itemId nếu thiếu
 const fillItemNameForOrderItems = async (orderItems) => {
@@ -51,28 +52,44 @@ exports.getPreOrders = async (req, res) => {
       minAmount,
       maxAmount,
       sortBy = "createdAt", // "createdAt", "totalAmount", "scheduledTime"
-      sortOrder = "desc" // "asc", "desc"
+      sortOrder = "desc", // "asc", "desc"
+      filterBy = "createdAt" // "createdAt" hoặc "scheduledTime"
     } = req.query;
 
     // Build query filter
-    const filter = { status: "preorder" };
-
-    // Filter theo waiterResponseStatus
-    if (waiterResponseStatus) {
-      filter["waiterResponse.status"] = waiterResponseStatus;
+    const filter = {};
+    
+    // Nếu filter "Đơn đặt trước hôm nay" (approved + scheduledTime) → bao gồm cả đơn đã chuyển status
+    // Ngược lại → chỉ lấy đơn có status = "preorder"
+    if (waiterResponseStatus === "approved" && filterBy === "scheduledTime") {
+      // Đơn đã approved, scheduledTime hôm nay → có thể đã chuyển sang confirmed/preparing/served
+      // Với đơn đã chuyển status, vẫn có waiterResponse.status = "approved" từ khi approve
+      filter.status = { $in: ["preorder", "confirmed", "preparing", "served"] };
+      filter["waiterResponse.status"] = "approved";
+    } else {
+      // Đơn đang chờ (pending) hoặc các filter khác → chỉ lấy status = "preorder"
+      filter.status = "preorder";
+      // Filter theo waiterResponseStatus
+      if (waiterResponseStatus) {
+        filter["waiterResponse.status"] = waiterResponseStatus;
+      }
     }
 
-    // Filter theo khoảng thời gian (createdAt)
+    // Filter theo khoảng thời gian
+    // Nếu filterBy=scheduledTime → filter theo scheduledTime (ngày khách đến)
+    // Ngược lại → filter theo createdAt (ngày tạo đơn)
     if (fromDate || toDate) {
-      filter.createdAt = {};
+      const dateField = filterBy === "scheduledTime" ? "scheduledTime" : "createdAt";
+      
+      filter[dateField] = {};
       if (fromDate) {
-        filter.createdAt.$gte = new Date(fromDate);
+        filter[dateField].$gte = new Date(fromDate);
       }
       if (toDate) {
         // Thêm 1 ngày để bao gồm cả ngày toDate
         const toDateEnd = new Date(toDate);
         toDateEnd.setHours(23, 59, 59, 999);
-        filter.createdAt.$lte = toDateEnd;
+        filter[dateField].$lte = toDateEnd;
       }
     }
 
@@ -87,6 +104,53 @@ exports.getPreOrders = async (req, res) => {
       }
     }
 
+    // Filter theo role để tránh trùng lặp
+    // Admin chỉ thấy đơn lớn, Cashier chỉ thấy đơn nhỏ
+    const { role } = req.user;
+    const threshold = await getLargeOrderThreshold();
+    
+    if (role === "admin") {
+      // Admin chỉ thấy đơn lớn (> threshold)
+      if (filter.totalAmount) {
+        // Nếu đã có filter, merge logic
+        const existingGte = filter.totalAmount.$gte;
+        // Đảm bảo đơn lớn hơn threshold
+        filter.totalAmount.$gt = threshold;
+        // Nếu có minAmount từ query và lớn hơn threshold, giữ giá trị đó
+        if (existingGte !== undefined && existingGte > threshold) {
+          filter.totalAmount.$gte = existingGte;
+        }
+        // Xóa $lte nếu có vì admin chỉ xem đơn lớn
+        if (filter.totalAmount.$lte !== undefined) {
+          delete filter.totalAmount.$lte;
+        }
+      } else {
+        filter.totalAmount = { $gt: threshold };
+      }
+    } else if (role === "cashier") {
+      // Cashier chỉ thấy đơn nhỏ (<= threshold)
+      if (filter.totalAmount) {
+        const existingLte = filter.totalAmount.$lte;
+        const existingGte = filter.totalAmount.$gte;
+        // Đảm bảo đơn nhỏ hơn hoặc bằng threshold
+        filter.totalAmount.$lte = threshold;
+        // Nếu có maxAmount từ query và nhỏ hơn threshold, dùng giá trị đó
+        if (existingLte !== undefined && existingLte < threshold) {
+          filter.totalAmount.$lte = existingLte;
+        }
+        // Xóa $gt nếu có vì cashier chỉ xem đơn nhỏ
+        if (filter.totalAmount.$gt !== undefined) {
+          delete filter.totalAmount.$gt;
+        }
+        // Đảm bảo không có $gte lớn hơn threshold
+        if (existingGte !== undefined && existingGte > threshold) {
+          delete filter.totalAmount.$gte;
+        }
+      } else {
+        filter.totalAmount = { $lte: threshold };
+      }
+    }
+
     // Build sort options
     const sortOptions = {};
     if (sortBy === "totalAmount") {
@@ -98,6 +162,19 @@ exports.getPreOrders = async (req, res) => {
       sortOptions.createdAt = sortOrder === "asc" ? 1 : -1;
     }
 
+    // Debug log để kiểm tra filter (safe serialization)
+    try {
+      const filterForLog = JSON.parse(JSON.stringify(filter, (key, value) => {
+        if (value instanceof Date) {
+          return value.toISOString();
+        }
+        return value;
+      }));
+      console.log("🔍 PreOrder filter:", JSON.stringify(filterForLog, null, 2));
+    } catch (logErr) {
+      console.log("🔍 PreOrder filter (raw):", filter);
+    }
+    
     const orders = await Order.find(filter)
       .populate({
         path: "userId",
@@ -112,6 +189,8 @@ exports.getPreOrders = async (req, res) => {
         select: "amountPaid status paymentMethod createdAt payTime isDeposit",
       })
       .sort(sortOptions);
+    
+    console.log(`📊 Found ${orders.length} orders matching filter`);
 
     // Tự động fill itemName từ itemId nếu thiếu và tính tổng tiền đã thanh toán
     for (const order of orders) {

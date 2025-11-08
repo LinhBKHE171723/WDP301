@@ -34,6 +34,17 @@ const adminApi = {
   // Lấy danh sách items và menus để thêm vào đơn
   getAllItems: () => Client.get("/customer/items/all"),
   getAllMenus: () => Client.get("/customer/menus/all"),
+  // Settings APIs
+  getSettings: (category) => Client.get("/admin/settings", { params: category ? { category } : {} }),
+  getPreOrderSettings: () => Client.get("/admin/settings/preorder"),
+  getSetting: (key) => Client.get(`/admin/settings/${key}`),
+  updateSetting: (key, value, description, category) => {
+    // Đảm bảo value là number nếu là threshold
+    const payloadValue = key === "preorder.largeOrderThreshold" && typeof value === "string" 
+      ? Number(value) 
+      : value;
+    return Client.put(`/admin/settings/${key}`, { value: payloadValue, description, category });
+  },
 };
 
 export default adminApi;

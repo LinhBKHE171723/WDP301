@@ -7,6 +7,7 @@ const Payment = require("../models/Payment");
 const Feedback = require("../models/Feedback");
 const User = require("../models/User");
 const { populateOrderItemDetails, validateTableAvailability, checkItemStock, createOrderItemsFromCart, createCustomerAccount } = require("../utils/customerHelpers");
+const { isLargeOrder } = require("../utils/preorderHelpers");
 
 // Lấy thông tin bàn theo số bàn
 exports.getTableByNumber = async (req, res) => {
@@ -641,12 +642,26 @@ exports.createPreOrder = async (req, res) => {
     const groupedOrderItems = groupSplitOrderItemsForCustomer(populatedOrder.orderItems);
     populatedOrder.orderItems = groupedOrderItems;
 
-    // Emit WebSocket event để thông báo waiter có đơn đặt trước mới
+    // Emit WebSocket event - phân loại đơn lớn/nhỏ để gửi đúng đối tượng
     const webSocketService = req.app.get("webSocketService");
     if (webSocketService) {
       webSocketService.broadcastToOrder(order._id, "preorder:created", populatedOrder);
-      webSocketService.broadcastToAllWaiters("preorder:needs_waiter_confirm", populatedOrder);
-      webSocketService.broadcastToAllAdmins("preorder:new", populatedOrder);
+      
+      // Kiểm tra đơn lớn hay nhỏ
+      const isLarge = await isLargeOrder(order);
+      console.log(`📦 PreOrder created - Order ID: ${order._id}, Total: ${order.totalAmount}, Is Large: ${isLarge}`);
+      
+      if (isLarge) {
+        // Đơn lớn → chỉ gửi cho Admin
+        console.log(`📤 Broadcasting preorder:new to ADMINS (large order)`);
+        webSocketService.broadcastToAllAdmins("preorder:new", populatedOrder);
+      } else {
+        // Đơn nhỏ → chỉ gửi cho Cashier (không gửi cho admin để tránh trùng)
+        console.log(`📤 Broadcasting preorder:new to CASHIERS (small order)`);
+        webSocketService.broadcastToAllCashiers("preorder:new", populatedOrder);
+      }
+    } else {
+      console.warn("⚠️ WebSocket service not available");
     }
 
     res.status(201).json({

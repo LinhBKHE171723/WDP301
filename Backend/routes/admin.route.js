@@ -11,6 +11,8 @@ const itemCtrl = require("../controllers/admin/item.controller");
 const itemTrendCtrl = require("../controllers/admin/itemTrend.controller");
 const performanceDetailCtrl = require("../controllers/admin/performanceDetail.controller");
 const customerReportCtrl = require("../controllers/admin/customerReport.controller");
+const settingsController = require("../controllers/admin/settings.controller");
+const { checkPreOrderPermission } = require("../middlewares/preorderPermission.middleware");
 
 // =======================================================
 // NHÓM 1: CÁC ROUTE QUẢN LÝ CHUNG (Đã có & chạy tốt)
@@ -29,19 +31,25 @@ router.get("/feedbacks", feedbackController.getAll);
 router.get("/feedbacks/:id", feedbackController.getOne);
 router.delete("/feedbacks/:id", feedbackController.remove);
 
+// --- SETTINGS ROUTES (/api/admin/settings) ---
+router.get("/settings", authRequired, roleRequired("admin"), settingsController.getSettings);
+router.get("/settings/preorder", authRequired, roleRequired("admin"), settingsController.getPreOrderSettings);
+router.get("/settings/:key", authRequired, roleRequired("admin"), settingsController.getSetting);
+router.put("/settings/:key", authRequired, roleRequired("admin"), settingsController.updateSetting);
+
 // --- PREORDER ROUTES (/api/admin/preorders) ---
-router.get("/preorders", authRequired, roleRequired("admin"), preorderController.getPreOrders);
-router.get("/customers/:userId/info", authRequired, roleRequired("admin"), preorderController.getCustomerInfo);
-router.patch("/preorders/:orderId/approve", authRequired, roleRequired("admin"), preorderController.approvePreOrder);
-router.patch("/preorders/:orderId/cancel", authRequired, roleRequired("admin"), preorderController.cancelPreOrder);
-router.post("/preorders/:orderId/deposit", authRequired, roleRequired("admin"), preorderController.recordDeposit);
-router.patch("/preorders/:orderId/items", authRequired, roleRequired("admin"), preorderController.modifyPreOrderItems);
-router.patch("/preorders/:orderId", authRequired, roleRequired("admin"), preorderController.updatePreOrder);
-router.post("/preorders/:orderId/notes", authRequired, roleRequired("admin"), preorderController.addAdminNote);
-router.delete("/preorders/:orderId/notes/:noteId", authRequired, roleRequired("admin"), preorderController.deleteAdminNote);
-router.patch("/preorders/:orderId/notes/:noteId", authRequired, roleRequired("admin"), preorderController.updateAdminNote);
+router.get("/preorders", authRequired, roleRequired("admin", "cashier"), preorderController.getPreOrders);
+router.get("/customers/:userId/info", authRequired, roleRequired("admin", "cashier"), preorderController.getCustomerInfo);
+router.patch("/preorders/:orderId/approve", authRequired, roleRequired("admin", "cashier"), checkPreOrderPermission, preorderController.approvePreOrder);
+router.patch("/preorders/:orderId/cancel", authRequired, roleRequired("admin", "cashier"), checkPreOrderPermission, preorderController.cancelPreOrder);
+router.post("/preorders/:orderId/deposit", authRequired, roleRequired("admin", "cashier"), checkPreOrderPermission, preorderController.recordDeposit);
+router.patch("/preorders/:orderId/items", authRequired, roleRequired("admin", "cashier"), checkPreOrderPermission, preorderController.modifyPreOrderItems);
+router.patch("/preorders/:orderId", authRequired, roleRequired("admin", "cashier"), checkPreOrderPermission, preorderController.updatePreOrder);
+router.post("/preorders/:orderId/notes", authRequired, roleRequired("admin", "cashier"), checkPreOrderPermission, preorderController.addAdminNote);
+router.delete("/preorders/:orderId/notes/:noteId", authRequired, roleRequired("admin", "cashier"), checkPreOrderPermission, preorderController.deleteAdminNote);
+router.patch("/preorders/:orderId/notes/:noteId", authRequired, roleRequired("admin", "cashier"), checkPreOrderPermission, preorderController.updateAdminNote);
 router.get("/preorders/export", authRequired, roleRequired("admin"), preorderController.exportPreOrders);
-router.post("/preorders/bulk-action", authRequired, roleRequired("admin"), preorderController.bulkActionPreOrders);
+router.post("/preorders/bulk-action", authRequired, roleRequired("admin", "cashier"), preorderController.bulkActionPreOrders);
 
 // =======================================================
 // NHÓM 2: CÁC ROUTE THỐNG KÊ & BÁO CÁO

@@ -1,6 +1,7 @@
 import { useEffect, useRef } from "react";
 import { toast } from "sonner";
 import useAdminWebSocket from "../../hooks/useAdminWebSocket";
+import { useAuth } from "../../context/AuthContext";
 
 const formatCurrency = (amount) => {
   if (!amount) return "0 ₫";
@@ -15,6 +16,9 @@ const formatCurrency = (amount) => {
  * This component should be placed in the admin layout to show notifications on all admin pages
  */
 export default function AdminPreOrderNotification() {
+  const { user } = useAuth();
+  const userRole = user?.role || 'admin';
+  
   // Track preorders that have already shown toast to avoid duplicates
   const shownToastRef = useRef(new Set());
 
@@ -26,7 +30,8 @@ export default function AdminPreOrderNotification() {
     if (!lastMessage) return;
 
     // Handle new preorder event
-    if (lastMessage.type === 'preorder:new' || lastMessage.type === 'preorder:needs_waiter_confirm') {
+    // Admin chỉ nhận đơn lớn, Cashier chỉ nhận đơn nhỏ (backend đã filter)
+    if (lastMessage.type === 'preorder:new') {
       const newPreorder = lastMessage.data;
       
       if (newPreorder && newPreorder._id) {

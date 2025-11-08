@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
+import { useSearchParams } from "react-router-dom";
 import { Card } from "../ui/admin/card";
 import { Input } from "../ui/admin/input";
 import {
@@ -14,6 +15,7 @@ import { Button } from "../ui/admin/button";
 import adminApi from "../../api/adminApi";
 import waiterApi from "../../api/waiterApi";
 import useAdminWebSocket from "../../hooks/useAdminWebSocket";
+import { useAuth } from "../../context/AuthContext";
 import { toast } from "react-toastify";
 
 const formatDate = (iso) => {
@@ -37,6 +39,14 @@ const formatCurrency = (amount) => {
 };
 
 export function PreOrderTable() {
+  const { user } = useAuth();
+  const userRole = user?.role || "admin";
+  const isCashier = userRole === "cashier";
+  const isAdmin = userRole === "admin";
+
+  // Read query params from URL
+  const [searchParams, setSearchParams] = useSearchParams();
+
   const [search, setSearch] = useState("");
   const [preorders, setPreorders] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -44,15 +54,29 @@ export function PreOrderTable() {
   const [customerInfo, setCustomerInfo] = useState(null);
   const [loadingCustomerInfo, setLoadingCustomerInfo] = useState(false);
   
-  // Advanced filters
-  const [waiterResponseStatus, setWaiterResponseStatus] = useState("");
-  const [fromDate, setFromDate] = useState("");
-  const [toDate, setToDate] = useState("");
-  const [minAmount, setMinAmount] = useState("");
-  const [maxAmount, setMaxAmount] = useState("");
-  const [sortBy, setSortBy] = useState("createdAt");
-  const [sortOrder, setSortOrder] = useState("desc");
+  // Advanced filters - initialize from URL params
+  const [waiterResponseStatus, setWaiterResponseStatus] = useState(searchParams.get("waiterResponseStatus") || "");
+  const [fromDate, setFromDate] = useState(searchParams.get("fromDate") || "");
+  const [toDate, setToDate] = useState(searchParams.get("toDate") || "");
+  const [minAmount, setMinAmount] = useState(searchParams.get("minAmount") || "");
+  const [maxAmount, setMaxAmount] = useState(searchParams.get("maxAmount") || "");
+  const [sortBy, setSortBy] = useState(searchParams.get("sortBy") || "createdAt");
+  const [sortOrder, setSortOrder] = useState(searchParams.get("sortOrder") || "desc");
   const [showFilters, setShowFilters] = useState(false);
+  const [filterBy, setFilterBy] = useState(searchParams.get("filterBy") || "createdAt");
+
+  // Sync state from URL params when URL changes (e.g., when navigating from dashboard)
+  useEffect(() => {
+    const urlWaiterStatus = searchParams.get("waiterResponseStatus") || "";
+    const urlFromDate = searchParams.get("fromDate") || "";
+    const urlToDate = searchParams.get("toDate") || "";
+    const urlFilterBy = searchParams.get("filterBy") || "createdAt";
+    
+    if (urlWaiterStatus !== waiterResponseStatus) setWaiterResponseStatus(urlWaiterStatus);
+    if (urlFromDate !== fromDate) setFromDate(urlFromDate);
+    if (urlToDate !== toDate) setToDate(urlToDate);
+    if (urlFilterBy !== filterBy) setFilterBy(urlFilterBy);
+  }, [searchParams]);
   
   // Approve/Cancel modals
   const [approveModalOpen, setApproveModalOpen] = useState(false);
@@ -133,6 +157,7 @@ export function PreOrderTable() {
         if (maxAmount) params.maxAmount = maxAmount;
         if (sortBy) params.sortBy = sortBy;
         if (sortOrder) params.sortOrder = sortOrder;
+        if (filterBy) params.filterBy = filterBy;
         
         const response = await adminApi.getPreOrders(params);
         const ordersData = response?.data || [];
@@ -146,7 +171,22 @@ export function PreOrderTable() {
     };
 
     fetchPreOrders();
-  }, [waiterResponseStatus, fromDate, toDate, minAmount, maxAmount, sortBy, sortOrder]);
+  }, [waiterResponseStatus, fromDate, toDate, minAmount, maxAmount, sortBy, sortOrder, filterBy]);
+
+  // Sync URL params when filters change
+  useEffect(() => {
+    const params = new URLSearchParams();
+    if (waiterResponseStatus) params.set("waiterResponseStatus", waiterResponseStatus);
+    if (fromDate) params.set("fromDate", fromDate);
+    if (toDate) params.set("toDate", toDate);
+    if (minAmount) params.set("minAmount", minAmount);
+    if (maxAmount) params.set("maxAmount", maxAmount);
+    if (sortBy && sortBy !== "createdAt") params.set("sortBy", sortBy);
+    if (sortOrder && sortOrder !== "desc") params.set("sortOrder", sortOrder);
+    if (filterBy && filterBy !== "createdAt") params.set("filterBy", filterBy);
+    
+    setSearchParams(params, { replace: true });
+  }, [waiterResponseStatus, fromDate, toDate, minAmount, maxAmount, sortBy, sortOrder, filterBy, setSearchParams]);
 
   // Listen for preorder updates via WebSocket to update the list
   // Note: Toast notifications are handled by AdminPreOrderNotification component
@@ -161,7 +201,16 @@ export function PreOrderTable() {
     const orderId = String(orderData._id);
 
     // Handle new preorder event
-    if (messageType === 'preorder:new' || messageType === 'preorder:needs_waiter_confirm') {
+    // Admin chỉ nhận đơn lớn, Cashier chỉ nhận đơn nhỏ (backend đã filter)
+    if (messageType === 'preorder:new') {
+        // Show toast notification
+        const customerName = orderData.userId?.name || "Khách hàng";
+        const orderTotal = formatCurrency(orderData.totalAmount || 0);
+        toast.info(`🆕 Đơn đặt trước mới từ ${customerName} - ${orderTotal}`, {
+          position: "top-right",
+          autoClose: 5000,
+        });
+        
         setPreorders((prevPreorders) => {
           // Check if preorder already exists (avoid duplicates)
           const exists = prevPreorders.some(
@@ -183,6 +232,13 @@ export function PreOrderTable() {
     }
     // Handle cancelled preorder - remove from list (vì status đã thành "cancelled", không còn là "preorder")
     else if (messageType === 'preorder:cancelled') {
+      // Show toast notification
+      const customerName = orderData.userId?.name || "Khách hàng";
+      toast.warning(`❌ Đơn đặt trước từ ${customerName} đã bị hủy`, {
+        position: "top-right",
+        autoClose: 3000,
+      });
+      
       setPreorders((prevPreorders) => {
         const filtered = prevPreorders.filter(
           (order) => String(order._id) !== orderId
@@ -200,6 +256,21 @@ export function PreOrderTable() {
       messageType === 'preorder:deposit_recorded' ||
       messageType === 'preorder:items_modified'
     ) {
+      // Show toast notifications for important events
+      const customerName = orderData.userId?.name || "Khách hàng";
+      if (messageType === 'preorder:approved') {
+        toast.success(`✅ Đơn đặt trước từ ${customerName} đã được duyệt`, {
+          position: "top-right",
+          autoClose: 3000,
+        });
+      } else if (messageType === 'preorder:deposit_recorded') {
+        const depositAmount = formatCurrency(orderData.totalDeposit || orderData.totalPaid || 0);
+        toast.success(`💰 Đã ghi nhận tiền cọc ${depositAmount} từ ${customerName}`, {
+          position: "top-right",
+          autoClose: 3000,
+        });
+      }
+      
       setPreorders((prevPreorders) => {
         const exists = prevPreorders.some(
           (order) => String(order._id) === orderId
@@ -281,7 +352,19 @@ export function PreOrderTable() {
 
   return (
     <div className="space-y-4">
-      <div className="text-2xl font-semibold">Đơn đặt trước</div>
+      <div className="flex items-center justify-between">
+        <div className="text-2xl font-semibold">Đơn đặt trước</div>
+        {isAdmin && (
+          <span className="px-3 py-1 bg-blue-100 text-blue-800 rounded-full text-sm font-medium">
+            Đơn lớn (Admin)
+          </span>
+        )}
+        {isCashier && (
+          <span className="px-3 py-1 bg-green-100 text-green-800 rounded-full text-sm font-medium">
+            Đơn nhỏ (Cashier)
+          </span>
+        )}
+      </div>
 
       <Card>
         {/* Search */}
@@ -303,6 +386,8 @@ export function PreOrderTable() {
               setMaxAmount("");
               setSortBy("createdAt");
               setSortOrder("desc");
+              setFilterBy("createdAt");
+              setSearchParams({}, { replace: true }); // Clear URL params
             }}
           >
             Xóa bộ lọc
@@ -1029,19 +1114,6 @@ export function PreOrderTable() {
                                   Hủy đơn
                                 </Button>
                               </>
-                            )}
-                            {(waiterResponseStatus === "approved" || order?.status === "confirmed") && (
-                              <Button
-                                variant="outline"
-                                onClick={() => {
-                                  setSelectedOrderForAction(order);
-                                  setDepositForm({ amount: "", paymentMethod: "cash", adminNotes: "" });
-                                  setDepositModalOpen(true);
-                                }}
-                                className="bg-blue-50 text-blue-700 hover:bg-blue-100"
-                              >
-                                Nhập tiền cọc
-                              </Button>
                             )}
                             <Button
                               variant="outline"

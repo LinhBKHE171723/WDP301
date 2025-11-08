@@ -130,6 +130,7 @@ function CashierApp() {
       <Route path="orderpayment" element={<AdminCashierOrderPaymentRoute />} />
       <Route path="unpaid" element={<AdminCashierUnpaidOrdersRoute />} />
       <Route path="tables" element={<AdminCashierTableManagementRoute />} />
+      <Route path="preorders" element={<PreOrderPage />} />
       <Route path="*" element={<Navigate to="dashboard" replace />} />
     </Routes>
   );

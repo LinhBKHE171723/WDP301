@@ -12,13 +12,17 @@ import {
   Minus,
   Printer,
   Grid3x3,
+  Calendar,
 } from "lucide-react"
+import { useNavigate } from "react-router-dom"
 import { toast } from "react-toastify"
 import "./CashierDashboard.css"
 import UnpaidOrdersList from "./Unpaid-orders-list"
 import TableManagement from "./table-management"
 import Client from "../../api/Client"
 import useCashierSocket from "../../hooks/useCashierSocket"
+import adminApi from "../../api/adminApi"
+import useAdminWebSocket from "../../hooks/useAdminWebSocket"
 
 /**
  * Props hỗ trợ cả phiên bản cũ và mới:
@@ -33,9 +37,19 @@ export default function CashierDashboard({
   onAddPettyCash,
   onPrintXReport,
 }) {
+  const navigate = useNavigate();
+  
   // ====== Điều hướng màn con (từ file mới) ======
   const [showPaymentHistory, setShowPaymentHistory] = useState(false)
   const [showTableManagement, setShowTableManagement] = useState(false)
+  
+  // ====== Preorders (đơn đặt trước) ======
+  const [pendingPreordersCount, setPendingPreordersCount] = useState(0) // Đơn đang chờ duyệt
+  const [todaysPreordersCount, setTodaysPreordersCount] = useState(0) // Đơn đã duyệt, scheduledTime hôm nay
+  const [loadingPreorders, setLoadingPreorders] = useState(true)
+  
+  // WebSocket để nhận thông báo preorder mới
+  const { lastMessage: preorderMessage } = useAdminWebSocket()
 
   // ====== Phiếu thu/chi (từ file mới) ======
   const [showPettyCashForm, setShowPettyCashForm] = useState(false)
@@ -159,6 +173,69 @@ export default function CashierDashboard({
   useEffect(() => {
     fetchUnpaidOrders()
   }, [fetchUnpaidOrders])
+
+  // Fetch số lượng preorders đang chờ và preorders hôm nay
+  const fetchPreordersCounts = useCallback(async () => {
+    try {
+      setLoadingPreorders(true)
+      
+      // 1. Fetch đơn đang chờ duyệt (pending)
+      const pendingResponse = await adminApi.getPreOrders({ waiterResponseStatus: "pending" })
+      const pendingOrders = Array.isArray(pendingResponse?.data) ? pendingResponse.data : []
+      setPendingPreordersCount(pendingOrders.length)
+      
+      // 2. Fetch đơn đã duyệt, scheduledTime trong hôm nay
+      const today = new Date()
+      today.setHours(0, 0, 0, 0)
+      const tomorrow = new Date(today)
+      tomorrow.setDate(tomorrow.getDate() + 1)
+      
+      const todaysResponse = await adminApi.getPreOrders({
+        waiterResponseStatus: "approved",
+        fromDate: today.toISOString(),
+        toDate: tomorrow.toISOString(),
+        filterBy: "scheduledTime" // Filter theo scheduledTime thay vì createdAt
+      })
+      const todaysOrders = Array.isArray(todaysResponse?.data) ? todaysResponse.data : []
+      
+      // Backend đã filter theo scheduledTime, nhưng vẫn lọc thêm để chắc chắn
+      const filteredTodaysOrders = todaysOrders.filter(order => {
+        if (!order.scheduledTime) return false
+        const scheduledDate = new Date(order.scheduledTime)
+        scheduledDate.setHours(0, 0, 0, 0)
+        return scheduledDate.getTime() === today.getTime()
+      })
+      
+      setTodaysPreordersCount(filteredTodaysOrders.length)
+      
+    } catch (error) {
+      console.error("Không thể tải số lượng đơn đặt trước:", error)
+      setPendingPreordersCount(0)
+      setTodaysPreordersCount(0)
+    } finally {
+      setLoadingPreorders(false)
+    }
+  }, [])
+
+  useEffect(() => {
+    fetchPreordersCounts()
+  }, [fetchPreordersCounts])
+
+  // Listen for new preorders via WebSocket
+  useEffect(() => {
+    if (!preorderMessage) return
+
+    const messageType = preorderMessage.type
+    console.log(`📨 CashierDashboard received WebSocket message: ${messageType}`, preorderMessage)
+
+    // Khi có preorder mới, hủy, duyệt, hoặc confirmed → refresh cả 2 counts
+    if (messageType === 'preorder:new' || messageType === 'preorder:cancelled' || 
+        messageType === 'preorder:approved' || messageType === 'order:confirmed') {
+      console.log(`🔄 Refreshing preorder counts due to ${messageType}`)
+      // Refresh counts
+      fetchPreordersCounts()
+    }
+  }, [preorderMessage, fetchPreordersCounts])
 
   useCashierSocket({
     onOrderPreparing: handleRealtimePreparing,
@@ -389,6 +466,11 @@ export default function CashierDashboard({
             <p className="dashboard-subtitle">Tổng quan ca làm việc</p>
           </div>
           <div style={{ display: "flex", gap: "0.75rem" }}>
+            {/* Nút mới - Đơn đặt trước */}
+            <button onClick={() => navigate("/admin/cashier/preorders")} className="button button-secondary">
+              <Calendar className="button-icon" />
+              Đơn đặt trước
+            </button>
             {/* Nút mới - Quản lý bàn */}
             <button onClick={() => setShowTableManagement(true)} className="button button-secondary">
               <Grid3x3 className="button-icon" />
@@ -491,6 +573,94 @@ export default function CashierDashboard({
           <div className="revenue-footer">
             <button className="button button-view-orders" onClick={() => setShowPaymentHistory(true)}>
               Xem lịch sử thanh toán
+            </button>
+          </div>
+        </div>
+
+        {/* Card 1: Đơn đặt trước đang chờ duyệt */}
+        <div 
+          className="revenue-card revenue-card-preorder-pending"
+          style={{ 
+            cursor: 'pointer',
+            transition: 'transform 0.2s, box-shadow 0.2s',
+          }}
+          onMouseEnter={(e) => {
+            e.currentTarget.style.transform = 'translateY(-2px)'
+            e.currentTarget.style.boxShadow = '0 4px 12px rgba(0,0,0,0.15)'
+          }}
+          onMouseLeave={(e) => {
+            e.currentTarget.style.transform = 'translateY(0)'
+            e.currentTarget.style.boxShadow = ''
+          }}
+          onClick={() => navigate("/admin/cashier/preorders?waiterResponseStatus=pending")}
+        >
+          <div className="revenue-card-header">
+            <div className="revenue-icon-wrapper" style={{ backgroundColor: 'rgba(59, 130, 246, 0.1)' }}>
+              <Calendar className="revenue-icon" style={{ color: '#3b82f6' }} />
+            </div>
+            <span className="revenue-label">Đơn đặt trước đang chờ</span>
+          </div>
+          <div className="revenue-amount" style={{ color: '#3b82f6', fontSize: '2rem', fontWeight: 'bold' }}>
+            {loadingPreorders ? '...' : pendingPreordersCount}
+          </div>
+          <div className="revenue-footer">
+            <button 
+              className="button button-view-orders" 
+              onClick={(e) => {
+                e.stopPropagation()
+                navigate("/admin/cashier/preorders?waiterResponseStatus=pending")
+              }}
+            >
+              Xem đơn chờ duyệt
+            </button>
+          </div>
+        </div>
+
+        {/* Card 2: Đơn đặt trước hôm nay (đã duyệt) */}
+        <div 
+          className="revenue-card revenue-card-preorder-today"
+          style={{ 
+            cursor: 'pointer',
+            transition: 'transform 0.2s, box-shadow 0.2s',
+          }}
+          onMouseEnter={(e) => {
+            e.currentTarget.style.transform = 'translateY(-2px)'
+            e.currentTarget.style.boxShadow = '0 4px 12px rgba(0,0,0,0.15)'
+          }}
+          onMouseLeave={(e) => {
+            e.currentTarget.style.transform = 'translateY(0)'
+            e.currentTarget.style.boxShadow = ''
+          }}
+          onClick={() => {
+            const today = new Date()
+            today.setHours(0, 0, 0, 0)
+            const tomorrow = new Date(today)
+            tomorrow.setDate(tomorrow.getDate() + 1)
+            navigate(`/admin/cashier/preorders?waiterResponseStatus=approved&fromDate=${today.toISOString()}&toDate=${tomorrow.toISOString()}&filterBy=scheduledTime`)
+          }}
+        >
+          <div className="revenue-card-header">
+            <div className="revenue-icon-wrapper" style={{ backgroundColor: 'rgba(251, 146, 60, 0.1)' }}>
+              <Clock className="revenue-icon" style={{ color: '#fb923c' }} />
+            </div>
+            <span className="revenue-label">Đơn đặt trước hôm nay</span>
+          </div>
+          <div className="revenue-amount" style={{ color: '#fb923c', fontSize: '2rem', fontWeight: 'bold' }}>
+            {loadingPreorders ? '...' : todaysPreordersCount}
+          </div>
+          <div className="revenue-footer">
+            <button 
+              className="button button-view-orders" 
+              onClick={(e) => {
+                e.stopPropagation()
+                const today = new Date()
+                today.setHours(0, 0, 0, 0)
+                const tomorrow = new Date(today)
+                tomorrow.setDate(tomorrow.getDate() + 1)
+                navigate(`/admin/cashier/preorders?waiterResponseStatus=approved&fromDate=${today.toISOString()}&toDate=${tomorrow.toISOString()}&filterBy=scheduledTime`)
+              }}
+            >
+              Xem đơn hôm nay
             </button>
           </div>
         </div>
