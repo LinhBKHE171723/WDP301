@@ -340,6 +340,26 @@ class WebSocketService {
   }
 
   // ==================================================
+  // 📢 Gửi broadcast cho tất cả admin
+  // ==================================================
+  broadcastToAllAdmins(eventType, data) {
+    const message = {
+      type: eventType,
+      data,
+      timestamp: new Date().toISOString()
+    };
+
+    let sentCount = 0;
+    this.wss.clients.forEach(ws => {
+      if (ws.readyState === WebSocket.OPEN && ws.userRole === 'admin') {
+        ws.send(JSON.stringify(message));
+        sentCount++;
+      }
+    });
+    console.log(`📡 Broadcasted ${eventType} to ${sentCount} admin(s)`, data);
+  }
+
+  // ==================================================
   // 📢 Gửi thông báo cập nhật bàn cho waiter (khi bàn được giải phóng/đổi trạng thái)
   // ==================================================
   broadcastTableUpdate(tableId, tableData) {

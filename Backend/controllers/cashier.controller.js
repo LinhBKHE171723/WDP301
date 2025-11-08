@@ -72,6 +72,8 @@ function formatOrder(order) {
     tableNumber,
     items,
     totalAmount: order.totalAmount ?? subtotal,
+    remainingAmount: order.remainingAmount ?? (order.totalAmount ?? subtotal), // Số tiền còn lại cần thanh toán
+    totalPaid: order.totalPaid ?? 0, // Tổng tiền đã thanh toán (bao gồm tiền cọc nếu có)
     orderTime: order.createdAt,
     waitTime: calculateWaitTime(order.createdAt),
     status: order.status,
@@ -88,11 +90,22 @@ exports.getPreparingOrders = async (_req, res) => {
       .sort({ createdAt: 1 })
       .populate("tableId", "tableNumber");
 
+    // Import payment helpers
+    const { calculateRemainingAmount, calculateTotalPaid, ensurePaymentIdsSync } = require("../utils/paymentHelpers");
+
     // Populate orderItems một cách rõ ràng và đảm bảo có đầy đủ field
     const OrderItem = require("../models/OrderItem");
     
     for (let i = 0; i < orders.length; i++) {
       const order = orders[i];
+      
+      // Đảm bảo paymentIds được sync
+      await ensurePaymentIdsSync(order);
+      
+      // Tính remainingAmount cho order này
+      const totalPaid = await calculateTotalPaid(order._id);
+      const remainingAmount = Math.max(0, order.totalAmount - totalPaid);
+      
       if (order.orderItems && order.orderItems.length > 0) {
         // Lấy OrderItem IDs (có thể là ObjectIds hoặc strings)
         const orderItemIds = order.orderItems.map(item => {
@@ -120,18 +133,24 @@ exports.getPreparingOrders = async (_req, res) => {
           // Convert order sang plain object và gán orderItems
           const orderPlain = order.toObject ? order.toObject({ getters: true }) : { ...order };
           orderPlain.orderItems = groupedItems;
+          // Thêm remainingAmount và totalPaid
+          orderPlain.remainingAmount = remainingAmount;
+          orderPlain.totalPaid = totalPaid;
           // Thay thế order trong array bằng plain object
           orders[i] = orderPlain;
         } else {
           const orderPlain = order.toObject ? order.toObject({ getters: true }) : { ...order };
           orderPlain.orderItems = [];
+          orderPlain.remainingAmount = remainingAmount;
+          orderPlain.totalPaid = totalPaid;
           orders[i] = orderPlain;
         }
       } else {
         // Convert order sang plain object ngay cả khi không có orderItems
-        if (order.toObject) {
-          orders[i] = order.toObject({ getters: true });
-        }
+        const orderPlain = order.toObject ? order.toObject({ getters: true }) : { ...order };
+        orderPlain.remainingAmount = remainingAmount;
+        orderPlain.totalPaid = totalPaid;
+        orders[i] = orderPlain;
       }
     }
 
@@ -172,30 +191,35 @@ exports.completeOrderPayment = async (req, res) => {
       });
     }
 
-    const amount = order.totalAmount ?? (order.orderItems || []).reduce(
-      (sum, item) => sum + (item.price || 0) * (item.quantity || 0),
-      0
-    );
+    // Tính số tiền còn lại cần thanh toán (có thể đã có tiền cọc)
+    const { calculateRemainingAmount, calculateTotalPaid, addPaymentToOrder, ensurePaymentIdsSync } = require("../utils/paymentHelpers");
+    
+    // Đảm bảo paymentIds được sync
+    await ensurePaymentIdsSync(order);
+    
+    // Tính remainingAmount (nếu có tiền cọc thì chỉ thanh toán số còn lại)
+    const remainingAmount = await calculateRemainingAmount(order._id, order.totalAmount);
+    const finalAmount = remainingAmount > 0 ? remainingAmount : order.totalAmount;
 
-    order.status = "paid";
-    await order.save();
+    // Tạo Payment mới cho số tiền còn lại
+    const payment = new Payment({
+      orderId: order._id,
+      paymentMethod,
+      status: "paid",
+      amountPaid: finalAmount,
+      payTime: new Date(),
+      cashierId: req.user.id,
+      isDeposit: false, // Đánh dấu đây là thanh toán cuối (không phải cọc)
+    });
+    await payment.save();
 
-    const payment = await Payment.findOneAndUpdate(
-      { orderId: order._id },
-      {
-        $set: {
-          paymentMethod,
-          status: "paid",
-          amountPaid: amount,
-          payTime: new Date(),
-          cashierId: req.user.id,
-        },
-      },
-      { new: true, upsert: true, setDefaultsOnInsert: true }
-    );
+    // Thêm payment vào order.paymentIds
+    await addPaymentToOrder(order._id, payment);
 
-    if (!order.paymentId || order.paymentId.toString() !== payment._id.toString()) {
-      order.paymentId = payment._id;
+    // Kiểm tra đã thanh toán đủ chưa
+    const totalPaid = await calculateTotalPaid(order._id);
+    if (totalPaid >= order.totalAmount) {
+      order.status = "paid";
       await order.save();
     }
 
@@ -206,6 +230,14 @@ exports.completeOrderPayment = async (req, res) => {
         select: "itemName itemId quantity price note status",
         populate: { path: "itemId", select: "name" },
       });
+
+    // Tính lại remainingAmount và totalPaid sau khi thanh toán
+    const newTotalPaid = await calculateTotalPaid(order._id);
+    const newRemainingAmount = Math.max(0, order.totalAmount - newTotalPaid);
+    
+    // Cập nhật vào populatedOrder để formatOrder có thể sử dụng
+    populatedOrder.remainingAmount = newRemainingAmount;
+    populatedOrder.totalPaid = newTotalPaid;
 
     // Populate orderItemDetails và group orderItems
     if (populatedOrder.orderItems && populatedOrder.orderItems.length > 0) {
@@ -224,7 +256,9 @@ exports.completeOrderPayment = async (req, res) => {
       message: "Thanh toán đơn hàng thành công",
       data: {
         orderId: order._id,
-        amountPaid: amount,
+        amountPaid: finalAmount,
+        remainingAmount: remainingAmount,
+        totalAmount: order.totalAmount,
         paymentMethod,
       },
     });
@@ -236,6 +270,3 @@ exports.completeOrderPayment = async (req, res) => {
     });
   }
 };
-
-module.exports.formatOrder = formatOrder;
-

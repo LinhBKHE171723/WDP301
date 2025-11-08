@@ -48,8 +48,18 @@ async function classifyCustomer(userId, options = {}) {
   const firstOrder = allOrders[0];
   const lastOrder = allOrders[allOrders.length - 1];
   const daysDiff = (lastOrder.createdAt - firstOrder.createdAt) / (1000 * 60 * 60 * 24);
-  const monthsDiff = daysDiff / 30;
-  const visitFrequency = monthsDiff > 0 ? orderCount / monthsDiff : 0;
+  
+  let visitFrequency = 0;
+  if (daysDiff <= 0 || daysDiff < 30) {
+    // Nếu khoảng thời gian quá ngắn (< 30 ngày) hoặc chỉ có 1 đơn (daysDiff = 0)
+    // Tính frequency như thể đã dùng ít nhất 1 tháng
+    // Điều này tránh tần suất quá cao khi khách hàng mới chỉ có vài đơn trong thời gian ngắn
+    visitFrequency = orderCount / 1; // Tính như thể đã trải qua 1 tháng
+  } else {
+    // Nếu đã có đủ thời gian (>= 30 ngày), tính frequency bình thường
+    const monthsDiff = daysDiff / 30;
+    visitFrequency = monthsDiff > 0 ? orderCount / monthsDiff : 0;
+  }
   
   // 4. Lấy feedback
   const feedbacks = await Feedback.find({ userId: userId }).sort({ createdAt: -1 });

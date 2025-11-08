@@ -24,6 +24,7 @@ import CustomerReportPage from "../pages/admin/CustomerReportPage";
 import PerformancePage from "../pages/admin/PerformancePage";
 import PerformanceDetailPage from "../pages/admin/PerformancePageDetail";
 import PreOrderPage from "../pages/admin/PreOrderPage";
+import AdminPreOrderNotification from "../components/admin/AdminPreOrderNotification";
 import CashierShiftManager from "../components/cashier/CashierShiftManager";
 import CashierDashboard from "../components/cashier/CashierDashboard";
 import OrderPayment from "../components/cashier/order-payment";
@@ -129,6 +130,7 @@ function CashierApp() {
       <Route path="orderpayment" element={<AdminCashierOrderPaymentRoute />} />
       <Route path="unpaid" element={<AdminCashierUnpaidOrdersRoute />} />
       <Route path="tables" element={<AdminCashierTableManagementRoute />} />
+      <Route path="preorders" element={<PreOrderPage />} />
       <Route path="*" element={<Navigate to="dashboard" replace />} />
     </Routes>
   );
@@ -209,6 +211,7 @@ export default function AppRouter() {
             path="/admin/*"
             element={
               <div className="min-h-screen">
+                <AdminPreOrderNotification />
                 <div className="flex">
                   <Sidebar />
                   <main className="flex-1 p-6 space-y-6 ml-64">

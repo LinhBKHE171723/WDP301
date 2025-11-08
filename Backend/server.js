@@ -3,6 +3,7 @@ const http = require("http");
 const app = require("./app");
 const webSocketService = require("./services/websocket.service");
 const { checkAndReassignStaleItems } = require("./utils/staleItemsChecker");
+const { checkUpcomingPreOrders } = require("./utils/preorderReminder");
 
 // Load .env file
 dotenv.config();
@@ -40,5 +41,21 @@ server.listen(PORT, HOST, () => {
     setInterval(() => {
       checkAndReassignStaleItems(webSocketService, STALE_ITEM_THRESHOLD_MINUTES);
     }, STALE_CHECK_INTERVAL_MS);
+  }, 5000); // Wait 5 seconds for MongoDB connection
+
+  // Pre-order reminder configuration
+  const PREORDER_REMINDER_MINUTES = 30; // Remind 30 minutes before scheduled time
+  const PREORDER_CHECK_INTERVAL_MS = 5 * 60 * 1000; // Check every 5 minutes
+  
+  setTimeout(() => {
+    console.log(`⏰ Starting pre-order reminder checker (reminder: ${PREORDER_REMINDER_MINUTES} minutes before, check interval: ${PREORDER_CHECK_INTERVAL_MS / 1000} seconds)`);
+    
+    // Run immediately once, then schedule recurring checks
+    checkUpcomingPreOrders(webSocketService, PREORDER_REMINDER_MINUTES);
+    
+    // Schedule recurring checks
+    setInterval(() => {
+      checkUpcomingPreOrders(webSocketService, PREORDER_REMINDER_MINUTES);
+    }, PREORDER_CHECK_INTERVAL_MS);
   }, 5000); // Wait 5 seconds for MongoDB connection
 });

@@ -51,9 +51,14 @@ export function DialogTrigger({ asChild = false, children }) {
 }
 
 export function DialogContent({ className = "", children }) {
+  // Default to max-w-lg, but allow override via className prop
+  // If className contains max-w, use it; otherwise use default max-w-lg
+  const hasMaxW = className && /\bmax-w-/.test(className);
+  const defaultMaxW = hasMaxW ? "" : "max-w-lg";
+  
   return (
     <div
-      className={`w-full max-w-lg rounded-xl bg-white p-6 shadow-xl ${className}`}
+      className={`w-full ${defaultMaxW} rounded-xl bg-white p-6 shadow-xl ${className}`}
       onClick={(e) => e.stopPropagation()}
     >
       {children}
