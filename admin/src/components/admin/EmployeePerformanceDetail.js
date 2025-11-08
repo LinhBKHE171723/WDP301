@@ -1,121 +1,220 @@
 import React, { useEffect, useState } from "react";
-import { useParams } from "react-router-dom";
+import axios from "axios";
+import { Loader2, CalendarDays } from "lucide-react";
 
-export default function ShiftDetail({  }) {
-  const [data, setData] = useState([]);
+export default function ShiftDetail({ userId }) {
+  const today = new Date();
+  const [month, setMonth] = useState(today.getMonth() + 1);
+  const [year, setYear] = useState(today.getFullYear());
+  const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
 
-  // Phân trang FE
-  const [currentPage, setCurrentPage] = useState(1);
-  const itemsPerPage = 5; // Số bản ghi mỗi trang
-const { userId } = useParams();
+  // Hàm tạo from/to theo tháng-năm
+  const getRange = (month, year) => {
+    const from = new Date(year, month - 1, 1);
+    const to = new Date(year, month, 0); // ngày cuối tháng
+    return {
+      from: from.toISOString().split("T")[0],
+      to: to.toISOString().split("T")[0],
+    };
+  };
 
+  // Gọi API
   useEffect(() => {
-    const fetchShifts = async () => {
+    const fetchData = async () => {
+      setLoading(true);
+      const { from, to } = getRange(month, year);
       try {
-        const res = await fetch(`http://localhost:5000/api/admin/performance/shifts/${userId}`);
-        const json = await res.json();
-        if (json.success && Array.isArray(json.data)) {
-          setData(json.data);
-        } else {
-          throw new Error(json.message || "Không có dữ liệu");
-        }
+        const res = await axios.get(
+          `http://localhost:5000/api/admin/performance/shifts/${userId}?from=${from}&to=${to}`
+        );
+        if (res.data.success) setData(res.data.data);
+        else throw new Error(res.data.message);
       } catch (err) {
         setError(err.message);
       } finally {
         setLoading(false);
       }
     };
-    if (userId) fetchShifts();
-  }, [userId]);
+    fetchData();
+  }, [userId, month, year]);
 
-  if (loading) return <p className="text-center mt-10 text-gray-600">⏳ Đang tải dữ liệu...</p>;
-  if (error) return <p className="text-center text-red-600">Lỗi: {error}</p>;
-  if (data.length === 0) return <p className="text-center text-gray-500">Không có ca làm việc nào.</p>;
+  // loading & error
+  if (loading)
+    return (
+      <div className="flex items-center justify-center py-10 text-gray-600">
+        <Loader2 className="animate-spin mr-2" /> Đang tải dữ liệu...
+      </div>
+    );
 
-  const totalPages = Math.ceil(data.length / itemsPerPage);
-  const startIndex = (currentPage - 1) * itemsPerPage;
-  const currentData = data.slice(startIndex, startIndex + itemsPerPage);
+  if (error)
+    return (
+      <div className="text-red-500 text-center py-10">
+        ❌ Lỗi tải dữ liệu: {error}
+      </div>
+    );
 
-  const formatDate = (iso) => new Date(iso).toLocaleDateString("vi-VN");
-  const formatTime = (iso) => new Date(iso).toLocaleTimeString("vi-VN", { hour: "2-digit", minute: "2-digit" });
+  if (!data)
+    return (
+      <div className="text-gray-500 text-center py-10">
+        Không có dữ liệu để hiển thị
+      </div>
+    );
 
+  // ====== Tính toán hiển thị =======
+  const totalHours = (data.totalWorkedMinutes / 60).toFixed(1);
+  const validShifts = data.totalShifts - data.absentCount;
+  const onTimeCount =
+    validShifts -
+    data.shifts.filter((s) => s.status === "late" || s.status === "early_leave")
+      .length;
+  const onTimeRate =
+    data.totalShifts > 0
+      ? ((onTimeCount / data.totalShifts) * 100).toFixed(1)
+      : 0;
+
+  // ====== Giao diện =======
   return (
-    <div className="p-6 bg-gray-50 min-h-screen">
-      <h2 className="text-2xl font-bold mb-4 text-gray-800"> Danh sách ca làm việc của </h2>
+    <div className="p-6 bg-white rounded-2xl shadow-md">
+      <div className="flex items-center justify-between mb-4">
+        <h2 className="text-2xl font-semibold flex items-center">
+          <CalendarDays className="w-6 h-6 mr-2 text-indigo-600" />
+          Thống kê tháng {month}/{year}
+        </h2>
 
-      <div className="overflow-x-auto bg-white rounded-lg shadow-lg">
-        <table className="min-w-full text-sm text-gray-700 border">
-          <thead className="bg-gray-100 text-gray-600 uppercase text-xs font-semibold">
-            <tr>
-              <th className="px-4 py-3 text-left">Ngày</th>
-              <th className="px-4 py-3 text-left">Giờ bắt đầu</th>
-              <th className="px-4 py-3 text-left">Giờ kết thúc</th>
-              <th className="px-4 py-3 text-left">Tổng thời gian</th>
-              <th className="px-4 py-3 text-left">Trạng thái</th>
+        {/* Bộ chọn tháng + năm */}
+        <div className="flex gap-2">
+          <select
+            value={month}
+            onChange={(e) => setMonth(Number(e.target.value))}
+            className="border rounded-lg px-3 py-1 text-sm"
+          >
+            {Array.from({ length: 12 }, (_, i) => i + 1).map((m) => (
+              <option key={m} value={m}>
+                Tháng {m}
+              </option>
+            ))}
+          </select>
+
+          <select
+            value={year}
+            onChange={(e) => setYear(Number(e.target.value))}
+            className="border rounded-lg px-3 py-1 text-sm"
+          >
+            {Array.from({ length: 5 }, (_, i) => today.getFullYear() - i).map(
+              (y) => (
+                <option key={y} value={y}>
+                  Năm {y}
+                </option>
+              )
+            )}
+          </select>
+        </div>
+      </div>
+
+      {/* Tổng quan tháng */}
+      <div className="grid grid-cols-2 md:grid-cols-3 gap-4 mb-6">
+        <Stat label="Tổng ca" value={data.totalShifts} />
+        <Stat label="Giờ làm" value={`${totalHours}h`} />
+        <Stat label="Đi trễ" value={`${data.totalLate} phút`} />
+        <Stat label="Về sớm" value={`${data.totalEarly} phút`} />
+        <Stat label="Nghỉ" value={`${data.absentCount} buổi`} />
+        <Stat label="Tỉ lệ đúng giờ" value={`${onTimeRate}%`} />
+      </div>
+
+      {/* Bảng chi tiết */}
+      <div className="overflow-x-auto border-t pt-4">
+        <table className="min-w-full border-collapse text-sm">
+          <thead>
+            <tr className="bg-gray-100 text-gray-700 uppercase text-xs">
+              <th className="py-2 px-3 text-left">Ngày</th>
+              <th className="py-2 px-3 text-left">Ca làm</th>
+              <th className="py-2 px-3 text-left">Giờ check-in</th>
+              <th className="py-2 px-3 text-left">Giờ check-out</th>
+              <th className="py-2 px-3 text-center">Trễ</th>
+              <th className="py-2 px-3 text-center">Sớm</th>
+              <th className="py-2 px-3 text-center">Trạng thái</th>
+              <th className="py-2 px-3 text-left">Ghi chú</th>
             </tr>
           </thead>
           <tbody>
-            {currentData.map((shift) => (
-              <tr key={shift._id} className="border-t hover:bg-gray-50 transition">
-                <td className="px-4 py-3">{formatDate(shift.date)}</td>
-                <td className="px-4 py-3">{formatTime(shift.startTime)}</td>
-                <td className="px-4 py-3">{formatTime(shift.endTime)}</td>
-<td className="px-4 py-3">
-  {shift.startTime && shift.endTime
-    ? (() => {
-        const start = new Date(shift.startTime);
-        const end = new Date(shift.endTime);
-        const diffMs = end - start;
-        const diffMinutes = Math.floor(diffMs / 1000 / 60);
-        const hours = Math.floor(diffMinutes / 60);
-        const minutes = diffMinutes % 60;
-        return `${hours}h ${minutes}p`;
-      })()
-    : "Chưa hoàn thành"}
-</td>
-                <td className="px-4 py-3">
-                  <span
-                    className={`px-2 py-1 rounded-full text-xs font-semibold ${
-                      shift.status === "checked_out"
-                        ? "bg-green-100 text-green-700"
-                        : shift.status === "checked_in"
-                        ? "bg-blue-100 text-blue-700"
-                        : "bg-gray-100 text-gray-600"
-                    }`}
-                  >
-                    {shift.status}
-                  </span>
+            {data.shifts.map((shift, idx) => (
+              <tr
+                key={idx}
+                className={`border-b ${
+                  idx % 2 === 0 ? "bg-white" : "bg-gray-50"
+                }`}
+              >
+                <td className="py-2 px-3">
+                  {new Date(shift.date).toLocaleDateString("vi-VN")}
                 </td>
+                <td className="py-2 px-3">{shift.workShiftId?.name}</td>
+                <td className="py-2 px-3">
+                  {shift.startTime
+                    ? new Date(shift.startTime).toLocaleTimeString("vi-VN", {
+                        hour: "2-digit",
+                        minute: "2-digit",
+                      })
+                    : "--"}
+                </td>
+                <td className="py-2 px-3">
+                  {shift.endTime
+                    ? new Date(shift.endTime).toLocaleTimeString("vi-VN", {
+                        hour: "2-digit",
+                        minute: "2-digit",
+                      })
+                    : "--"}
+                </td>
+                <td className="py-2 px-3 text-center">
+                  {shift.lateMinutes || 0}
+                </td>
+                <td className="py-2 px-3 text-center">
+                  {shift.earlyLeaveMinutes || 0}
+                </td>
+                <td className="py-2 px-3 text-center">
+                  <StatusBadge status={shift.status} />
+                </td>
+                <td className="py-2 px-3">{shift.note || "--"}</td>
               </tr>
             ))}
           </tbody>
         </table>
-
-        {/* Pagination Controls */}
-        <div className="flex justify-between items-center px-4 py-3 border-t bg-gray-50">
-          <button
-            onClick={() => setCurrentPage((p) => Math.max(p - 1, 1))}
-            disabled={currentPage === 1}
-            className="px-3 py-1 bg-gray-200 text-gray-700 rounded-lg disabled:opacity-50 hover:bg-gray-300 transition"
-          >
-            ← Trang trước
-          </button>
-
-          <span className="text-sm text-gray-600">
-            Trang {currentPage}/{totalPages}
-          </span>
-
-          <button
-            onClick={() => setCurrentPage((p) => Math.min(p + 1, totalPages))}
-            disabled={currentPage === totalPages}
-            className="px-3 py-1 bg-gray-200 text-gray-700 rounded-lg disabled:opacity-50 hover:bg-gray-300 transition"
-          >
-            Trang sau →
-          </button>
-        </div>
       </div>
     </div>
   );
 }
+
+/* Components phụ */
+const Stat = ({ label, value }) => (
+  <div className="bg-indigo-50 border border-indigo-100 rounded-xl p-3 text-center shadow-sm">
+    <div className="text-indigo-600 text-sm">{label}</div>
+    <div className="font-semibold text-lg">{value}</div>
+  </div>
+);
+
+const StatusBadge = ({ status }) => {
+  const colorMap = {
+    checked_out: "bg-green-100 text-green-700",
+    checked_in: "bg-blue-100 text-blue-700",
+    late: "bg-yellow-100 text-yellow-700",
+    early_leave: "bg-orange-100 text-orange-700",
+    absent: "bg-red-100 text-red-700",
+    pending: "bg-gray-100 text-gray-600",
+  };
+  const textMap = {
+    checked_out: "Hoàn thành",
+    checked_in: "Đang làm",
+    late: "Đi trễ",
+    early_leave: "Về sớm",
+    absent: "Vắng",
+    pending: "Chưa điểm danh",
+  };
+  return (
+    <span
+      className={`px-3 py-1 rounded-full text-xs font-medium ${colorMap[status]}`}
+    >
+      {textMap[status] || status}
+    </span>
+  );
+};
