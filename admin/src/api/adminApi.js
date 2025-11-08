@@ -45,6 +45,14 @@ const adminApi = {
       : value;
     return Client.put(`/admin/settings/${key}`, { value: payloadValue, description, category });
   },
+  // Work Shift APIs
+  getWorkShifts: () => Client.get("/admin/work-shifts"),
+  getWorkShift: (id) => Client.get(`/admin/work-shifts/${id}`),
+  createWorkShift: (data) => Client.post("/admin/work-shifts", data),
+  updateWorkShift: (id, data) => Client.put(`/admin/work-shifts/${id}`, data),
+  deleteWorkShift: (id) => Client.delete(`/admin/work-shifts/${id}`),
+  // Get employees list for assigning to shifts (lấy tất cả, không phân trang)
+  getUsers: (params) => Client.get("/admin/users", { params: { ...params, limit: 1000 } }),
 };
 
 export default adminApi;
