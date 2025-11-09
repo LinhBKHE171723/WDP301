@@ -6,27 +6,20 @@
 const Order = require("../../models/Order");
 const OrderItem = require("../../models/OrderItem");
 const User = require("../../models/User");
-const Shift = require("../../models/Shift"); // Model chấm công/ca làm việc
-const Feedback = require("../../models/Feedback"); // Model feedback
+const Shift = require("../../models/Shift"); 
+const Feedback = require("../../models/Feedback"); 
 const mongoose = require("mongoose");
 
-// ===== HÀM HELPER CHUNG =====
 
-/**
- * Chuẩn hóa đầu vào thời gian (từ ngày, đến ngày).
- * @param {string} from - Ngày bắt đầu (chuỗi ISO hoặc Date)
- * @param {string} to - Ngày kết thúc (chuỗi ISO hoặc Date)
- * @returns {{fromDate: Date, toDate: Date}}
- */
 function normalizeTimeInputs(from, to) {
   const now = new Date();
   let toDate = to ? new Date(to) : now;
-  // Đặt thời gian về cuối ngày để bao gồm tất cả bản ghi trong ngày
+  // Đặt thời gian về cuối ngày 
   toDate.setHours(23, 59, 59, 999);
 
   let fromDate = from
     ? new Date(from)
-    : new Date(new Date().setDate(now.getDate() - 30)); // Mặc định là 30 ngày trước
+    : new Date(new Date().setDate(now.getDate() - 30)); 
   // Đặt thời gian về đầu ngày
   fromDate.setHours(0, 0, 0, 0);
 
@@ -36,18 +29,15 @@ function normalizeTimeInputs(from, to) {
 exports.getWaitersPerformance = async ({ from, to }) => {
   const { fromDate, toDate } = normalizeTimeInputs(from, to);
 
-  // B1: Lấy danh sách tất cả nhân viên phục vụ (chỉ loại bỏ tài khoản bị banned)
   const waiters = await User.find({ role: "waiter", accountStatus: "active" }).select(
     "name email status accountStatus"
   );
 
-  // B2: Tính toán hiệu suất và chuyên cần cho từng người
   const OrderItem = require("../../models/OrderItem");
   const Payment = require("../../models/Payment");
   
   const performanceData = await Promise.all(
     waiters.map(async (waiter) => {
-      // Cách 1: Filter theo Payment.payTime (chính xác nhất - thời gian thanh toán thực tế)
       const paymentsInRange = await Payment.find({
         status: 'paid',
         payTime: { $gte: fromDate, $lte: toDate },
@@ -55,35 +45,31 @@ exports.getWaitersPerformance = async ({ from, to }) => {
 
       const orderIdsFromPayments = paymentsInRange.map(p => p.orderId).filter(id => id != null);
 
-      // Cách 2: Backup - Nếu không có payTime, filter theo Order.updatedAt khi status = 'paid'
-      // Lấy các orders có status = 'paid' và updatedAt trong khoảng thời gian
+ 
       const paidOrdersByUpdateTime = await Order.find({
         status: 'paid',
         updatedAt: { $gte: fromDate, $lte: toDate },
-        _id: { $nin: orderIdsFromPayments }, // Loại bỏ những orders đã có trong payments
+        _id: { $nin: orderIdsFromPayments }, 
       }).select('_id');
 
-      // Gộp orderIds từ cả 2 nguồn
       const allPaidOrderIds = [
         ...orderIdsFromPayments,
         ...paidOrdersByUpdateTime.map(o => o._id)
       ];
 
-      // Tìm tất cả OrderItem mà waiter đã phục vụ (status = "served") trong các orders đã thanh toán
       const servedOrderItems = await OrderItem.find({
         servedBy: waiter._id,
         status: "served",
         orderId: { $in: allPaidOrderIds }
       }).select("orderId");
 
-      // Tìm comboItems mà waiter đã phục vụ
       const servedComboOrderItems = await OrderItem.find({
         "comboItems.servedBy": waiter._id,
         "comboItems.status": "served",
         orderId: { $in: allPaidOrderIds }
       }).select("orderId");
 
-      // Lấy danh sách orderIds unique mà waiter đã tham gia phục vụ
+     
       const waiterOrderIds = [
         ...new Set([
           ...servedOrderItems.map(item => item.orderId.toString()),
@@ -91,7 +77,6 @@ exports.getWaitersPerformance = async ({ from, to }) => {
         ])
       ].map(id => new mongoose.Types.ObjectId(id));
 
-      // Tính hiệu suất dựa trên các orders mà waiter đã phục vụ ít nhất 1 món
       const orders = await Order.find({
         _id: { $in: waiterOrderIds },
         status: "paid",
@@ -112,15 +97,18 @@ exports.getWaitersPerformance = async ({ from, to }) => {
       // Tính tổng giờ làm việc (từ các shift đã checkout)
       const completedShifts = shifts.filter(s => s.status === 'checked_out');
       const totalHours = completedShifts.reduce((sum, shift) => {
-        // duration tính bằng phút, chuyển sang giờ
-        return sum + (shift.duration || 0) / 60;
+        const workedMinutes = shift.totalWorkedMinutes 
+    ? shift.totalWorkedMinutes 
+    : (shift.startTime && shift.endTime
+        ? Math.max(0, (new Date(shift.endTime) - new Date(shift.startTime)) / (1000 * 60))
+        : 0);
+
+  return sum + workedMinutes / 60;
       }, 0);
       
-      // (Giả sử bạn có logic để xác định đi muộn)
       const lateCount = shifts.filter(s => s.status === 'checked_in' /* && s.isLate */).length; 
       const daysWorked = shifts.length;
 
-      // Lấy feedback có waiterRating từ các Order mà waiter đã phục vụ
       let averageRating = null;
       let totalRatings = 0;
       let goodRatingRate = null;
@@ -145,9 +133,9 @@ exports.getWaitersPerformance = async ({ from, to }) => {
       return {
         employee: waiter,
         performance: {
-          totalRevenue, // Giữ lại để tương thích, sẽ bỏ sau
+          totalRevenue, 
           orderCount,
-          averageOrderValue: orderCount > 0 ? totalRevenue / orderCount : 0, // Giữ lại để tương thích
+          averageOrderValue: orderCount > 0 ? totalRevenue / orderCount : 0, 
           itemsServedCount,
           ordersPerHour: totalHours > 0 ? orderCount / totalHours : 0,
           itemsPerHour: totalHours > 0 ? itemsServedCount / totalHours : 0,

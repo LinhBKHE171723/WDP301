@@ -28,6 +28,8 @@ const seedDatabase = async () => {
       Payment.deleteMany(),
       Feedback.deleteMany(),
       PurchaseOrder.deleteMany(),
+      Shift.deleteMany(),
+      WorkShift.deleteMany(),
     ]);
     console.log("🧹 Đã xoá toàn bộ dữ liệu cũ.");
 
@@ -387,7 +389,7 @@ const seedDatabase = async () => {
       shifts.push(...cashierShifts);
     }
 
-    await Shift.insertMany(shifts);
+    await Shift.create(shifts);
     console.log(`✅ Đã tạo ${shifts.length} shifts cho nhân viên.`);
 
     // 3️⃣ Nguyên liệu

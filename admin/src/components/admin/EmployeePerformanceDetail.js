@@ -10,17 +10,16 @@ export default function ShiftDetail({ userId }) {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
 
-  // Hàm tạo from/to theo tháng-năm
   const getRange = (month, year) => {
     const from = new Date(year, month - 1, 1);
-    const to = new Date(year, month, 0); // ngày cuối tháng
+    const to = new Date(year, month, 0); 
     return {
       from: from.toISOString().split("T")[0],
       to: to.toISOString().split("T")[0],
     };
   };
 
-  // Gọi API
+  
   useEffect(() => {
     const fetchData = async () => {
       setLoading(true);
@@ -40,7 +39,7 @@ export default function ShiftDetail({ userId }) {
     fetchData();
   }, [userId, month, year]);
 
-  // loading & error
+
   if (loading)
     return (
       <div className="flex items-center justify-center py-10 text-gray-600">
@@ -62,7 +61,6 @@ export default function ShiftDetail({ userId }) {
       </div>
     );
 
-  // ====== Tính toán hiển thị =======
   const totalHours = (data.totalWorkedMinutes / 60).toFixed(1);
   const validShifts = data.totalShifts - data.absentCount;
   const onTimeCount =
@@ -74,7 +72,6 @@ export default function ShiftDetail({ userId }) {
       ? ((onTimeCount / data.totalShifts) * 100).toFixed(1)
       : 0;
 
-  // ====== Giao diện =======
   return (
     <div className="p-6 bg-white rounded-2xl shadow-md">
       <div className="flex items-center justify-between mb-4">
@@ -83,7 +80,7 @@ export default function ShiftDetail({ userId }) {
           Thống kê tháng {month}/{year}
         </h2>
 
-        {/* Bộ chọn tháng + năm */}
+   
         <div className="flex gap-2">
           <select
             value={month}
@@ -132,8 +129,8 @@ export default function ShiftDetail({ userId }) {
               <th className="py-2 px-3 text-left">Ca làm</th>
               <th className="py-2 px-3 text-left">Giờ check-in</th>
               <th className="py-2 px-3 text-left">Giờ check-out</th>
-              <th className="py-2 px-3 text-center">Trễ</th>
-              <th className="py-2 px-3 text-center">Sớm</th>
+              <th className="py-2 px-3 text-center">Đi Trễ (phút)</th>
+              <th className="py-2 px-3 text-center">Về Sớm (phút)</th>
               <th className="py-2 px-3 text-center">Trạng thái</th>
               <th className="py-2 px-3 text-left">Ghi chú</th>
             </tr>
@@ -148,6 +145,7 @@ export default function ShiftDetail({ userId }) {
               >
                 <td className="py-2 px-3">
                   {new Date(shift.date).toLocaleDateString("vi-VN")}
+                  <div className="text-xs text-gray-500">{shift.dayOfWeek}</div>
                 </td>
                 <td className="py-2 px-3">{shift.workShiftId?.name}</td>
                 <td className="py-2 px-3">

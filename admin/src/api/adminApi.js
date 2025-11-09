@@ -53,6 +53,54 @@ const adminApi = {
   deleteWorkShift: (id) => Client.delete(`/admin/work-shifts/${id}`),
   // Get employees list for assigning to shifts (lấy tất cả, không phân trang)
   getUsers: (params) => Client.get("/admin/users", { params: { ...params, limit: 1000 } }),
+
+
+    // --- Quản lý tài khoản ---
+  getAllUsers: async (params) => {
+    const res = await Client.get("/api/admin/users", { params });
+    return res.data;
+  },
+
+  updateUser: async (userId, data) => {
+    const res = await Client.put(`/api/admin/users/${userId}`, data);
+    return res.data;
+  },
+
+  createUser: async (data) => {
+    const res = await Client.post("/api/admin/users", data);
+    return res.data;
+  },
+
+  // --- Hiệu suất nhân viên ---
+  getEmployeePerformance: async (params) => {
+    const res = await Client.get("/api/admin/performance", { params });
+    return res.data;
+  },
+
+  getShiftDetail: async (userId, from, to) => {
+    const res = await Client.get(`/api/admin/performance/shifts/${userId}`, {
+      params: { from, to },
+    });
+    return res.data;
+  },
+
+  // --- Thống kê thất thoát nguyên liệu ---
+  getIngredientWasteStats: async () => {
+    const res = await Client.get("/api/purchaseOrders/expired-summary");
+    return res.data;
+  },
+
+  // --- Báo cáo khách hàng ---
+  getCustomerReports: async (params) => {
+    const res = await Client.get("/api/admin/customers/report", { params });
+    return res.data;
+  },
+
+  // --- Feedback ---
+  getFeedbacks: async (params) => {
+    const res = await Client.get("/api/admin/feedbacks", { params });
+    return res.data;
+  },
 };
 
 export default adminApi;
