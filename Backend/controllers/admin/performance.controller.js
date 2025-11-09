@@ -40,9 +40,7 @@ exports.getChefStats = async (req, res) => {
   }
 };
 
-/**
- * Lấy thống kê hiệu suất của tất cả thu ngân (Cashier).
- */
+
 exports.getCashierStats = async (req, res) => {
   try {
     const { from, to } = req.query;

@@ -83,8 +83,7 @@ router.get("/items/sales-by-time", statsCtrl.getItemsSalesByTimePeriod);
 // trang khách hàng thân thiết
 router.get("/reports/customers", customerReportCtrl.getCustomerReport);
 
-// hieu suat nhan vien 
-router.get("/waiters", performanceController.getWaiterStats);
+
 
 // Test endpoint để trigger stale items reassignment (chỉ dùng để debug)
 router.post("/test/reassign-stale-items", async (req, res) => {
@@ -107,8 +106,12 @@ router.post("/test/reassign-stale-items", async (req, res) => {
     });
   }
 });
+// hieu suat nhan vien 
+router.get("/waiters", performanceController.getWaiterStats);
 router.get("/chefs", performanceController.getChefStats);
 router.get("/cashiers", performanceController.getCashierStats);
+
+
 // ca lam viec
 router.get("/performance/shifts/:userId", performanceDetailCtrl.getUserShifts);
 
