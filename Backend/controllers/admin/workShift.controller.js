@@ -36,7 +36,7 @@ exports.getWorkShift = async (req, res) => {
 // Tạo ca làm việc mới
 exports.createWorkShift = async (req, res) => {
   try {
-    const { name, startTime, endTime, employees = [], isActive = true } = req.body;
+    const { name, startTime, endTime, daysOfWeek, employees = [], isActive = true } = req.body;
     
     // Validation - employees là optional, có thể tạo ca trống rồi gán nhân viên sau
     if (!name || !startTime || !endTime) {
@@ -49,6 +49,19 @@ exports.createWorkShift = async (req, res) => {
       return error(res, "Định dạng giờ không hợp lệ. Vui lòng sử dụng định dạng HH:MM (ví dụ: 08:00)", 400);
     }
     
+    // Validate daysOfWeek
+    let validDaysOfWeek = [0, 1, 2, 3, 4, 5, 6]; // Default: cả tuần
+    if (daysOfWeek !== undefined) {
+      if (!Array.isArray(daysOfWeek) || daysOfWeek.length === 0) {
+        return error(res, "Phải chọn ít nhất một ngày trong tuần", 400);
+      }
+      const invalidDays = daysOfWeek.filter(day => day < 0 || day > 6 || !Number.isInteger(day));
+      if (invalidDays.length > 0) {
+        return error(res, "daysOfWeek phải là mảng các số từ 0-6 (0=Chủ nhật, 1=Thứ 2, ..., 6=Thứ 7)", 400);
+      }
+      validDaysOfWeek = [...new Set(daysOfWeek)].sort(); // Remove duplicates and sort
+    }
+    
     // Check if name already exists
     const existing = await WorkShift.findOne({ name: name.trim() });
     if (existing) {
@@ -59,6 +72,7 @@ exports.createWorkShift = async (req, res) => {
       name: name.trim(),
       startTime,
       endTime,
+      daysOfWeek: validDaysOfWeek,
       employees: Array.isArray(employees) ? employees : [],
       isActive
     });
@@ -80,7 +94,7 @@ exports.createWorkShift = async (req, res) => {
 exports.updateWorkShift = async (req, res) => {
   try {
     const { id } = req.params;
-    const { name, startTime, endTime, employees, isActive } = req.body;
+    const { name, startTime, endTime, daysOfWeek, employees, isActive } = req.body;
     
     const workShift = await WorkShift.findById(id);
     if (!workShift) {
@@ -96,6 +110,18 @@ exports.updateWorkShift = async (req, res) => {
       if (endTime && !timeRegex.test(endTime)) {
         return error(res, "Định dạng giờ kết thúc không hợp lệ", 400);
       }
+    }
+    
+    // Validate daysOfWeek if provided
+    if (daysOfWeek !== undefined) {
+      if (!Array.isArray(daysOfWeek) || daysOfWeek.length === 0) {
+        return error(res, "Phải chọn ít nhất một ngày trong tuần", 400);
+      }
+      const invalidDays = daysOfWeek.filter(day => day < 0 || day > 6 || !Number.isInteger(day));
+      if (invalidDays.length > 0) {
+        return error(res, "daysOfWeek phải là mảng các số từ 0-6 (0=Chủ nhật, 1=Thứ 2, ..., 6=Thứ 7)", 400);
+      }
+      workShift.daysOfWeek = [...new Set(daysOfWeek)].sort(); // Remove duplicates and sort
     }
     
     // Check name uniqueness if changing name

@@ -22,6 +22,7 @@ export default function SettingsPage() {
     name: "",
     startTime: "",
     endTime: "",
+    daysOfWeek: [0, 1, 2, 3, 4, 5, 6], // Mặc định: cả tuần
     employees: [],
     isActive: true
   });
@@ -129,6 +130,7 @@ export default function SettingsPage() {
       name: "",
       startTime: "",
       endTime: "",
+      daysOfWeek: [0, 1, 2, 3, 4, 5, 6], // Mặc định: cả tuần
       employees: [],
       isActive: true
     });
@@ -141,6 +143,9 @@ export default function SettingsPage() {
       name: shift.name || "",
       startTime: shift.startTime || "",
       endTime: shift.endTime || "",
+      daysOfWeek: shift.daysOfWeek && shift.daysOfWeek.length > 0 
+        ? shift.daysOfWeek 
+        : [0, 1, 2, 3, 4, 5, 6], // Default nếu không có
       employees: shift.employees?.map(e => e._id || e) || [],
       isActive: shift.isActive !== undefined ? shift.isActive : true
     });
@@ -151,6 +156,11 @@ export default function SettingsPage() {
     try {
       if (!shiftForm.name || !shiftForm.startTime || !shiftForm.endTime) {
         toast.error("Vui lòng điền đầy đủ thông tin");
+        return;
+      }
+
+      if (!shiftForm.daysOfWeek || shiftForm.daysOfWeek.length === 0) {
+        toast.error("Vui lòng chọn ít nhất một ngày trong tuần");
         return;
       }
 
@@ -187,6 +197,47 @@ export default function SettingsPage() {
 
   const formatCurrency = (value) => {
     return new Intl.NumberFormat("vi-VN").format(value);
+  };
+
+  const formatDaysOfWeek = (daysOfWeek) => {
+    if (!daysOfWeek || daysOfWeek.length === 0) return "Không có";
+    if (daysOfWeek.length === 7) return "Cả tuần";
+    
+    const dayNames = ["CN", "T2", "T3", "T4", "T5", "T6", "T7"];
+    return daysOfWeek.map(day => dayNames[day]).join(", ");
+  };
+
+  const dayNames = [
+    { value: 0, label: "Chủ nhật" },
+    { value: 1, label: "Thứ 2" },
+    { value: 2, label: "Thứ 3" },
+    { value: 3, label: "Thứ 4" },
+    { value: 4, label: "Thứ 5" },
+    { value: 5, label: "Thứ 6" },
+    { value: 6, label: "Thứ 7" }
+  ];
+
+  const handleDayToggle = (day) => {
+    const currentDays = shiftForm.daysOfWeek || [];
+    if (currentDays.includes(day)) {
+      // Bỏ chọn ngày
+      const newDays = currentDays.filter(d => d !== day);
+      if (newDays.length === 0) {
+        toast.warning("Phải chọn ít nhất một ngày trong tuần");
+        return;
+      }
+      setShiftForm({
+        ...shiftForm,
+        daysOfWeek: newDays.sort()
+      });
+    } else {
+      // Chọn thêm ngày
+      const newDays = [...currentDays, day].sort();
+      setShiftForm({
+        ...shiftForm,
+        daysOfWeek: newDays
+      });
+    }
   };
 
   if (loading && activeTab === "preorder") {
@@ -315,6 +366,7 @@ export default function SettingsPage() {
                           <th className="p-3 text-left text-sm font-semibold">Tên ca</th>
                           <th className="p-3 text-left text-sm font-semibold">Giờ bắt đầu</th>
                           <th className="p-3 text-left text-sm font-semibold">Giờ kết thúc</th>
+                          <th className="p-3 text-left text-sm font-semibold">Thứ trong tuần</th>
                           <th className="p-3 text-left text-sm font-semibold">Số nhân viên</th>
                           <th className="p-3 text-left text-sm font-semibold">Trạng thái</th>
                           <th className="p-3 text-left text-sm font-semibold">Thao tác</th>
@@ -326,6 +378,7 @@ export default function SettingsPage() {
                             <td className="p-3">{shift.name}</td>
                             <td className="p-3">{shift.startTime}</td>
                             <td className="p-3">{shift.endTime}</td>
+                            <td className="p-3 text-sm">{formatDaysOfWeek(shift.daysOfWeek)}</td>
                             <td className="p-3">{shift.employees?.length || 0}</td>
                             <td className="p-3">
                               <span className={`px-2 py-1 rounded text-xs font-medium ${
@@ -398,6 +451,31 @@ export default function SettingsPage() {
                         value={shiftForm.endTime}
                         onChange={(e) => setShiftForm({ ...shiftForm, endTime: e.target.value })}
                       />
+                    </div>
+                    
+                    <div>
+                      <label className="block text-sm font-medium mb-1">
+                        Thứ trong tuần *
+                      </label>
+                      <div className="grid grid-cols-2 gap-2 mt-2">
+                        {dayNames.map((day) => (
+                          <label
+                            key={day.value}
+                            className="flex items-center gap-2 cursor-pointer p-2 border rounded hover:bg-gray-50"
+                          >
+                            <input
+                              type="checkbox"
+                              checked={shiftForm.daysOfWeek?.includes(day.value)}
+                              onChange={() => handleDayToggle(day.value)}
+                              className="w-4 h-4"
+                            />
+                            <span className="text-sm">{day.label}</span>
+                          </label>
+                        ))}
+                      </div>
+                      <p className="text-xs text-gray-500 mt-1">
+                        Chọn các ngày trong tuần mà ca làm việc này áp dụng. Mặc định: cả tuần.
+                      </p>
                     </div>
                     
                     <div>
