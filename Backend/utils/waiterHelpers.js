@@ -127,9 +127,10 @@ const calculateAllWaitersWorkload = async () => {
 /**
  * Tự động chọn và assign waiter có workload thấp nhất cho một OrderItem
  * @param {String|ObjectId} orderItemId - ID của OrderItem
+ * @param {String|ObjectId} excludeWaiterId - (Optional) Waiter ID cần loại trừ khỏi danh sách chọn (dùng khi reassign stale items)
  * @returns {Object|null} Waiter được assign hoặc null nếu không có waiter active
  */
-exports.assignWaiterToItem = async (orderItemId) => {
+exports.assignWaiterToItem = async (orderItemId, excludeWaiterId = null) => {
   try {
     // Kiểm tra OrderItem tồn tại
     const orderItem = await OrderItem.findById(orderItemId);
@@ -145,10 +146,17 @@ exports.assignWaiterToItem = async (orderItemId) => {
     }
 
     // Tính workload cho tất cả waiters
-    const workloads = await calculateAllWaitersWorkload();
+    let workloads = await calculateAllWaitersWorkload();
+
+    // Loại trừ waiter cũ nếu có (để tránh reassign lại cho chính waiter đó khi reassign stale items)
+    if (excludeWaiterId) {
+      const excludeIdStr = excludeWaiterId.toString();
+      workloads = workloads.filter(w => w.waiterId.toString() !== excludeIdStr);
+      console.log(`🚫 Excluding waiter ${excludeIdStr} from assignment`);
+    }
 
     if (workloads.length === 0) {
-      console.log("No active waiters available. OrderItem will have servedBy = null");
+      console.log("No active waiters available" + (excludeWaiterId ? " (after exclusion)" : "") + ". OrderItem will have servedBy = null");
       orderItem.servedBy = null;
       await orderItem.save();
       return null;
@@ -179,9 +187,10 @@ exports.assignWaiterToItem = async (orderItemId) => {
  * Tự động chọn và assign waiter có workload thấp nhất cho một comboItem
  * @param {String|ObjectId} orderItemId - ID của OrderItem (combo)
  * @param {Number} comboItemIndex - Index của comboItem trong mảng comboItems
+ * @param {String|ObjectId} excludeWaiterId - (Optional) Waiter ID cần loại trừ khỏi danh sách chọn (dùng khi reassign stale items)
  * @returns {Object|null} Waiter được assign hoặc null nếu không có waiter active
  */
-exports.assignWaiterToComboItem = async (orderItemId, comboItemIndex) => {
+exports.assignWaiterToComboItem = async (orderItemId, comboItemIndex, excludeWaiterId = null) => {
   try {
     // Kiểm tra OrderItem tồn tại
     const orderItem = await OrderItem.findById(orderItemId);
@@ -207,10 +216,17 @@ exports.assignWaiterToComboItem = async (orderItemId, comboItemIndex) => {
     }
 
     // Tính workload cho tất cả waiters
-    const workloads = await calculateAllWaitersWorkload();
+    let workloads = await calculateAllWaitersWorkload();
+
+    // Loại trừ waiter cũ nếu có (để tránh reassign lại cho chính waiter đó khi reassign stale items)
+    if (excludeWaiterId) {
+      const excludeIdStr = excludeWaiterId.toString();
+      workloads = workloads.filter(w => w.waiterId.toString() !== excludeIdStr);
+      console.log(`🚫 Excluding waiter ${excludeIdStr} from combo item assignment`);
+    }
 
     if (workloads.length === 0) {
-      console.log("No active waiters available. ComboItem will have servedBy = null");
+      console.log("No active waiters available" + (excludeWaiterId ? " (after exclusion)" : "") + ". ComboItem will have servedBy = null");
       orderItem.comboItems[comboItemIndex].servedBy = null;
       await orderItem.save();
       return null;
@@ -430,8 +446,8 @@ exports.reassignStaleItems = async (thresholdMinutes = 10) => {
       console.log(`  🔍 Processing stale OrderItem: ${orderItem.itemName || orderItem._id} (readyAt: ${orderItem.readyAt ? orderItem.readyAt.toISOString() : 'null'}, updatedAt: ${orderItem.updatedAt ? orderItem.updatedAt.toISOString() : 'null'}, servedBy: ${orderItem.servedBy})`);
       const oldWaiterId = orderItem.servedBy;
       
-      // Reassign
-      const newWaiter = await exports.assignWaiterToItem(orderItem._id);
+      // Reassign - LOẠI TRỪ waiter cũ để tránh reassign lại cho chính họ
+      const newWaiter = await exports.assignWaiterToItem(orderItem._id, oldWaiterId);
       
       if (newWaiter && newWaiter._id.toString() !== oldWaiterId.toString()) {
         reassignedItems.push({
@@ -480,8 +496,8 @@ exports.reassignStaleItems = async (thresholdMinutes = 10) => {
             staleComboCount++;
             const oldWaiterId = comboItem.servedBy;
             
-            // Reassign
-            const newWaiter = await exports.assignWaiterToComboItem(orderItem._id, i);
+            // Reassign - LOẠI TRỪ waiter cũ để tránh reassign lại cho chính họ
+            const newWaiter = await exports.assignWaiterToComboItem(orderItem._id, i, oldWaiterId);
             
             if (newWaiter && newWaiter._id.toString() !== oldWaiterId.toString()) {
               reassignedItems.push({

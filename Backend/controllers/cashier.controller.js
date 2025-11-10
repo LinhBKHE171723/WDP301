@@ -84,6 +84,9 @@ function formatOrders(orders = []) {
   return orders.map(formatOrder).filter(Boolean);
 }
 
+// Export formatOrder để có thể sử dụng ở file khác
+exports.formatOrder = formatOrder;
+
 exports.getPreparingOrders = async (_req, res) => {
   try {
     const orders = await Order.find({ status: { $in: ["confirmed", "preparing", "served"] } })

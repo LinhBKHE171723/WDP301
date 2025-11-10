@@ -33,6 +33,18 @@ const populateOrderItemDetails = async (orderItems) => {
         }
       }
     }
+    
+    // Populate itemName cho comboItems nếu thiếu
+    if (orderItem.comboItems && Array.isArray(orderItem.comboItems)) {
+      for (const comboItem of orderItem.comboItems) {
+        if (!comboItem.itemName && comboItem.itemId) {
+          const comboItemDoc = await Item.findById(comboItem.itemId);
+          if (comboItemDoc && comboItemDoc.name) {
+            comboItem.itemName = comboItemDoc.name;
+          }
+        }
+      }
+    }
   }
   return orderItems;
 };
