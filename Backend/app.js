@@ -29,9 +29,15 @@ app.disable("etag");
 mongoose
   // .connect(process.env.MONGO_URI)
   .connect(process.env.MONGO_URI)
-  .then(() => {
-    seedDatabase();
+  .then(async () => {
     console.log("✅ MongoDB connected");
+    await seedDatabase();
+    console.log("✅ Database seeding completed");
+    // Sau khi DB đã có dữ liệu, require cron
+    require("./utils/cron");
+    console.log("⏰ Cron jobs started");
+
+
   })
   .catch((err) => console.error(" MongoDB connection error:", err));
 
