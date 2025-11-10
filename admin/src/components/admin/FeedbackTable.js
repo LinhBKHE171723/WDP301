@@ -12,6 +12,7 @@ import {
 } from "../ui/admin/dialog";
 import { Button } from "../ui/admin/button";
 import axios from "axios";
+import Client from "../../api/Client";
 
 const formatDate = (iso) => {
   if (!iso) return "-";
@@ -44,25 +45,26 @@ export function FeedbackTable() {
 
   // 🔹 Gọi API có phân trang + filter
   useEffect(() => {
-    axios
-      .get("http://localhost:5000/api/admin/feedbacks", {
-        params: {
-          page,
-          limit,
-          rating: ratingFilter === "all" ? undefined : ratingFilter,
-          search: search || undefined,
-        },
-      })
-      .then((res) => {
-        const apiData = res.data?.data || {};
-        setFeedbacks(Array.isArray(apiData.feedbacks) ? apiData.feedbacks : []);
-        setTotal(Number(apiData.total || 0));
-      })
-      .catch((err) => {
-        console.error("Lỗi khi load feedbacks:", err);
-        setFeedbacks([]);
-        setTotal(0);
-      });
+    Client.get("/admin/feedbacks", {
+  params: {
+    page,
+    limit,
+    rating: ratingFilter === "all" ? undefined : ratingFilter,
+    search: search || undefined,
+  },
+})
+  .then((res) => {
+    // Client trả về res = response.data (KHÔNG có res.data.data)
+    const apiData = res.data || {};
+    setFeedbacks(Array.isArray(apiData.feedbacks) ? apiData.feedbacks : []);
+    setTotal(Number(apiData.total || 0));
+  })
+  .catch((err) => {
+    console.error("Lỗi khi load feedbacks:", err);
+    setFeedbacks([]);
+    setTotal(0);
+  });
+
   }, [page, limit, ratingFilter, search]);
 
   const filtered = useMemo(() => {

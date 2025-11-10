@@ -9,6 +9,7 @@ import {
   DialogDescription,
   DialogFooter,
 } from "../ui/admin/dialog";
+import Client from "../../api/Client";
 function toDatetimeLocal(d) {
   if (!d) return "";
   const date = new Date(d);
@@ -40,11 +41,14 @@ export default function ShiftDetail({ userId }) {
       setLoading(true);
       const { from, to } = getRange(month, year);
       try {
-        const res = await axios.get(
-          `http://localhost:5000/api/admin/performance/shifts/${userId}?from=${from}&to=${to}`
-        );
-        if (res.data.success) setData(res.data.data);
-        else throw new Error(res.data.message);
+        const res = await Client.get(
+  `/admin/performance/shifts/${userId}`,
+  { params: { from, to } }
+);
+
+if (res.success) setData(res.data);
+else throw new Error(res.message);
+
       } catch (err) {
         setError(err.message);
       } finally {
@@ -216,12 +220,13 @@ export default function ShiftDetail({ userId }) {
             setEditShift(null);
             // Reload data
             const { from, to } = getRange(month, year);
-            axios
-              .get(
-                `http://localhost:5000/api/admin/performance/shifts/${userId}?from=${from}&to=${to}`
-              )
-              .then((res) => setData(res.data.data));
-          }}
+            Client.get(
+  `/admin/performance/shifts/${userId}`,
+  { params: { from, to } }
+).then((res) => setData(res.data));
+
+          }
+          }
         />
       )}
     </div>
@@ -273,14 +278,15 @@ function EditShiftModal({ shift, onClose, onSaved }) {
   const handleSave = async () => {
     setLoading(true);
     try {
-      await axios.put(
-        `http://localhost:5000/api/admin/performance/shifts/${shift._id}`,
-        {
-          startTime: startTime || null,
-          endTime: endTime || null,
-          note,
-        }
-      );
+      await Client.put(
+  `/admin/performance/shifts/${shift._id}`,
+  {
+    startTime: startTime || null,
+    endTime: endTime || null,
+    note,
+  }
+);
+
       onSaved();
     } catch (err) {
       alert("Lỗi cập nhật: " + err.message);

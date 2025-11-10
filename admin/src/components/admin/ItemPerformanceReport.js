@@ -81,7 +81,6 @@ const ItemPerformanceReport = () => {
       });
   }, [dateRange, itemLimit]);
 
-  // Fetch danh sách items có sẵn khi chuyển sang chart mode hoặc thay đổi date range
   useEffect(() => {
     if (viewMode !== "chart") return;
 
@@ -127,11 +126,9 @@ const ItemPerformanceReport = () => {
       });
   }, [viewMode, dateRange, timeGroup]);
 
-  // Fetch chart data khi các tùy chọn thay đổi
   useEffect(() => {
     if (viewMode !== "chart") return;
 
-    // Nếu ở chế độ chọn món cụ thể nhưng chưa chọn món nào, không fetch data
     if (useCustomSelection && selectedItemIds.length === 0) {
       setChartData({ chartData: [], itemNames: [] });
       setChartLoading(false);

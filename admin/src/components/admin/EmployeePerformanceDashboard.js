@@ -1,34 +1,36 @@
-import React, { useState, useEffect } from "react";
+import { useState, useEffect } from "react";
 import { Users, ChefHat, Calendar, BarChart2 } from "lucide-react";
-import axios from "axios"; // ✅ 1. Import axios
 import { Link } from "react-router-dom";
+import Client from "../../api/Client"; // ✅ dùng Client — không dùng axios nữa
 
 export default function EmployeePerformanceDashboard() {
-  // === STATE MANAGEMENT (giữ nguyên) ===
   const [selectedRole, setSelectedRole] = useState("waiter");
   const [dates, setDates] = useState(() => {
     const today = new Date();
     const lastMonth = new Date();
     lastMonth.setDate(today.getDate() - 30);
+
     return {
       from: lastMonth.toISOString().split("T")[0],
       to: today.toISOString().split("T")[0],
     };
   });
+
   const [performanceData, setPerformanceData] = useState([]);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
 
   useEffect(() => {
     setLoading(true);
     setError(null);
 
+    // ✅ GIỮ NGUYÊN API CỦA BẠN (vì BE đang dùng cái này!)
     const endpoint =
       selectedRole === "waiter"
-        ? "/api/admin/waiters"
+        ? "/admin/waiters"
         : selectedRole === "chef"
-        ? "/api/admin/chefs"
-        : "/api/admin/cashiers";
+        ? "/admin/chefs"
+        : "/admin/cashiers";
 
     const fromDate = new Date(dates.from);
     const toDate = new Date(dates.to);
@@ -39,14 +41,16 @@ export default function EmployeePerformanceDashboard() {
     const fromISO = fromDate.toISOString();
     const toISO = toDate.toISOString();
 
-    const url = `http://localhost:5000${endpoint}?from=${encodeURIComponent(
-      fromISO
-    )}&to=${encodeURIComponent(toISO)}`;
-
-    axios
-      .get(url)
+    // ✅ Không build URL thủ công nữa → dùng Client tự xử lý baseURL
+    Client.get(endpoint, {
+      params: {
+        from: fromISO,
+        to: toISO,
+      },
+    })
       .then((res) => {
-        const apiData = res.data.data;
+        // ✅ Client return res = response.data
+        const apiData = res.data || []; // BE trả { data: [...] }
         setPerformanceData(Array.isArray(apiData) ? apiData : []);
       })
       .catch((err) => {
@@ -58,7 +62,6 @@ export default function EmployeePerformanceDashboard() {
         setLoading(false);
       });
   }, [selectedRole, dates]);
-  // === UI RENDERING (giữ nguyên) ===
   return (
     <div className="p-6 bg-gray-50 min-h-screen">
       <header className="mb-6">

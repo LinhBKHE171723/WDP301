@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useMemo } from 'react';
+import Client from "../../api/Client";
 
 // --- COMPONENT CHÍNH ---
 const CustomerReport = () => {
@@ -30,31 +31,22 @@ const CustomerReport = () => {
     const [currentPage, setCurrentPage] = useState(1);
     const ITEMS_PER_PAGE = 10; // 10 khách hàng mỗi trang
 
-    // --- API ENDPOINT ---
-    const API_URL = 'http://localhost:5000/api/admin/reports/customers';
-
-    // --- EFFECT ĐỂ FETCH DỮ LIỆU ---
-    // Chỉ fetch một lần khi component được mount
-    useEffect(() => {
-        const fetchData = async () => {
-            setLoading(true);
-            setError(null);
-            try {
-                // Tạm thời chưa gửi filter khi fetch lần đầu
-                const response = await fetch(API_URL);
-                if (!response.ok) {
-                    throw new Error('Không thể tải dữ liệu khách hàng');
-                }
-                const result = await response.json();
-                setAllCustomers(result.data || []);
-            } catch (err) {
-                setError(err.message);
-            } finally {
-                setLoading(false);
-            }
-        };
-        fetchData();
-    }, []); // Dependency rỗng `[]` để chỉ chạy 1 lần
+   useEffect(() => {
+    const fetchData = async () => {
+        setLoading(true);
+        setError(null);
+        try {
+            const res = await Client.get("/admin/reports/customers");
+            setAllCustomers(res.data || []);
+        } catch (err) {
+            console.error(err);
+            setError("Không thể tải dữ liệu khách hàng");
+        } finally {
+            setLoading(false);
+        }
+    };
+    fetchData();
+}, []);
 
     // --- LOGIC LỌC, SẮP XẾP VÀ PHÂN TRANG (CLIENT-SIDE) ---
     const filteredCustomers = useMemo(() => {
