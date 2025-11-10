@@ -141,24 +141,27 @@ exports.getTodayShift = async (req, res) => {
 exports.checkIn = async (req, res) => {
     try {
         const userId = req.user.id;
+        const today = new Date();
+        today.setHours(0, 0, 0, 0);
 
-        const today = new Date().setHours(0, 0, 0, 0);
         const shift = await Shift.findOne({ userId, date: today }).populate("workShiftId");
         if (!shift) return res.status(404).json({ success: false, message: "Không có ca làm hôm nay." });
 
-        if (shift.startTime) return res.json({ success: false, message: "Bạn đã check-in rồi." });
+        if (shift.startTime) return res.status(400).json({ success: false, message: "Bạn đã check-in rồi." });
 
         const now = new Date();
-        const scheduledStart = today;
-        const [h, m] = shift.workShiftId.startTime.split(":");
-        new Date(scheduledStart).setHours(h, m, 0, 0);
+
+        // Tính thời gian bắt đầu ca làm chuẩn
+        const scheduledStart = new Date(today);
+        const [h, m] = shift.workShiftId.startTime.split(":").map(Number);
+        scheduledStart.setHours(h, m, 0, 0);
 
         shift.startTime = now;
         shift.status = now > scheduledStart ? "late" : "checked_in";
 
         await shift.save();
 
-        // Update user active
+        // Update status user → chỉ active khi check-in
         await User.findByIdAndUpdate(userId, { status: "active" });
 
         res.json({ success: true, message: "✅ Check-in thành công!", shift });
@@ -166,29 +169,31 @@ exports.checkIn = async (req, res) => {
         res.status(500).json({ success: false, message: err.message });
     }
 };
+
 // Check-out
 exports.checkOut = async (req, res) => {
     try {
         const userId = req.user.id;
-        const today = new Date().setHours(0, 0, 0, 0);
+        const today = new Date();
+        today.setHours(0, 0, 0, 0);
 
         const shift = await Shift.findOne({ userId, date: today }).populate("workShiftId");
-        if (!shift || !shift.startTime)
-            return res.status(400).json({ success: false, message: "Bạn chưa check-in." });
+        if (!shift || !shift.startTime) return res.status(400).json({ success: false, message: "Bạn chưa check-in." });
 
-        if (shift.endTime)
-            return res.json({ success: false, message: "Bạn đã check-out rồi." });
+        if (shift.endTime) return res.status(400).json({ success: false, message: "Bạn đã check-out rồi." });
 
         const now = new Date();
 
         const scheduledEnd = new Date(today);
-        const [eh, em] = shift.workShiftId.endTime.split(":");
+        const [eh, em] = shift.workShiftId.endTime.split(":").map(Number);
         scheduledEnd.setHours(eh, em, 0, 0);
 
         shift.endTime = now;
         shift.status = now < scheduledEnd ? "early_leave" : "checked_out";
 
         await shift.save();
+
+        // User status → vẫn giữ active nếu muốn, hoặc để inactive cũng được
         await User.findByIdAndUpdate(userId, { status: "inactive" });
 
         res.json({ success: true, message: "✅ Check-out thành công!", shift });
