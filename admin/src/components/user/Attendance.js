@@ -46,9 +46,19 @@ function Attendance() {
         loadShift();
     }, []);
 
-    if (loading) return <p>Đang tải ca làm hôm nay...</p>;
+    if (loading) return (
+        <div className="p-4">
+            <Header />
+            <p>Đang tải thông tin ca làm hôm nay...</p>
+        </div>
+    );
 
-    if (!shift) return <p>❌ Hôm nay bạn không có ca làm.</p>;
+    if (!shift) return (
+        <div className="p-4">
+            <Header />
+            <p>Bạn không có ca làm hôm nay.</p>
+        </div>
+    );
 
     const { workShiftId, status, startTime, endTime } = shift;
 
