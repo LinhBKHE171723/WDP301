@@ -78,24 +78,47 @@ exports.formatOrderForKitchen = (order) => {
         itemType: plainOrderItem.itemType,
         // Đảm bảo comboItems có đầy đủ thông tin (itemName, status, assignedChef, etc.)
         comboItems: (plainOrderItem.comboItems || []).map((ci) => {
-          // Format assignedChef cho comboItem
-          let comboItemAssignedChef = null;
-          if (ci.assignedChef) {
-            if (typeof ci.assignedChef === 'object' && ci.assignedChef.name) {
-              comboItemAssignedChef = ci.assignedChef;
-            } else {
-              comboItemAssignedChef = null;
+          try {
+            // Format assignedChef cho comboItem
+            let comboItemAssignedChef = null;
+            if (ci && ci.assignedChef) {
+              if (typeof ci.assignedChef === 'object' && ci.assignedChef.name) {
+                comboItemAssignedChef = ci.assignedChef;
+              } else {
+                comboItemAssignedChef = null;
+              }
             }
+            
+            // Format servedBy cho comboItem
+            let comboItemServedBy = null;
+            if (ci && ci.servedBy) {
+              if (typeof ci.servedBy === 'object' && ci.servedBy.name) {
+                comboItemServedBy = ci.servedBy;
+              } else {
+                comboItemServedBy = null;
+              }
+            }
+            
+            return {
+              itemId: ci?.itemId || null,
+              itemName: ci?.itemName || (ci?.itemId && typeof ci.itemId === 'object' ? ci.itemId.name : null) || "Món đã xóa",
+              status: ci?.status || "pending",
+              assignedChef: comboItemAssignedChef, // ✅ Format đúng assignedChef
+              servedBy: comboItemServedBy, // ✅ Format đúng servedBy
+              readyAt: ci?.readyAt || null,
+            };
+          } catch (ciError) {
+            console.error("Lỗi khi format comboItem:", ciError, ci);
+            // Return comboItem với thông tin tối thiểu nếu có lỗi
+            return {
+              itemId: ci?.itemId || null,
+              itemName: ci?.itemName || "Món đã xóa",
+              status: ci?.status || "pending",
+              assignedChef: null,
+              servedBy: null,
+              readyAt: ci?.readyAt || null,
+            };
           }
-          
-          return {
-            itemId: ci.itemId,
-            itemName: ci.itemName || (ci.itemId && typeof ci.itemId === 'object' ? ci.itemId.name : null) || "Món đã xóa",
-            status: ci.status || "pending",
-            assignedChef: comboItemAssignedChef, // ✅ Format đúng assignedChef
-            servedBy: ci.servedBy,
-            readyAt: ci.readyAt,
-          };
         }),
       };
     }),
@@ -304,7 +327,17 @@ exports.assignChefToItem = async (req, res) => {
         }
         
         if (fullOrder) {
-          webSocketService.broadcastToOrder(orderItem.orderId, "order:updated", fullOrder);
+          try {
+            // Format order cho kitchen để đảm bảo assignedChef được populate đầy đủ
+            const formattedOrder = exports.formatOrderForKitchen(fullOrder);
+            if (formattedOrder) {
+              webSocketService.broadcastToOrder(orderItem.orderId, "order:updated", formattedOrder);
+            }
+          } catch (formatError) {
+            console.error("Lỗi khi format order cho WebSocket:", formatError);
+            // Fallback: broadcast order gốc nếu format thất bại
+            webSocketService.broadcastToOrder(orderItem.orderId, "order:updated", fullOrder);
+          }
         }
       } catch (wsError) {
         console.error("Lỗi khi emit WebSocket:", wsError);
@@ -701,7 +734,17 @@ exports.updateComboItemStatus = async (req, res) => {
       }
       
       if (fullOrder) {
-        webSocketService.broadcastToOrder(orderItem.orderId, "order:updated", fullOrder);
+        try {
+          // Format order cho kitchen để đảm bảo assignedChef được populate đầy đủ
+          const formattedOrder = exports.formatOrderForKitchen(fullOrder);
+          if (formattedOrder) {
+            webSocketService.broadcastToOrder(orderItem.orderId, "order:updated", formattedOrder);
+          }
+        } catch (formatError) {
+          console.error("Lỗi khi format order cho WebSocket:", formatError);
+          // Fallback: broadcast order gốc nếu format thất bại
+          webSocketService.broadcastToOrder(orderItem.orderId, "order:updated", fullOrder);
+        }
         
         // Thông báo cho waiter được gán comboItem (comboItem.servedBy) khi combo item ready
         if (status === 'ready') {
@@ -842,7 +885,17 @@ exports.assignChefToComboItem = async (req, res) => {
         }
         
         if (fullOrder) {
-          webSocketService.broadcastToOrder(orderItem.orderId, "order:updated", fullOrder);
+          try {
+            // Format order cho kitchen để đảm bảo assignedChef được populate đầy đủ
+            const formattedOrder = exports.formatOrderForKitchen(fullOrder);
+            if (formattedOrder) {
+              webSocketService.broadcastToOrder(orderItem.orderId, "order:updated", formattedOrder);
+            }
+          } catch (formatError) {
+            console.error("Lỗi khi format order cho WebSocket:", formatError);
+            // Fallback: broadcast order gốc nếu format thất bại
+            webSocketService.broadcastToOrder(orderItem.orderId, "order:updated", fullOrder);
+          }
         }
       } catch (wsError) {
         console.error("Lỗi khi emit WebSocket:", wsError);

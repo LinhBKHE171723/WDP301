@@ -67,8 +67,35 @@ export default function OrderDetails({
       await kitchenApi.updateComboItemStatus(orderItemId, comboItemIndex, "ready");
       toast.success("Đã hoàn thành món trong combo!");
 
-      // 2. Refresh order data (sẽ được cập nhật qua WebSocket hoặc refetch)
-      // Tạm thời chỉ thông báo, WebSocket sẽ tự động cập nhật
+      // 2. Cập nhật state local ngay lập tức để tránh bấm lại
+      setOrders((prevOrders) =>
+        prevOrders.map((order) => {
+          if (order._id !== selectedOrder._id) return order;
+
+          // Handle cả items (API format) và orderItems (WebSocket format)
+          const currentItems = order.items || order.orderItems || [];
+          const updatedItems = currentItems.map((item) => {
+            const itemId = item.orderItemId || item._id;
+            if (itemId === orderItemId && item.comboItems && item.comboItems[comboItemIndex]) {
+              // Cập nhật comboItem status
+              return {
+                ...item,
+                comboItems: item.comboItems.map((ci, idx) =>
+                  idx === comboItemIndex ? { ...ci, status: "ready" } : ci
+                ),
+              };
+            }
+            return item;
+          });
+
+          // Giữ nguyên cấu trúc dữ liệu (items hoặc orderItems)
+          return {
+            ...order,
+            items: order.items ? updatedItems : undefined,
+            orderItems: order.orderItems ? updatedItems : undefined,
+          };
+        })
+      );
     } catch (err) {
       console.error("Lỗi khi hoàn thành món trong combo:", err);
       toast.error("Không thể hoàn thành món. Vui lòng thử lại.");
@@ -239,7 +266,7 @@ export default function OrderDetails({
                               👨‍🍳 {typeof comboItem.assignedChef === 'object' && comboItem.assignedChef.name 
                                 ? comboItem.assignedChef.name 
                                 : typeof comboItem.assignedChef === 'string' && comboItem.assignedChef.length > 20
-                                  ? 'Đang tải...' // Hiển thị "Đang tải..." nếu là ObjectId string
+                                  ? comboItem.assignedChef.substring(0, 8) + '...' // Hiển thị một phần ID nếu chưa populate (fallback)
                                   : comboItem.assignedChef}
                             </div>
                           )}
@@ -262,12 +289,12 @@ export default function OrderDetails({
                               Giao Bếp
                             </button>
                           )}
-                          {/* Nút Hoàn thành cho từng món trong combo */}
+                          {/* Nút Hoàn thành cho từng món trong combo - chỉ hiển thị khi status là "preparing" */}
                           {comboItem.status === "preparing" && (
                             <button
                               onClick={() => handleMarkComboItemAsReady(normalizedItem.orderItemId, index)}
-                              disabled={loading}
-                              className="bg-green-500 hover:bg-green-600 text-white px-2 py-1 rounded text-xs font-medium transition-colors disabled:bg-gray-400"
+                              disabled={loading || comboItem.status !== "preparing"}
+                              className="bg-green-500 hover:bg-green-600 text-white px-2 py-1 rounded text-xs font-medium transition-colors disabled:bg-gray-400 disabled:cursor-not-allowed"
                             >
                               {loading ? "..." : "Hoàn thành"}
                             </button>

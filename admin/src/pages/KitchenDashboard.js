@@ -120,11 +120,20 @@ export default function KitchenDashboard() {
   const formatOrderFromWebSocket = (rawOrder) => {
     // Nếu order đã được format (có items), đảm bảo items có đầy đủ thông tin
     if (rawOrder.items && Array.isArray(rawOrder.items)) {
-      // Đảm bảo mỗi item có itemType và comboItems
+      // Đảm bảo mỗi item có itemType và comboItems với status đầy đủ
       const normalizedItems = rawOrder.items.map((item) => ({
         ...item,
         itemType: item.itemType || (item.itemId?.type ? "menu" : "item"),
-        comboItems: item.comboItems || [],
+        // Đảm bảo comboItems có status đầy đủ từ WebSocket message (không chỉ spread)
+        // Quan trọng: Phải giữ nguyên status từ WebSocket, không fallback về "pending"
+        comboItems: (item.comboItems || []).map((ci) => ({
+          itemId: ci.itemId || null,
+          itemName: ci.itemName || "Món đã xóa",
+          status: ci.status !== undefined && ci.status !== null ? ci.status : "pending", // ✅ Giữ nguyên status từ WebSocket
+          assignedChef: ci.assignedChef || null,
+          servedBy: ci.servedBy || null,
+          readyAt: ci.readyAt || null,
+        })),
       }));
       return {
         ...rawOrder,
@@ -195,13 +204,25 @@ export default function KitchenDashboard() {
         case "order:updated":
           // Cập nhật order trong danh sách
           if (lastMessage.data && activeTab === "kds") {
-            // Chỉ update orders có status confirmed
-            if (lastMessage.data.status === "confirmed") {
+            // Update orders có status confirmed hoặc preparing (giống như API getConfirmedOrders)
+            // API getConfirmedOrders chỉ lấy confirmed, nhưng khi start preparing, order vẫn cần hiển thị
+            if (lastMessage.data.status === "confirmed" || lastMessage.data.status === "preparing") {
               const formattedOrder = formatOrderFromWebSocket(lastMessage.data);
               console.log(
                 "📦 Formatted order with comboItems:",
                 formattedOrder
               );
+              // Debug: Log comboItems status để kiểm tra
+              if (formattedOrder.items) {
+                formattedOrder.items.forEach((item, idx) => {
+                  if (item.comboItems && item.comboItems.length > 0) {
+                    console.log(`📦 Item ${idx} comboItems status:`, item.comboItems.map(ci => ({
+                      itemName: ci.itemName,
+                      status: ci.status
+                    })));
+                  }
+                });
+              }
               setOrders((prevOrders) => {
                 if (!Array.isArray(prevOrders)) return [formattedOrder];
                 const updated = prevOrders.map((order) =>
@@ -218,13 +239,13 @@ export default function KitchenDashboard() {
               });
               console.log("✅ Updated order in queue:", formattedOrder._id);
             } else {
-              // Nếu order không còn confirmed, xóa khỏi danh sách
+              // Nếu order không còn confirmed/preparing, xóa khỏi danh sách
               setOrders((prevOrders) => {
                 if (!Array.isArray(prevOrders)) return [];
                 return prevOrders.filter((o) => o._id !== lastMessage.data._id);
               });
               console.log(
-                "🗑️ Removed order from queue (not confirmed):",
+                "🗑️ Removed order from queue (not confirmed/preparing):",
                 lastMessage.data._id
               );
             }

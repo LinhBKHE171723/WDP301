@@ -203,8 +203,32 @@ WaiterDashboard có một useEffect lắng nghe lastMessage → xử lý cập n
                 case 'order:updated':
                     // Đơn hàng được cập nhật
                     console.log('🔄 Order updated:', lastMessage.data);
+                    const updatedOrderData = lastMessage.data;
 
-                    // Refresh both lists
+                    // Cập nhật state ngay lập tức nếu order đã có trong danh sách
+                    setOrders(prevOrders => {
+                        const orderIndex = prevOrders.findIndex(o => o._id === updatedOrderData._id);
+                        if (orderIndex !== -1) {
+                            // Cập nhật order trong danh sách
+                            const newOrders = [...prevOrders];
+                            newOrders[orderIndex] = updatedOrderData;
+                            return newOrders;
+                        }
+                        return prevOrders;
+                    });
+
+                    setPendingOrders(prevPending => {
+                        const orderIndex = prevPending.findIndex(o => o._id === updatedOrderData._id);
+                        if (orderIndex !== -1) {
+                            // Cập nhật order trong danh sách
+                            const newPending = [...prevPending];
+                            newPending[orderIndex] = updatedOrderData;
+                            return newPending;
+                        }
+                        return prevPending;
+                    });
+
+                    // Refresh để đảm bảo đồng bộ với server
                     fetchOrders();
                     fetchPendingOrders();
                     break;
