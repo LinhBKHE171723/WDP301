@@ -935,6 +935,62 @@ exports.addItemsToOrder = async (req, res) => {
       details: 'Customer thêm món vào đơn hàng'
     });
     
+    // 🔍 Tự động gán lại tableId nếu order hiện tại không có tableId
+    // (tương tự logic trong createOrder - khi customer sửa đơn và gửi lại)
+    if (!order.tableId) {
+      let finalTableId = null;
+      
+      // Case 1: Customer đã đăng nhập - tìm theo userId
+      if (order.userId) {
+        const latestActiveOrder = await Order.findOne({
+          userId: order.userId,
+          _id: { $ne: order._id }, // Loại trừ order hiện tại
+          status: { $in: ["confirmed", "preparing", "served"] },
+          tableId: { $ne: null }
+        })
+        .sort({ createdAt: -1 })
+        .limit(1);
+        
+        if (latestActiveOrder?.tableId) {
+          finalTableId = latestActiveOrder.tableId;
+          console.log(`✅ Auto-reassigned tableId from userId: ${finalTableId} (Order ID: ${latestActiveOrder._id})`);
+        }
+      }
+      
+      // Case 2: Customer chưa đăng nhập - tìm order gần nhất của guest user
+      if (!finalTableId && !order.userId) {
+        // Tìm order gần nhất của guest user (trong 2 giờ) có tableId
+        const twoHoursAgo = new Date(Date.now() - 2 * 60 * 60 * 1000);
+        const latestGuestOrder = await Order.findOne({
+          userId: null,
+          _id: { $ne: order._id }, // Loại trừ order hiện tại
+          createdAt: { $gte: twoHoursAgo },
+          status: { $in: ["confirmed", "preparing", "served"] },
+          tableId: { $ne: null }
+        })
+        .sort({ createdAt: -1 })
+        .limit(1);
+        
+        if (latestGuestOrder?.tableId) {
+          finalTableId = latestGuestOrder.tableId;
+          console.log(`✅ Auto-reassigned tableId from recent guest order: ${finalTableId}`);
+        }
+      }
+      
+      // Gán tableId nếu tìm thấy
+      if (finalTableId) {
+        order.tableId = finalTableId;
+        console.log(`✅ Auto-assigned tableId ${finalTableId} to order ${order._id} after modification`);
+        
+        // Kiểm tra bàn có tồn tại không
+        const table = await Table.findById(finalTableId);
+        if (!table) {
+          console.warn(`⚠️ Table ${finalTableId} not found, setting tableId to null`);
+          order.tableId = null;
+        }
+      }
+    }
+    
     await order.save();
 
     // Cập nhật Payment với totalAmount mới
@@ -1597,7 +1653,7 @@ exports.confirmOrder = async (req, res) => {
     const populatedOrder = await Order.findById(order._id)
       .populate({
         path: "orderItems",
-        select: "itemName itemId quantity price note status assignedChef",
+        select: "itemName itemId quantity price note status assignedChef itemType comboItems", // ✅ THÊM itemType và comboItems
         populate: [
           {
             path: "itemId",
@@ -1615,6 +1671,13 @@ exports.confirmOrder = async (req, res) => {
     // Populate thông tin item trong orderItems
     await populateOrderItemDetails(populatedOrder.orderItems);
 
+    // Populate assignedChef cho comboItems (cần cho kitchen format)
+    const { populateComboItemsChefs, formatOrderForKitchen } = require("./kitchen.order.controller");
+    await populateComboItemsChefs(populatedOrder.orderItems);
+
+    // Format order cho kitchen (KHÔNG group items, format giống getConfirmedOrders)
+    const kitchenFormattedOrder = formatOrderForKitchen(populatedOrder);
+
     // Gộp các OrderItem đã bị tách lại thành 1 dòng khi hiển thị cho customer
     const { groupSplitOrderItemsForCustomer } = require("../utils/customerHelpers");
     const groupedOrderItems = groupSplitOrderItemsForCustomer(populatedOrder.orderItems);
@@ -1624,8 +1687,8 @@ exports.confirmOrder = async (req, res) => {
     const webSocketService = req.app.get("webSocketService");
     if (webSocketService) {
       webSocketService.broadcastToOrder(order._id, "order:confirmed", populatedOrder);
-      // Broadcast to all kitchen connections
-      webSocketService.broadcastToAllKitchen("order:confirmed", populatedOrder);
+      // Broadcast to all kitchen connections với format đúng cho kitchen
+      webSocketService.broadcastToAllKitchen("order:confirmed", kitchenFormattedOrder);
       
       // Broadcast to cashiers để hiển thị đơn chờ thanh toán ngay khi customer confirm
       if (webSocketService.broadcastToAllCashiers) {

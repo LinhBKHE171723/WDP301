@@ -236,7 +236,11 @@ export default function OrderDetails({
                           {/* Hiển thị chef đã được gán cho món này */}
                           {comboItem.assignedChef && (
                             <div className="mt-1 text-xs text-blue-600">
-                              👨‍🍳 {typeof comboItem.assignedChef === 'object' ? comboItem.assignedChef.name : comboItem.assignedChef}
+                              👨‍🍳 {typeof comboItem.assignedChef === 'object' && comboItem.assignedChef.name 
+                                ? comboItem.assignedChef.name 
+                                : typeof comboItem.assignedChef === 'string' && comboItem.assignedChef.length > 20
+                                  ? 'Đang tải...' // Hiển thị "Đang tải..." nếu là ObjectId string
+                                  : comboItem.assignedChef}
                             </div>
                           )}
                         </div>
