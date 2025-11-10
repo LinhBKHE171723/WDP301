@@ -165,8 +165,8 @@ exports.getWaitersPerformance = async ({ from, to }) => {
 
   performanceData.sort(
     (a, b) =>
-      (b.performance.itemsServedCount || 0) -
-      (a.performance.itemsServedCount || 0)
+      (b.performance.itemsPerHour  || 0) -
+      (a.performance.itemsPerHour  || 0)
   );
 
   return performanceData;
@@ -359,7 +359,7 @@ exports.getChefsPerformance = async ({ from, to }) => {
   );
 
   performanceData.sort(
-    (a, b) => b.performance.itemsCookedCount - a.performance.itemsCookedCount
+    (a, b) => b.performance.itemsPerHour  - a.performance.itemsPerHour 
   );
 
   return performanceData;

@@ -44,9 +44,8 @@ exports.getUserMonthlySummary = async (userId, from, to) => {
     totalLate += s.lateMinutes || 0;
     totalEarly += s.earlyLeaveMinutes || 0;
 
-    if (s.status === "late") lateCount++;
-
-    if (s.status === "early_leave") earlyCount++;
+    if (s.lateMinutes > 0) lateCount++;
+    if (s.earlyLeaveMinutes > 0) earlyCount++;
 
     if (s.status === "pending" || s.status === "absent") absentCount++;
   }
@@ -56,8 +55,8 @@ exports.getUserMonthlySummary = async (userId, from, to) => {
     totalWorkedMinutes,
     totalLate,
     totalEarly,
-    lateCount,  
-    earlyCount,  
+    lateCount,
+    earlyCount,
     absentCount,
     shifts: shiftsWithDay,
   };

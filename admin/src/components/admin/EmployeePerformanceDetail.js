@@ -7,7 +7,7 @@ import {
   DialogHeader,
   DialogTitle,
   DialogDescription,
-  DialogFooter
+  DialogFooter,
 } from "../ui/admin/dialog";
 function toDatetimeLocal(d) {
   if (!d) return "";
@@ -23,8 +23,8 @@ export default function ShiftDetail({ userId }) {
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
-   const [editShift, setEditShift] = useState(null); 
-const [saving, setSaving] = useState(false);
+  const [editShift, setEditShift] = useState(null);
+  const [saving, setSaving] = useState(false);
 
   const getRange = (month, year) => {
     const from = new Date(year, month - 1, 1);
@@ -129,11 +129,12 @@ const [saving, setSaving] = useState(false);
         <Stat label="Giờ làm" value={`${totalHours}h`} />
         <Stat
           label="Đi trễ"
-          value={`${data.totalLate} phút `}
+          value={`${data.totalLate || 0} phút (${data.lateCount || 0} ngày)`}
         />
+
         <Stat
           label="Về sớm"
-          value={`${data.totalEarly} phút (${data.earlyCount} lần)`}
+          value={`${data.totalEarly || 0} phút (${data.earlyCount || 0} ngày)`}
         />
 
         <Stat label="Nghỉ" value={`${data.absentCount} buổi`} />
@@ -195,37 +196,34 @@ const [saving, setSaving] = useState(false);
                 </td>
                 <td className="py-2 px-3">{shift.note || "--"}</td>
                 <td className="py-2 px-3 text-left">
-  <button
-    onClick={() => setEditShift(shift)}
-    className="text-blue-600 underline text-sm"
-  >
-    Sửa
-  </button>
-</td>
-
+                  <button
+                    onClick={() => setEditShift(shift)}
+                    className="text-blue-600 underline text-sm"
+                  >
+                    Sửa
+                  </button>
+                </td>
               </tr>
             ))}
           </tbody>
         </table>
-
-        
       </div>
-       {editShift && (
-  <EditShiftModal
-    shift={editShift}
-    onClose={() => setEditShift(null)}
-    onSaved={() => {
-      setEditShift(null);
-      // Reload data
-      const { from, to } = getRange(month, year);
-      axios
-        .get(`http://localhost:5000/api/admin/performance/shifts/${userId}?from=${from}&to=${to}`)
-        .then((res) => setData(res.data.data));
-    }}
-  />
-)}
-
-
+      {editShift && (
+        <EditShiftModal
+          shift={editShift}
+          onClose={() => setEditShift(null)}
+          onSaved={() => {
+            setEditShift(null);
+            // Reload data
+            const { from, to } = getRange(month, year);
+            axios
+              .get(
+                `http://localhost:5000/api/admin/performance/shifts/${userId}?from=${from}&to=${to}`
+              )
+              .then((res) => setData(res.data.data));
+          }}
+        />
+      )}
     </div>
   );
 }
@@ -267,7 +265,7 @@ function EditShiftModal({ shift, onClose, onSaved }) {
     shift.startTime ? toDatetimeLocal(shift.startTime) : ""
   );
   const [endTime, setEndTime] = useState(
-    shift.endTime ? toDatetimeLocal(shift.endTime): ""
+    shift.endTime ? toDatetimeLocal(shift.endTime) : ""
   );
   const [note, setNote] = useState(shift.note || "");
   const [loading, setLoading] = useState(false);
@@ -303,7 +301,9 @@ function EditShiftModal({ shift, onClose, onSaved }) {
 
         <div className="space-y-4 mt-2">
           <div>
-            <label className="block text-sm font-medium mb-1">Giờ check-in</label>
+            <label className="block text-sm font-medium mb-1">
+              Giờ check-in
+            </label>
             <input
               type="datetime-local"
               value={startTime}
@@ -313,7 +313,9 @@ function EditShiftModal({ shift, onClose, onSaved }) {
           </div>
 
           <div>
-            <label className="block text-sm font-medium mb-1">Giờ check-out</label>
+            <label className="block text-sm font-medium mb-1">
+              Giờ check-out
+            </label>
             <input
               type="datetime-local"
               value={endTime}
@@ -333,10 +335,7 @@ function EditShiftModal({ shift, onClose, onSaved }) {
         </div>
 
         <DialogFooter>
-          <button
-            className="px-4 py-2 rounded-lg border"
-            onClick={onClose}
-          >
+          <button className="px-4 py-2 rounded-lg border" onClick={onClose}>
             Hủy
           </button>
           <button
@@ -351,5 +350,3 @@ function EditShiftModal({ shift, onClose, onSaved }) {
     </Dialog>
   );
 }
-
-
