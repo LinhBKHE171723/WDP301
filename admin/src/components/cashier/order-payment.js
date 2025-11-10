@@ -7,13 +7,11 @@ function OrderPayment({ order, onBack, onPaymentComplete }) {
   const [showReceipt, setShowReceipt] = useState(false)
   const [showPaymentSuccess, setShowPaymentSuccess] = useState(false)
 
-  const VAT_RATE = 0.1
   const subtotal = order.items.reduce((sum, item) => sum + item.price * item.quantity, 0)
-  const vat = subtotal * VAT_RATE
-  const totalAmount = subtotal + vat // Tổng tiền đơn hàng
+  const totalAmount = subtotal // Tổng tiền đơn hàng
   
   // Sử dụng remainingAmount từ backend (đã trừ tiền cọc nếu có)
-  const remainingAmount = order.remainingAmount ?? totalAmount
+  const remainingAmount = order.remainingAmount ?? subtotal
   const totalPaid = order.totalPaid ?? 0 // Tiền cọc đã thanh toán (nếu có)
 
   const formatCurrency = (amount) =>
@@ -137,14 +135,6 @@ function OrderPayment({ order, onBack, onPaymentComplete }) {
 
           <div className="receipt-summary">
             <div className="receipt-summary-row">
-              <span className="receipt-summary-label">Tạm tính:</span>
-              <span className="receipt-summary-value">{formatCurrency(subtotal)}</span>
-            </div>
-            <div className="receipt-summary-row">
-              <span className="receipt-summary-label">VAT (10%):</span>
-              <span className="receipt-summary-value">{formatCurrency(vat)}</span>
-            </div>
-            <div className="receipt-summary-row">
               <span className="receipt-summary-label">Tổng đơn:</span>
               <span className="receipt-summary-value">{formatCurrency(totalAmount)}</span>
             </div>
@@ -250,14 +240,6 @@ function OrderPayment({ order, onBack, onPaymentComplete }) {
         <div className="payment-section">
           <h2 className="section-title">Tổng tiền</h2>
           <div className="summary-card">
-            <div className="summary-row">
-              <span className="summary-label">Tạm tính:</span>
-              <span className="summary-value">{formatCurrency(subtotal)}</span>
-            </div>
-            <div className="summary-row">
-              <span className="summary-label">VAT (10%):</span>
-              <span className="summary-value">{formatCurrency(vat)}</span>
-            </div>
             <div className="summary-row">
               <span className="summary-label">Tổng đơn:</span>
               <span className="summary-value">{formatCurrency(totalAmount)}</span>
