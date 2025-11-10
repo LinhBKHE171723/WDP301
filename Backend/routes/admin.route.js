@@ -14,10 +14,8 @@ const customerReportCtrl = require("../controllers/admin/customerReport.controll
 const settingsController = require("../controllers/admin/settings.controller");
 const workShiftController = require("../controllers/admin/workShift.controller");
 const { checkPreOrderPermission } = require("../middlewares/preorderPermission.middleware");
+const shiftController = require("../controllers/admin/shift.controller");
 
-// =======================================================
-// NHÓM 1: CÁC ROUTE QUẢN LÝ CHUNG (Đã có & chạy tốt)
-// =======================================================
 
 // --- USERS ROUTES (/api/admin/users) ---
 router.get("/users", userCtrl.list);
@@ -59,9 +57,6 @@ router.patch("/preorders/:orderId/notes/:noteId", authRequired, roleRequired("ad
 router.get("/preorders/export", authRequired, roleRequired("admin"), preorderController.exportPreOrders);
 router.post("/preorders/bulk-action", authRequired, roleRequired("admin", "cashier"), preorderController.bulkActionPreOrders);
 
-// =======================================================
-// NHÓM 2: CÁC ROUTE THỐNG KÊ & BÁO CÁO
-// =======================================================
 
 // --- API cho Trang "Doanh thu Tổng quan" (Trang hiện tại của bạn) ---
 router.get("/revenue", statsCtrl.getRevenueStats); // <-- API này bạn nói đang chạy mượt
@@ -114,5 +109,6 @@ router.get("/cashiers", performanceController.getCashierStats);
 
 // ca lam viec
 router.get("/performance/shifts/:userId", performanceDetailCtrl.getUserShifts);
+router.put("/performance/shifts/:shiftId", shiftController.updateShift);
 
 module.exports = router;

@@ -21,6 +21,8 @@ exports.getUserMonthlySummary = async (userId, from, to) => {
   let totalEarly = 0;
   let absentCount = 0;
 
+  let lateCount = 0;
+  let earlyCount = 0;
 
   const dayNames = [
     "Chủ nhật",
@@ -37,11 +39,15 @@ exports.getUserMonthlySummary = async (userId, from, to) => {
     dayOfWeek: dayNames[new Date(s.date).getDay()],
   }));
 
-  
   for (const s of shifts) {
     totalWorkedMinutes += s.totalWorkedMinutes || 0;
     totalLate += s.lateMinutes || 0;
     totalEarly += s.earlyLeaveMinutes || 0;
+
+    if (s.status === "late") lateCount++;
+
+    if (s.status === "early_leave") earlyCount++;
+
     if (s.status === "pending" || s.status === "absent") absentCount++;
   }
 
@@ -50,7 +56,9 @@ exports.getUserMonthlySummary = async (userId, from, to) => {
     totalWorkedMinutes,
     totalLate,
     totalEarly,
+    lateCount,  
+    earlyCount,  
     absentCount,
-    shifts: shiftsWithDay, 
+    shifts: shiftsWithDay,
   };
 };
