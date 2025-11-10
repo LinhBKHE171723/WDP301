@@ -6,7 +6,6 @@ export default function Sidebar() {
   
   // Cập nhật lại các mục menu - thêm prefix /admin/
   const items = [
-    { to: "/admin/", label: "Dashboard", icon: LayoutDashboard },
     { to: "/admin/preorders", label: "Đặt trước", icon: Calendar },
     { to: "/admin/analytics", label: "Báo cáo Doanh thu", icon: BarChart3 },
     { to: "/admin/item-report", label: "Báo cáo Món ăn", icon: Utensils },

@@ -219,7 +219,7 @@ export default function AppRouter() {
                     <Header />
                     <div className="container-page">
                       <Routes>
-                        <Route path="/" element={<DashboardPage />} />
+                        
                         <Route path="/preorders" element={<PreOrderPage />} />
                         <Route path="/analytics" element={<AnalyticsPage />} />
                         <Route path="/item-report" element={<ItemReportPage />} />
