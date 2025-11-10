@@ -4,6 +4,7 @@ const jwt = require("jsonwebtoken");
 const bcrypt = require("bcryptjs");
 const nodemailer = require("nodemailer");
 const streamifier = require("streamifier");
+const Shift = require("../models/Shift");
 // Lấy thông tin profile người dùng hiện tại
 exports.getProfile = async (req, res) => {
     try {
@@ -123,36 +124,45 @@ exports.resetPassword = async (req, res) => {
     }
 };
 
-// Lấy ca làm hôm nay
+// ===================== Lấy shift hôm nay =====================
 exports.getTodayShift = async (req, res) => {
     try {
         const userId = req.user.id;
-        const today = new Date().setHours(0, 0, 0, 0);
+        const { startOfDay, endOfDay } = getTodayRange();
 
-        const shift = await Shift.findOne({ userId, date: today }).populate("workShiftId");
+        // Tìm shift trong ngày hôm nay
+        const shift = await Shift.findOne({
+            userId,
+            date: { $gte: startOfDay, $lte: endOfDay }
+        }).populate("workShiftId");
 
         res.json({ success: true, shift });
     } catch (err) {
+        console.error("❌ Lỗi getTodayShift:", err);
         res.status(500).json({ success: false, message: err.message });
     }
 };
 
-// Check-in
+// ===================== Check-in =====================
 exports.checkIn = async (req, res) => {
     try {
         const userId = req.user.id;
-        const today = new Date();
-        today.setHours(0, 0, 0, 0);
+        const { startOfDay, endOfDay } = getTodayRange();
 
-        const shift = await Shift.findOne({ userId, date: today }).populate("workShiftId");
+        const shift = await Shift.findOne({
+            userId,
+            date: { $gte: startOfDay, $lte: endOfDay }
+        }).populate("workShiftId");
+
         if (!shift) return res.status(404).json({ success: false, message: "Không có ca làm hôm nay." });
 
-        if (shift.startTime) return res.status(400).json({ success: false, message: "Bạn đã check-in rồi." });
+        if (shift.startTime)
+            return res.status(400).json({ success: false, message: "Bạn đã check-in rồi." });
 
         const now = new Date();
 
         // Tính thời gian bắt đầu ca làm chuẩn
-        const scheduledStart = new Date(today);
+        const scheduledStart = new Date(shift.date);
         const [h, m] = shift.workShiftId.startTime.split(":").map(Number);
         scheduledStart.setHours(h, m, 0, 0);
 
@@ -161,30 +171,37 @@ exports.checkIn = async (req, res) => {
 
         await shift.save();
 
-        // Update status user → chỉ active khi check-in
+        // Cập nhật status user → active khi check-in
         await User.findByIdAndUpdate(userId, { status: "active" });
 
         res.json({ success: true, message: "✅ Check-in thành công!", shift });
     } catch (err) {
+        console.error("❌ Lỗi checkIn:", err);
         res.status(500).json({ success: false, message: err.message });
     }
 };
 
-// Check-out
+// ===================== Check-out =====================
 exports.checkOut = async (req, res) => {
     try {
         const userId = req.user.id;
-        const today = new Date();
-        today.setHours(0, 0, 0, 0);
+        const { startOfDay, endOfDay } = getTodayRange();
 
-        const shift = await Shift.findOne({ userId, date: today }).populate("workShiftId");
-        if (!shift || !shift.startTime) return res.status(400).json({ success: false, message: "Bạn chưa check-in." });
+        const shift = await Shift.findOne({
+            userId,
+            date: { $gte: startOfDay, $lte: endOfDay }
+        }).populate("workShiftId");
 
-        if (shift.endTime) return res.status(400).json({ success: false, message: "Bạn đã check-out rồi." });
+        if (!shift || !shift.startTime)
+            return res.status(400).json({ success: false, message: "Bạn chưa check-in." });
+
+        if (shift.endTime)
+            return res.status(400).json({ success: false, message: "Bạn đã check-out rồi." });
 
         const now = new Date();
 
-        const scheduledEnd = new Date(today);
+        // Tính thời gian kết thúc ca làm chuẩn
+        const scheduledEnd = new Date(shift.date);
         const [eh, em] = shift.workShiftId.endTime.split(":").map(Number);
         scheduledEnd.setHours(eh, em, 0, 0);
 
@@ -193,11 +210,12 @@ exports.checkOut = async (req, res) => {
 
         await shift.save();
 
-        // User status → vẫn giữ active nếu muốn, hoặc để inactive cũng được
+        // Cập nhật status user → inactive sau check-out
         await User.findByIdAndUpdate(userId, { status: "inactive" });
 
         res.json({ success: true, message: "✅ Check-out thành công!", shift });
     } catch (err) {
+        console.error("❌ Lỗi checkOut:", err);
         res.status(500).json({ success: false, message: err.message });
     }
 };

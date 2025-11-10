@@ -13,69 +13,92 @@ Day of month    *       mọi ngày trong tháng
 Month       *            tháng
 Day of week *           mọi ngày trong tuần
  */
-/**
- * Cron job chạy mỗi ngày lúc 00:00 (nửa đêm)
- * - Reset trạng thái tất cả nhân viên thành "inactive"
- * - Tạo shift cho tất cả nhân viên theo ca làm
- */
-cron.schedule("0 0 * * *", async () => {
-    console.log("🌅 00:00 Cron job: Reset employee status và tạo shift mới...");
 
+/**
+* Cron job 00:10
+* - Reset tất cả nhân viên thành inactive
+* - Tạo shift cho từng nhân viên theo ca làm
+* - Atomic: dùng transaction
+*/
+ccron.schedule("0 10 * * *", async () => {
+    console.log("🌅 00:10 Cron job: Reset employee status + tạo shift...");
+
+    const session = await mongoose.startSession();
+    session.startTransaction();
     try {
-        // 1️⃣ Reset status tất cả nhân viên (chỉ staff, không reset customer)
+        // Reset status nhân viên
         await User.updateMany(
             { role: { $in: ["waiter", "chef", "cashier", "kitchen_manager"] } },
-            { status: "inactive" }
+            { status: "inactive" },
+            { session }
         );
-        console.log("✅ Đã reset status tất cả nhân viên thành inactive");
 
-        // 2️⃣ Lấy tất cả ca làm đang active
-        const workShifts = await WorkShift.find({ isActive: true }).populate("employees");
+        // Lấy ca làm active
+        const workShifts = await WorkShift.find({ isActive: true }).populate("employees").session(session);
         if (!workShifts.length) {
             console.log("⚠️ Không có ca làm active nào.");
+            await session.commitTransaction();
+            session.endSession();
             return;
         }
 
         const today = new Date();
-        today.setHours(0, 0, 0, 0); // reset giờ để so sánh theo ngày
+        today.setHours(0, 0, 0, 0);
+        const tomorrow = new Date(today);
+        tomorrow.setDate(today.getDate() + 1);
 
-        // 3️⃣ Tạo shift cho từng nhân viên theo ca làm
+        // Tạo shift cho từng nhân viên
         for (const ws of workShifts) {
             for (const employee of ws.employees) {
                 await Shift.findOneAndUpdate(
-                    { userId: employee._id, date: today },
-                    { workShiftId: ws._id },
-                    { upsert: true, new: true }
+                    { userId: employee._id, date: { $gte: today, $lt: tomorrow } },
+                    { workShiftId: ws._id, status: "pending", startTime: null, endTime: null, date: today },
+                    { upsert: true, new: true, session }
                 );
             }
         }
 
-        console.log("✅ Shift hôm nay đã được tạo cho tất cả nhân viên");
-
+        await session.commitTransaction();
+        console.log("✅ Shift hôm nay đã được tạo cho tất cả nhân viên (transaction OK)");
     } catch (err) {
-        console.error("❌ Lỗi cron 00:00:", err.message);
+        await session.abortTransaction();
+        console.error("❌ Lỗi cron 00:10:", err.message);
+    } finally {
+        session.endSession();
     }
 });
 
+
 /**
- * Cron job chạy mỗi ngày lúc 23:59
- * - Tự động đánh dấu absent cho nhân viên chưa check-in
+ * Cron job 23:59
+ * - Đánh dấu absent cho nhân viên chưa check-in
+ * - Không cần reset user.status
  */
 cron.schedule("59 23 * * *", async () => {
-    console.log("🌙 23:59 Cron job: Cập nhật trạng thái absent cho shift chưa check-in...");
+    console.log("🌙 23:59 Cron job: Cập nhật absent cho các shift chưa check-in...");
+
+    // Lấy ngày hôm nay, reset giờ về 00:00:00
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+
+    // Lấy ngày mai để dùng trong điều kiện tìm kiếm
+    const tomorrow = new Date(today);
+    tomorrow.setDate(today.getDate() + 1);
 
     try {
-        const today = new Date();
-        today.setHours(0, 0, 0, 0);
-
-        const shifts = await Shift.find({ 
-            date: today,
-            startTime: { $exists: false } // chưa check-in
+        // Tìm tất cả shift hôm nay mà nhân viên chưa check-in
+        // Điều kiện:
+        // - date >= today và date < tomorrow => ca làm hôm nay
+        // - startTime không tồn tại hoặc null => chưa check-in
+        const shifts = await Shift.find({
+            date: { $gte: today, $lt: tomorrow },
+            $or: [{ startTime: { $exists: false } }, { startTime: null }]
         });
 
+        // Duyệt từng shift và đặt trạng thái là "absent"
         for (const shift of shifts) {
             shift.status = "absent";
-            await shift.save();
+            await shift.save(); // lưu lại thay đổi
         }
 
         console.log(`✅ ${shifts.length} shift chưa check-in đã được set thành absent`);

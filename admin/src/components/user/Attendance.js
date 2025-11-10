@@ -7,7 +7,6 @@ function Attendance() {
     const [shift, setShift] = useState(null);
     const [loading, setLoading] = useState(true);
 
-    // Load shift hôm nay từ server
     const loadShift = async () => {
         try {
             setLoading(true);
@@ -20,7 +19,6 @@ function Attendance() {
         }
     };
 
-    // Check-in
     const handleCheckIn = async () => {
         try {
             await userApi.checkIn();
@@ -31,7 +29,6 @@ function Attendance() {
         }
     };
 
-    // Check-out
     const handleCheckOut = async () => {
         try {
             await userApi.checkOut();
@@ -42,27 +39,13 @@ function Attendance() {
         }
     };
 
-    useEffect(() => {
-        loadShift();
-    }, []);
+    useEffect(() => { loadShift(); }, []);
 
-    if (loading) return (
-        <div className="p-4">
-            <Header />
-            <p>Đang tải thông tin ca làm hôm nay...</p>
-        </div>
-    );
-
-    if (!shift) return (
-        <div className="p-4">
-            <Header />
-            <p>Bạn không có ca làm hôm nay.</p>
-        </div>
-    );
+    if (loading) return <div className=""><Header /><p>Đang tải thông tin ca làm hôm nay...</p></div>;
+    if (!shift) return <div className=""><Header /><p>Bạn không có ca làm hôm nay.</p></div>;
 
     const { workShiftId, status, startTime, endTime } = shift;
 
-    // Xác định có thể check-in / check-out không
     const canCheckIn = status === "pending";
     const canCheckOut = status === "checked_in" || status === "late";
 
@@ -89,13 +72,14 @@ function Attendance() {
                         ✅ Check-In
                     </button>
 
-                    <button
-                        onClick={handleCheckOut}
-                        disabled={!canCheckOut}
-                        className={`px-4 py-2 rounded text-white ${canCheckOut ? "bg-red-600" : "bg-gray-400 cursor-not-allowed"}`}
-                    >
-                        🚪 Check-Out
-                    </button>
+                    {canCheckOut && (
+                        <button
+                            onClick={handleCheckOut}
+                            className="px-4 py-2 rounded bg-red-600 text-white"
+                        >
+                            🚪 Check-Out
+                        </button>
+                    )}
 
                     {!canCheckIn && !canCheckOut && status !== "pending" && (
                         <span className="text-gray-500 italic">Bạn đã hoàn thành điểm danh hôm nay</span>
