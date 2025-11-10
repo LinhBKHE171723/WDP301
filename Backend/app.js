@@ -15,7 +15,6 @@ const userRoutes = require("./routes/user.route");
 // load env
 dotenv.config();
 const { checkExpiryAndUpdateStock } = require("./utils/checkExpiryAndUpdateStock.js");
-const seed = require("./utils/seed");
 
 const app = express();
 
@@ -31,7 +30,7 @@ mongoose
   // .connect(process.env.MONGO_URI)
   .connect(process.env.MONGO_URI)
   .then(() => {
-   
+    seedDatabase()
     console.log("✅ MongoDB connected");
   })
   .catch((err) => console.error(" MongoDB connection error:", err));

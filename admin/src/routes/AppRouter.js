@@ -9,6 +9,7 @@ import TableDetail from "../components/waiter/TableDetail";
 import Profile from "../components/user/Profile";
 import ServingHistory from "../components/waiter/ServingHistory";
 import ServingHistoryDetail from "../components/waiter/ServingHistoryDetail";
+import Attendance from "../components/user/Attendance";
 // Admin components
 import Sidebar from "../components/admin/Sidebar";
 import { Header } from "../components/admin/Header";
@@ -254,6 +255,7 @@ export default function AppRouter() {
           <Route path="/waiter/orders/history" element={<ServingHistory />} />
           <Route path="/waiter/orders/history/:orderId" element={<ServingHistoryDetail />} />
           <Route path="/profile" element={<Profile />} />
+          <Route path="/user/attendance" element={<Attendance />} />
         </>
       )}
 
