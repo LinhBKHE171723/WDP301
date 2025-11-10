@@ -11,9 +11,17 @@ const purchaseOrderSchema = new Schema({
   unit: { type: String, required: true },
   price: { type: Number, required: true },
   time: { type: Date, default: Date.now },
+  expiryDate: { type: Date }, // Ngày hết hạn của lô nhập
+  usedQuantity: { type: Number, default: 0 }, // Số lượng đã sử dụng từ lô này
+  status: {
+    type: String,
+    enum: ["valid", "expired"],
+    default: "valid",
+  }, // Trạng thái: valid (còn hạn) hoặc expired (đã hết hạn)
+  note: { type: String, default: "" },
 });
 
-// ✅ Sau khi lưu PurchaseOrder → cập nhật lại Ingredient
+// ✅ Sau khi lưu PurchaseOrder → cập nhật lại stockQuantity của Ingredient
 purchaseOrderSchema.post("save", async function (doc, next) {
   try {
     const Ingredient = mongoose.model("Ingredient");
@@ -24,31 +32,17 @@ purchaseOrderSchema.post("save", async function (doc, next) {
       return next();
     }
 
-    // Ở đây doc.price là giá đơn vị (VNĐ / 1 đơn vị hàng)
-    // => Không cần chia cho quantity nữa
-    const newUnitPrice = doc.price;
+    // ✅ Cập nhật stockQuantity (giá thực tế được track qua PurchaseOrder.price)
+    const oldQty = Number(ingredient.stockQuantity) || 0;
+    const newQty = Number(doc.quantity) || 0;
+    const totalStockQty = oldQty + newQty;
 
-    // Tổng giá trị kho cũ + tổng giá trị lô mới
-    const totalStockValue =
-      ingredient.priceNow * ingredient.stockQuantity +
-      newUnitPrice * doc.quantity;
-
-    // Tổng số lượng mới
-    const totalStockQty = ingredient.stockQuantity + doc.quantity;
-
-    // Cập nhật giá trung bình mới
-    ingredient.priceNow =
-      totalStockQty > 0 ? totalStockValue / totalStockQty : newUnitPrice;
     ingredient.stockQuantity = totalStockQty;
-
     await ingredient.save();
 
     console.log(
-      `📦 Đã cập nhật Ingredient "${
-        ingredient.name
-      }": priceNow = ${ingredient.priceNow.toFixed(2)}, stockQuantity = ${
-        ingredient.stockQuantity
-      }`
+      `📦 Đã cập nhật Ingredient "${ingredient.name}": ` +
+        `stockQuantity = ${ingredient.stockQuantity} (giá nhập: ${doc.price.toLocaleString('vi-VN')}đ/${doc.unit})`
     );
 
     next();

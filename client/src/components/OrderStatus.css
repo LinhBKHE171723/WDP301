@@ -192,6 +192,52 @@
   margin-top: 8px;
 }
 
+/* Combo Items Container */
+.combo-items-container {
+  margin-top: 12px;
+  padding: 12px;
+  background: #f8f9fa;
+  border-radius: 8px;
+  border: 1px solid #e9ecef;
+}
+
+.combo-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 10px;
+  padding-bottom: 8px;
+  border-bottom: 1px solid #dee2e6;
+}
+
+.combo-status-label {
+  font-size: 13px;
+  font-weight: 500;
+  color: #495057;
+}
+
+.combo-items-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.combo-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 8px 12px;
+  background: white;
+  border-radius: 6px;
+  border: 1px solid #e9ecef;
+}
+
+.combo-item-name {
+  font-size: 13px;
+  color: #495057;
+  font-weight: 500;
+}
+
 /* Cart Section */
 .cart-section {
   margin-top: 20px;

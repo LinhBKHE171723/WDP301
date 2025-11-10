@@ -4,14 +4,15 @@ const { Schema } = mongoose;
 const orderSchema = new Schema(
   {
     userId: { type: Schema.Types.ObjectId, ref: "User" }, // khách hàng
-    servedBy: { type: Schema.Types.ObjectId, ref: "User" }, // nhân viên phục vụ
     tableId: { type: Schema.Types.ObjectId, ref: "Table" },
     orderItems: [{ type: Schema.Types.ObjectId, ref: "OrderItem" }],
-    paymentId: { type: Schema.Types.ObjectId, ref: "Payment" },
+    paymentId: { type: Schema.Types.ObjectId, ref: "Payment" }, // Giữ lại để backward compatibility
+    paymentIds: [{ type: Schema.Types.ObjectId, ref: "Payment" }], // Mảng nhiều payments (tiền cọc + thanh toán)
     status: {
       type: String,
       enum: [
         "pending",
+        "preorder",
         "confirmed",
         "preparing",
         "served",
@@ -23,6 +24,7 @@ const orderSchema = new Schema(
     totalAmount: Number,
     discount: Number,
     servedAt: Date,
+    scheduledTime: Date, // Thời gian khách muốn đến ăn (cho đặt trước)
     waiterResponse: {
       status: {
         type: String,
@@ -40,6 +42,11 @@ const orderSchema = new Schema(
       action: String, // 'waiter_approved', 'waiter_rejected', 'customer_confirmed', 'order_modified'
       timestamp: Date,
       details: String
+    }],
+    adminNotes: [{
+      note: String,
+      createdBy: { type: Schema.Types.ObjectId, ref: "User" },
+      createdAt: { type: Date, default: Date.now }
     }]
   },
   { timestamps: true }

@@ -1,7 +1,6 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState, useRef } from "react";
 import Header from "../components/waiter/Header";
 import OrderCard from "../components/waiter/OrderCard";
-import NotificationBell from "../components/waiter/NotificationBell";
 import waiterApi from "../api/waiterApi";
 import useWaiterWebSocket from "../hooks/useWaiterWebSocket";
 import { Container, Spinner, Row, Col } from "react-bootstrap";
@@ -23,7 +22,11 @@ export default function WaiterDashboard() {
 
     // trả về các hàm từ hook WebSocket và chạy hook này ở đây
     // hook này thay đổi state mỗi khi có tin nhắn từ server và sẽ làm component cha WaiterDashboard re-render
-    const { connectionState, lastMessage, subscribeToOrders, subscribeToOrder, unsubscribeFromAllOrders } = useWaiterWebSocket();
+    // Truyền userId để server biết waiter nào đang kết nối và chỉ gửi thông báo cho waiter đó
+    const { connectionState, lastMessage, subscribeToOrders, subscribeToOrder, unsubscribeFromAllOrders } = useWaiterWebSocket(user?.id);
+
+    // Track các đơn đã hiển thị toast để tránh hiển thị trùng lặp
+    const shownNotificationsRef = useRef(new Map()); // Map<orderId, timestamp>
 
     const [availableTables, setAvailableTables] = useState([]);
 
@@ -43,7 +46,9 @@ export default function WaiterDashboard() {
     const fetchOrders = async () => {
         try {
             const res = await waiterApi.getActiveOrders();
-            const ordersData = res.data || [];
+            // API trả về { success: true, data: orders } hoặc { success: true, orders: orders }
+            const ordersData = res.data || res.orders || [];
+            console.log('📦 Active orders loaded:', ordersData.length, ordersData);
             setOrders(ordersData);
 
             // Subscribe to all active orders for real-time updates
@@ -155,14 +160,34 @@ WaiterDashboard có một useEffect lắng nghe lastMessage → xử lý cập n
                     // Có đơn hàng mới hoặc được sửa đổi cần xác nhận
                     console.log('🆕 Order needs confirmation:', lastMessage.data);
 
+                    const orderId = lastMessage.data._id;
+                    const now = Date.now();
+                    
+                    // Kiểm tra xem đã hiển thị toast cho đơn này trong 2 giây qua chưa (tránh duplicate)
+                    const lastShown = shownNotificationsRef.current.get(orderId);
+                    if (lastShown && (now - lastShown) < 2000) {
+                        console.log('⏭️ Skipping duplicate notification for order:', orderId);
+                        break;
+                    }
+
                     // Subscribe to this order for real-time updates
-                    subscribeToOrder(lastMessage.data._id);
+                    subscribeToOrder(orderId);
 
                     // Kiểm tra xem đây có phải đơn hàng mới hay được sửa đổi
-                    const isExistingOrder = pendingOrders.some(o => o._id === lastMessage.data._id);
+                    const isExistingOrder = pendingOrders.some(o => o._id === orderId);
                     const message = isExistingOrder
                         ? `🔄 Đơn hàng từ bàn ${lastMessage.data.tableId?.tableNumber} đã được sửa đổi và cần xác nhận lại!`
                         : `🆕 Có đơn hàng mới từ bàn ${lastMessage.data.tableId?.tableNumber} cần xác nhận!`;
+
+                    // Đánh dấu đã hiển thị toast cho đơn này
+                    shownNotificationsRef.current.set(orderId, now);
+
+                    // Xóa các đơn đã hiển thị quá 10 giây để tránh memory leak
+                    shownNotificationsRef.current.forEach((timestamp, id) => {
+                        if (now - timestamp > 10000) {
+                            shownNotificationsRef.current.delete(id);
+                        }
+                    });
 
                     toast.info(message);
 
@@ -222,6 +247,28 @@ WaiterDashboard có một useEffect lắng nghe lastMessage → xử lý cập n
                     }
                     break;
 
+                case 'item:ready':
+                    // Món đơn đã ready, cần đi phục vụ
+                    console.log('🍽️ Item ready:', lastMessage.data);
+                    const itemData = lastMessage.data;
+                    toast.info(`🔔 ${itemData.itemName} đã sẵn sàng phục vụ tại bàn ${itemData.tableNumber}!`, {
+                        autoClose: 5000
+                    });
+                    // Refresh orders để cập nhật trạng thái
+                    fetchOrders();
+                    break;
+
+                case 'comboItem:ready':
+                    // Món trong combo đã ready, cần đi phục vụ
+                    console.log('🍽️ Combo item ready:', lastMessage.data);
+                    const comboItemData = lastMessage.data;
+                    toast.info(`🔔 ${comboItemData.comboItemName} (trong combo) đã sẵn sàng phục vụ tại bàn ${comboItemData.tableNumber}!`, {
+                        autoClose: 5000
+                    });
+                    // Refresh orders để cập nhật trạng thái
+                    fetchOrders();
+                    break;
+
                 default:
                     console.log('📨 Unknown message type:', lastMessage.type);
             }
@@ -247,7 +294,6 @@ WaiterDashboard có một useEffect lắng nghe lastMessage → xử lý cập n
                             {connectionState === 'reconnecting' && '🟡 Đang kết nối lại...'}
                             {connectionState === 'disconnected' && '🔴 Mất kết nối'}
                         </div>
-                        <NotificationBell />
                     </div>
                 </div>
 
@@ -321,7 +367,9 @@ WaiterDashboard có một useEffect lắng nghe lastMessage → xử lý cập n
                                         <OrderCard
                                             order={order}
                                             onUpdateStatus={handleUpdateStatus}
+                                            onWaiterResponse={handleWaiterResponse}
                                             isPending={false}
+                                            onOrderUpdate={fetchOrders} // Refresh orders sau khi đánh dấu đã phục vụ
                                         />
                                     </Col>
                                 ))}

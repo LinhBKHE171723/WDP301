@@ -2,13 +2,8 @@ const Feedback = require("../../models/Feedback");
 
 exports.getAll = async ({ page = 1, limit = 10, rating, search }) => {
   const query = {};
-
   if (rating) query.rating = rating;
-
-  if (search) {
-    query.$or = [{ comment: { $regex: search, $options: "i" } }];
-  }
-
+  if (search) query.$or = [{ comment: { $regex: search, $options: "i" } }];
   const skip = (page - 1) * limit;
 
   const feedbacks = await Feedback.find(query)
@@ -18,12 +13,19 @@ exports.getAll = async ({ page = 1, limit = 10, rating, search }) => {
     })
     .populate({
       path: "orderId",
-      select: "_id createdAt servedBy",
-      populate: {
-        path: "servedBy",
-        select: "name email role",
-      },
-    }).sort({ createdAt: -1 })
+      select: "_id createdAt orderItems",
+      populate: [
+        {
+          path: "orderItems",
+          populate: [
+            { path: "itemId", select: "name price" },
+            { path: "assignedChef", select: "name role" },
+            { path: "servedBy", select: "name email role" },
+          ],
+        },
+      ],
+    })
+    .sort({ createdAt: -1 })
     .skip(skip)
     .limit(Number(limit));
 
@@ -36,6 +38,7 @@ exports.getAll = async ({ page = 1, limit = 10, rating, search }) => {
     feedbacks,
   };
 };
+
 
 exports.getOne = async (id) => {
   return await Feedback.findById(id)

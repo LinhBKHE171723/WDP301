@@ -30,9 +30,26 @@ const waiterApi = {
   markOrderItemServed: (orderItemId) =>
     Client.patch(`/waiter/order-items/${orderItemId}/served`),
 
+  // ✅ Waiter đánh dấu MÓN TRONG COMBO đã được phục vụ
+  markComboItemServed: (orderItemId, comboItemIndex) =>
+    Client.patch(`/waiter/order-items/${orderItemId}/combo-items/${comboItemIndex}/served`),
+
   // ✅ Nếu tất cả món trong order đã được phục vụ → cập nhật trạng thái order
   markOrderFullyServed: (orderId) =>
     Client.patch(`/waiter/orders/${orderId}/fully-served`),
+
+  // Lấy order history đã phục vụ
+  getServingHistory(page, search, table, fromDate, toDate) {
+    return Client.get(`/waiter/orders/history`, {
+      params: { page, search, table, fromDate, toDate }
+    });
+  },
+
+
+  // Lấy chi tiết lịch sử phục vụ của một order
+  getServingHistoryDetails: (orderId) => Client.get(`/waiter/orders/history/${orderId}`),
+
+
 
   // ==========================
   // 🔸 TABLE MANAGEMENT

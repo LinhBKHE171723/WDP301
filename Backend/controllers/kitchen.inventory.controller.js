@@ -13,7 +13,7 @@ exports.getAllIngredients = async (req, res) => {
 // ✅ Tạo đơn nhập kho
 exports.createPurchaseOrder = async (req, res) => {
   try {
-    let { ingredientId, quantity, unit, price, supplier, note } = req.body;
+    let { ingredientId, quantity, unit, price, supplier, note, expiryDate } = req.body;
 
     if (!ingredientId || !quantity || quantity <= 0) {
       return res.status(400).json({
@@ -38,13 +38,12 @@ exports.createPurchaseOrder = async (req, res) => {
       price,
       supplier: supplier || "Nhập trực tiếp",
       note: note || "",
+      expiryDate: expiryDate ? new Date(expiryDate) : null, // Ngày hết hạn (nếu có)
+      usedQuantity: 0, // Mặc định chưa dùng gì
+      status: 'valid' // Mặc định còn hạn
     });
 
-    // ✅ Tính giá trung bình mới (Weighted Average)
-    const totalOld = ingredient.stockQuantity * (ingredient.priceNow || 0);
-    const totalNew = quantity * price;
-    const newStock = ingredient.stockQuantity + quantity;
-    const newAvgPrice = newStock > 0 ? (totalOld + totalNew) / newStock : price;
+    // ✅ stockQuantity được cập nhật tự động trong PurchaseOrder.post("save")
 
     res.status(201).json({
       message: "✅ Nhập hàng thành công!",
@@ -86,13 +85,12 @@ exports.getPurchaseHistory = async (req, res) => {
 // ✅ Tạo mới nguyên liệu
 exports.createIngredient = async (req, res) => {
   try {
-    const { name, unit, stockQuantity, minStock, priceNow } = req.body;
+    const { name, unit, stockQuantity, minStock } = req.body;
     const ingredient = await Ingredient.create({
       name,
       unit,
       stockQuantity,
       minStock,
-      priceNow,
     });
     res.status(201).json(ingredient);
   } catch (err) {
@@ -105,11 +103,11 @@ exports.createIngredient = async (req, res) => {
 exports.updateIngredient = async (req, res) => {
   try {
     const { id } = req.params;
-    const { name, unit, stockQuantity, minStock, priceNow } = req.body;
+    const { name, unit, stockQuantity, minStock } = req.body;
 
     const updated = await Ingredient.findByIdAndUpdate(
       id,
-      { name, unit, stockQuantity, minStock, priceNow },
+      { name, unit, stockQuantity, minStock },
       { new: true }
     );
 

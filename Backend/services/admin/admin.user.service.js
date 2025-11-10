@@ -95,7 +95,6 @@ if (!isValidEmail) {
     }
 
     const tempPassword = genTempPassword(10);
-    const passwordHash = await bcrypt.hash(tempPassword, SALT_ROUNDS);
 
     const user = await User.create({
       name,
@@ -104,7 +103,7 @@ if (!isValidEmail) {
       phone: phone || "",
       role: role || "waiter",
       status: "inactive",
-      password: passwordHash, 
+      password: tempPassword, 
     });
 
     const html = `
@@ -168,8 +167,39 @@ static async update(id, data) {
 
 
   static async updateStatus(id, status) {
+    // Lấy user hiện tại để check status cũ
+    const existingUser = await User.findById(id);
+    if (!existingUser) throw { status: 404, message: "User not found" };
+    
+    const oldStatus = existingUser.status;
+    const oldRole = existingUser.role;
+    
+    // Update status
     const user = await User.findByIdAndUpdate(id, { status }, { new: true });
-    if (!user) throw { status: 404, message: "User not found" };
+    
+    // Nếu là waiter và status chuyển từ active → inactive, reassign items
+    // (findByIdAndUpdate bỏ qua Mongoose hooks nên cần gọi thủ công)
+    if (oldRole === "waiter" && oldStatus === "active" && status === "inactive") {
+      const { reassignWaiterItems } = require("../utils/waiterHelpers");
+      try {
+        await reassignWaiterItems(id);
+      } catch (error) {
+        console.error(`Error reassigning items for waiter ${id}:`, error);
+        // Không throw để không block việc update status
+      }
+    }
+    
+    // Nếu là waiter và status chuyển từ inactive → active, assign null items
+    if (oldRole === "waiter" && oldStatus === "inactive" && status === "active") {
+      const { assignNullItemsToWaiter } = require("../utils/waiterHelpers");
+      try {
+        await assignNullItemsToWaiter(id);
+      } catch (error) {
+        console.error(`Error assigning null items to waiter ${id}:`, error);
+        // Không throw để không block việc update status
+      }
+    }
+    
     return user;
   }
 

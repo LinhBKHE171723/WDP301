@@ -92,6 +92,7 @@ export default function ItemsManager({ items, setItems }) {
             <th className="px-4 py-2 text-left">Tên món</th>
             <th className="px-4 py-2 text-left">Mô tả</th>
             <th className="px-4 py-2 text-left">Giá</th>
+            <th className="px-4 py-2 text-left">Phục vụ được</th>
             <th className="px-4 py-2 text-left">Trạng thái</th>
             <th className="px-4 py-2 text-left">Thao tác</th>
           </tr>
@@ -111,6 +112,20 @@ export default function ItemsManager({ items, setItems }) {
                 <td className="px-4 py-2">
                   {item.price.toLocaleString("vi-VN")} ₫
                 </td>
+                <td
+                  className={`px-4 py-2 font-medium ${
+                    item.maxServings === 0
+                      ? "text-red-500"
+                      : item.maxServings < 10
+                      ? "text-yellow-500"
+                      : "text-blue-600"
+                  }`}
+                >
+                  {item.maxServings === null
+                    ? "Không xác định"
+                    : `${item.maxServings} phần`}
+                </td>
+
                 <td className="px-4 py-2">
                   <label className="flex items-center cursor-pointer">
                     <input

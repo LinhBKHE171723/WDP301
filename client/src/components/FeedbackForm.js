@@ -5,12 +5,16 @@ import './FeedbackForm.css';
 
 const FeedbackForm = ({ orderId, onFeedbackSubmitted }) => {
   const [rating, setRating] = useState(0);
+  const [waiterRating, setWaiterRating] = useState(0);
+  const [chefRating, setChefRating] = useState(0);
   const [comment, setComment] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [canFeedback, setCanFeedback] = useState(false);
   const [existingFeedback, setExistingFeedback] = useState(null);
   const [checkingFeedback, setCheckingFeedback] = useState(true);
+  const [employees, setEmployees] = useState({ waiters: [], chefs: [] });
+  const [loadingEmployees, setLoadingEmployees] = useState(false);
 
   const checkCanFeedback = useCallback(async () => {
     try {
@@ -37,6 +41,29 @@ const FeedbackForm = ({ orderId, onFeedbackSubmitted }) => {
     checkCanFeedback();
   }, [orderId, checkCanFeedback]);
 
+  // Lấy thông tin waiter và chef đã tham gia order
+  useEffect(() => {
+    const fetchEmployees = async () => {
+      if (!orderId) return;
+      try {
+        setLoadingEmployees(true);
+        const response = await fetch(`http://localhost:5000/api/customer/orders/${orderId}/employees`);
+        const data = await response.json();
+        if (data.success) {
+          setEmployees(data.data || { waiters: [], chefs: [] });
+        }
+      } catch (err) {
+        console.error('Lỗi khi tải thông tin nhân viên:', err);
+      } finally {
+        setLoadingEmployees(false);
+      }
+    };
+
+    if (canFeedback) {
+      fetchEmployees();
+    }
+  }, [orderId, canFeedback]);
+
   const handleSubmit = async (e) => {
     e.preventDefault();
     
@@ -56,7 +83,9 @@ const FeedbackForm = ({ orderId, onFeedbackSubmitted }) => {
         },
         body: JSON.stringify({
           rating: rating,
-          comment: comment.trim()
+          comment: comment.trim(),
+          waiterRating: waiterRating > 0 ? waiterRating : undefined,
+          chefRating: chefRating > 0 ? chefRating : undefined
         })
       });
 
@@ -78,22 +107,22 @@ const FeedbackForm = ({ orderId, onFeedbackSubmitted }) => {
     }
   }
 
-  const renderStars = () => {
+  const renderStars = (currentRating, setRatingFn, disabled = false) => {
     return (
       <div className="star-rating">
         {[1, 2, 3, 4, 5].map((star) => (
           <button
             key={star}
             type="button"
-            className={`star ${star <= rating ? 'active' : ''}`}
-            onClick={() => setRating(star)}
-            disabled={loading}
+            className={`star ${star <= currentRating ? 'active' : ''}`}
+            onClick={() => setRatingFn(star)}
+            disabled={disabled || loading}
           >
             ★
           </button>
         ))}
         <span className="rating-text">
-          {getRatingText(rating)}
+          {getRatingText(currentRating)}
         </span>
       </div>
     );
@@ -122,6 +151,7 @@ const FeedbackForm = ({ orderId, onFeedbackSubmitted }) => {
         <h3>Đánh giá của bạn</h3>
         <div className="feedback-display">
           <div className="rating-display">
+            <strong>Đánh giá tổng thể:</strong>
             {[1, 2, 3, 4, 5].map((star) => (
               <span
                 key={star}
@@ -134,6 +164,38 @@ const FeedbackForm = ({ orderId, onFeedbackSubmitted }) => {
               {getRatingText(existingFeedback.rating)}
             </span>
           </div>
+          {existingFeedback.waiterRating && (
+            <div className="rating-display">
+              <strong>Đánh giá phục vụ:</strong>
+              {[1, 2, 3, 4, 5].map((star) => (
+                <span
+                  key={star}
+                  className={`star-display ${star <= existingFeedback.waiterRating ? 'active' : ''}`}
+                >
+                  ★
+                </span>
+              ))}
+              <span className="rating-text">
+                {getRatingText(existingFeedback.waiterRating)}
+              </span>
+            </div>
+          )}
+          {existingFeedback.chefRating && (
+            <div className="rating-display">
+              <strong>Đánh giá món ăn:</strong>
+              {[1, 2, 3, 4, 5].map((star) => (
+                <span
+                  key={star}
+                  className={`star-display ${star <= existingFeedback.chefRating ? 'active' : ''}`}
+                >
+                  ★
+                </span>
+              ))}
+              <span className="rating-text">
+                {getRatingText(existingFeedback.chefRating)}
+              </span>
+            </div>
+          )}
           {existingFeedback.comment && (
             <div className="comment-display">
               <strong>Nhận xét:</strong>
@@ -156,9 +218,35 @@ const FeedbackForm = ({ orderId, onFeedbackSubmitted }) => {
         
         <form onSubmit={handleSubmit}>
           <div className="form-group">
-            <label>Đánh giá tổng thể:</label>
-            {renderStars()}
+            <label>Đánh giá tổng thể: <span style={{color: 'red'}}>*</span></label>
+            {renderStars(rating, setRating)}
           </div>
+
+          {employees.waiters && employees.waiters.length > 0 && (
+            <div className="form-group">
+              <label>Đánh giá phục vụ (tùy chọn):</label>
+              {loadingEmployees ? (
+                <p>Đang tải thông tin...</p>
+              ) : (
+                <>
+                  {renderStars(waiterRating, setWaiterRating)}
+                </>
+              )}
+            </div>
+          )}
+
+          {employees.chefs && employees.chefs.length > 0 && (
+            <div className="form-group">
+              <label>Đánh giá món ăn (tùy chọn):</label>
+              {loadingEmployees ? (
+                <p>Đang tải thông tin...</p>
+              ) : (
+                <>
+                  {renderStars(chefRating, setChefRating)}
+                </>
+              )}
+            </div>
+          )}
 
           <div className="form-group">
             <label htmlFor="comment">Nhận xét (tùy chọn):</label>

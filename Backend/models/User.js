@@ -91,4 +91,39 @@ userSchema.methods.comparePassword = function (enteredPassword) {
   return bcrypt.compare(enteredPassword, this.password);
 };
 
+// Post hook: Tự động reassign items khi waiter status chuyển từ active → inactive
+userSchema.post("save", async function (doc, next) {
+  try {
+    // Skip hook nếu không phải waiter
+    if (doc.role !== "waiter") {
+      return next();
+    }
+
+    const OrderItem = require("../models/OrderItem");
+    // Check xem có OrderItem nào không (tránh lỗi khi seed hoặc khi tạo mới user)
+    const hasItems = await OrderItem.exists({});
+    if (!hasItems) {
+      return next(); // Skip nếu chưa có OrderItem (đang seed hoặc DB mới)
+    }
+
+    // Chỉ xử lý khi waiter status = inactive (reassign items của waiter này)
+    if (doc.status === "inactive") {
+      const { reassignWaiterItems } = require("../utils/waiterHelpers");
+      await reassignWaiterItems(doc._id);
+    }
+    
+    // Nếu waiter active lại (status = active), assign các món null cho waiter này
+    if (doc.status === "active") {
+      const { assignNullItemsToWaiter } = require("../utils/waiterHelpers");
+      await assignNullItemsToWaiter(doc._id);
+    }
+    
+    next();
+  } catch (error) {
+    console.error("Error in User post-save hook for waiter reassignment:", error);
+    // Không throw error để không block việc save user
+    next();
+  }
+});
+
 module.exports = mongoose.model("User", userSchema);

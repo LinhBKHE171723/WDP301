@@ -18,14 +18,14 @@ export default function Header() {
                 {/* Desktop Layout: 1 hàng */}
                 <div className="d-none d-lg-flex align-items-center justify-content-between w-100">
                     {/* Logo */}
-                <Navbar.Brand
+                    <Navbar.Brand
                         className="fw-bold text-dark d-flex align-items-center p-0"
                         style={{ cursor: "pointer", flexShrink: 0 }}
-                    onClick={() => navigate("/waiter/dashboard")}
-                >
+                        onClick={() => navigate("/waiter/dashboard")}
+                    >
                         <span style={{ fontSize: '22px' }}>🍽️</span>
                         <span className="ms-2" style={{ fontSize: '16px' }}>Nhà hàng WDP</span>
-                </Navbar.Brand>
+                    </Navbar.Brand>
 
                     {/* Navigation links */}
                     <div className="d-flex align-items-center gap-2">
@@ -37,18 +37,18 @@ export default function Header() {
                             Sơ đồ bàn
                         </Link>
                         <Link
-                            to="/waiter/checkin"
+                            to="/user/attendance"
                             className="btn btn-warning text-dark fw-semibold px-3 py-1"
                             style={{ fontSize: '14px' }}
                         >
-                                Check-in
-                            </Link>
+                            Điểm danh
+                        </Link>
                         <Link
-                            to="/waiter/dashboard"
+                            to="/waiter/orders/history"
                             className="btn btn-warning text-dark fw-semibold px-3 py-1"
                             style={{ fontSize: '14px' }}
                         >
-                            Danh sách Order
+                            Lịch sử phục vụ
                         </Link>
                     </div>
 

@@ -1,24 +1,17 @@
 const shiftService = require("../../services/admin/performanceDetail.service.js");
 
-/**
- * ✅ Lấy toàn bộ ca làm việc của 1 nhân viên (dành cho Admin)
- * GET /api/admin/performance/shifts/:userId
- */
-exports.getShiftDetailsByUser = async (req, res) => {
+exports.getUserShifts = async (req, res) => {
   try {
     const { userId } = req.params;
-    const data = await shiftService.getAllShiftsByUser(userId);
+    const { from, to } = req.query;
+    const summary = await shiftService.getUserMonthlySummary(userId, from, to);
 
     res.status(200).json({
       success: true,
-      message: `Lấy danh sách ca làm việc của nhân viên ${userId} thành công.`,
-      data,
+      message: "Fetched shift summary successfully",
+      data: summary,
     });
-  } catch (error) {
-    console.error("❌ Lỗi khi lấy ca làm việc:", error);
-    res.status(500).json({
-      success: false,
-      message: error.message || "Lỗi server khi lấy thông tin ca làm việc.",
-    });
+  } catch (err) {
+    res.status(500).json({ success: false, message: err.message });
   }
 };

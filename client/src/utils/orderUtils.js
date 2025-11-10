@@ -52,7 +52,7 @@ export const getStatusText = (status) => {
     'preparing': 'Đang chuẩn bị',
     'ready': 'Sẵn sàng',
     'served': 'Đã phục vụ',
-    'paid': 'Đã phục vụ', // Gộp "paid" vào "served"
+    'paid': 'Đã thanh toán',
     'cancelled': 'Đã hủy'
   };
   return statusMap[status] || status;
@@ -71,7 +71,7 @@ export const getStatusClass = (status) => {
     'preparing': 'status-preparing',
     'ready': 'status-ready',
     'served': 'status-served',
-    'paid': 'status-served', // Gộp "paid" vào "served" - cùng CSS class
+    'paid': 'status-paid', // Tách riêng CSS class cho "paid"
     'cancelled': 'status-cancelled'
   };
   return classMap[status] || 'status-default';

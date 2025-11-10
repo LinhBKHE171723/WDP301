@@ -3,38 +3,71 @@ import kitchenApi from "../../api/kitchenApi";
 import { toast } from "react-toastify";
 export default function ChefModal({
   chefs,
-  itemId,
+  itemId, // Có thể là string (orderItemId) hoặc object {orderItemId, comboItemIndex, comboItemName}
   orders,
   setOrders,
   onClose,
 }) {
   const [loading, setLoading] = useState(false);
 
+  // Xác định là món đơn hay món trong combo
+  const isComboItem = typeof itemId === 'object' && itemId.comboItemIndex !== undefined;
+  const orderItemId = typeof itemId === 'object' ? itemId.orderItemId : itemId;
+  const comboItemIndex = typeof itemId === 'object' ? itemId.comboItemIndex : null;
+  const comboItemName = typeof itemId === 'object' ? itemId.comboItemName : null;
+
   const handleSelectChef = async (chef) => {
     try {
       setLoading(true);
-      // 🧩 Gọi API thật
-      const res = await kitchenApi.assignChefToItem(itemId, chef._id);
+      let res;
+      
+      if (isComboItem) {
+        // Giao món trong combo cho chef
+        res = await kitchenApi.assignChefToComboItem(orderItemId, comboItemIndex, chef._id);
+      } else {
+        // Giao món đơn cho chef
+        res = await kitchenApi.assignChefToItem(orderItemId, chef._id);
+      }
+      
       toast.success(res.data?.message || "Giao món thành công!");
 
       // Cập nhật lại UI local
       setOrders((prevOrders) =>
-        prevOrders.map((order) => ({
-          ...order,
-          items: order.items.map((i) =>
-            i.orderItemId === itemId
-              ? { ...i, chef: chef.name, status: "preparing" }
-              : i
-          ),
-        }))
+        prevOrders.map((order) => {
+          const currentItems = order.items || order.orderItems || [];
+          const updatedItems = currentItems.map((i) => {
+            const itemIdToCompare = i.orderItemId || i._id;
+            
+            if (isComboItem) {
+              // Update combo item trong combo
+              if (itemIdToCompare === orderItemId && i.comboItems) {
+                const updatedComboItems = i.comboItems.map((ci, idx) => 
+                  idx === comboItemIndex 
+                    ? { ...ci, assignedChef: chef._id, status: "preparing" }
+                    : ci
+                );
+                return { ...i, comboItems: updatedComboItems };
+              }
+            } else {
+              // Update món đơn
+              if (itemIdToCompare === orderItemId) {
+                return { ...i, chef: chef.name, status: "preparing" };
+              }
+            }
+            return i;
+          });
+          
+          return {
+            ...order,
+            items: order.items ? updatedItems : undefined,
+            orderItems: order.orderItems ? updatedItems : undefined,
+          };
+        })
       );
 
       onClose();
     } catch (err) {
       console.error("Lỗi khi giao đầu bếp:", err);
-      // Hiển thị thông báo lỗi chi tiết từ backend
-      // err.response có thể là response từ axios interceptor (đã bị unwrap)
-      // hoặc err.response.data nếu từ axios error
       const errorMessage = err.response?.message || err.message || err.error?.message || "Không thể giao món. Vui lòng thử lại.";
       toast.error(errorMessage);
     } finally {
@@ -46,7 +79,7 @@ export default function ChefModal({
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
       <div className="bg-white rounded-xl p-6 w-full max-w-md shadow-lg">
         <h3 className="text-lg font-bold mb-4 text-gray-800">
-          Chọn đầu bếp để giao món
+          Chọn đầu bếp để giao {isComboItem ? `món "${comboItemName}"` : "món"}
         </h3>
 
         {chefs.length === 0 ? (

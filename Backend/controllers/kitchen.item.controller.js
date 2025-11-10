@@ -1,4 +1,5 @@
 const Item = require("../models/Item");
+const Ingredient = require("../models/Ingredient");
 exports.createItem = async (req, res) => {
   // Chỉ lấy các trường cần thiết từ body để tạo món ăn
   const { name, description, category, price, ingredients, image } = req.body;
@@ -144,7 +145,6 @@ exports.deleteItem = async (req, res) => {
 // --- Đánh dấu món ăn HẾT HÀNG ---
 exports.markItemUnavailable = async (req, res) => {
   const { itemId } = req.params;
-  const { reason } = req.body;
 
   try {
     console.log("🧠 markItemUnavailable:", itemId);
@@ -195,6 +195,78 @@ exports.markItemAvailable = async (req, res) => {
     console.error("❌ markItemAvailable ERROR:", error.message);
     res.status(500).json({
       message: "Lỗi Server khi phục hồi món ăn.",
+      error: error.message,
+    });
+  }
+};
+
+exports.getItemsWithAvailability = async (req, res) => {
+  try {
+    const items = await Item.find().populate("ingredients.ingredient");
+
+    const result = items.map((item) => {
+      // Nếu món không có định nghĩa nguyên liệu → không thể tính
+      if (!item.ingredients || item.ingredients.length === 0) {
+        return {
+          ...item.toObject(),
+          maxServings: null, // không xác định
+        };
+      }
+
+      let minServings = Infinity;
+
+      for (const ing of item.ingredients) {
+        const ingDoc = ing.ingredient;
+
+        // Nếu nguyên liệu chưa có hoặc hết hàng
+        if (!ingDoc || ingDoc.stockQuantity <= 0 || ing.quantity <= 0) {
+          minServings = 0;
+          break;
+        }
+
+        // Tính số phần dựa trên lượng tồn kho chia cho lượng cần cho 1 phần
+        const possible = ingDoc.stockQuantity / ing.quantity;
+        if (possible < minServings) minServings = possible;
+      }
+
+      return {
+        ...item.toObject(),
+        maxServings: Math.floor(minServings),
+      };
+    });
+
+    res.status(200).json({
+      message: "Tính toán số phần có thể phục vụ thành công.",
+      data: result,
+    });
+  } catch (error) {
+    console.error("❌ Lỗi khi tính toán số phần có thể phục vụ:", error);
+    res.status(500).json({
+      message: "Lỗi Server khi tính toán số phần có thể phục vụ.",
+      error: error.message,
+    });
+  }
+};
+
+exports.getItemById = async (req, res) => {
+  const { itemId } = req.params;
+
+  try {
+    // ✅ Populate để lấy thông tin ingredient đầy đủ
+    const item = await Item.findById(itemId).populate(
+      "ingredients.ingredient",
+      "name unit stockQuantity minStock"
+    );
+
+    if (!item) {
+      return res.status(404).json({ message: "Không tìm thấy món ăn." });
+    }
+
+    res.status(200).json(item);
+  } catch (error) {
+    console.error("❌ Lỗi getItemById:", error);
+    res.status(500).json({
+      message: "Lỗi Server khi lấy chi tiết món ăn.",
       error: error.message,
     });
   }

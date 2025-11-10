@@ -1,17 +1,21 @@
 import React, { useEffect, useState } from "react";
-import { Container, Card, Spinner, Table as BSTable } from "react-bootstrap";
+import { Container, Card, Spinner, Table as BSTable, Button } from "react-bootstrap";
 import { useParams } from "react-router-dom";
 import { toast } from "react-toastify";
 import Header from "./Header";
-import NotificationBell from "./NotificationBell";
 import waiterApi from "../../api/waiterApi";
 import { useAuth } from "../../context/AuthContext";
+import useWaiterWebSocket from "../../hooks/useWaiterWebSocket";
 
 export default function TableDetail() {
   const { tableId } = useParams();
   const [table, setTable] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [markingServed, setMarkingServed] = useState({}); // Track which item is being marked
   const { logout, user } = useAuth();
+
+  // WebSocket hook - truyền userId để server biết waiter nào đang kết nối
+  const { lastMessage, connectionState } = useWaiterWebSocket(user?.id);
 
   const fetchTableDetails = async () => {
     try {
@@ -30,6 +34,74 @@ export default function TableDetail() {
     fetchTableDetails();
   }, [tableId]);
 
+  // Handle WebSocket messages
+  useEffect(() => {
+    if (lastMessage) {
+      console.log('📨 TableDetail received WebSocket message:', lastMessage);
+
+      // Handle item:ready notification
+      if (lastMessage.type === 'item:ready' || lastMessage.type === 'comboItem:ready') {
+        const data = lastMessage.data;
+        if (data && table) {
+          // Refresh table details to show updated status
+          fetchTableDetails();
+          
+          // Show notification
+          const itemName = data.itemName || data.comboItemName || "Món ăn";
+          toast.info(`🔔 ${itemName} đã sẵn sàng phục vụ tại bàn ${data.tableNumber}!`, {
+            autoClose: 5000
+          });
+        }
+      }
+
+      // Handle order:updated
+      if (lastMessage.type === 'order:updated') {
+        const updatedOrder = lastMessage.data;
+        if (table && table.orderNow) {
+          setTable(prevTable => {
+            if (!prevTable) return prevTable;
+            const updatedOrders = prevTable.orderNow.map(order => 
+              order._id === updatedOrder._id ? updatedOrder : order
+            );
+            return { ...prevTable, orderNow: updatedOrders };
+          });
+        }
+      }
+    }
+  }, [lastMessage, table]);
+
+  // Handle mark item as served
+  const handleMarkItemServed = async (orderItemId) => {
+    try {
+      setMarkingServed(prev => ({ ...prev, [orderItemId]: true }));
+      await waiterApi.markOrderItemServed(orderItemId);
+      toast.success("Đã đánh dấu món đã phục vụ!");
+      fetchTableDetails(); // Refresh
+    } catch (error) {
+      console.error("Error marking item as served:", error);
+      toast.error(error.response?.data?.message || "Không thể đánh dấu món đã phục vụ!");
+    } finally {
+      setMarkingServed(prev => ({ ...prev, [orderItemId]: false }));
+    }
+  };
+
+  // Handle mark combo item as served
+  const handleMarkComboItemServed = async (orderItemId, comboItemIndex) => {
+    try {
+      const key = `${orderItemId}-${comboItemIndex}`;
+      setMarkingServed(prev => ({ ...prev, [key]: true }));
+      await waiterApi.markComboItemServed(orderItemId, comboItemIndex);
+      toast.success("Đã đánh dấu món trong combo đã phục vụ!");
+      fetchTableDetails(); // Refresh
+    } catch (error) {
+      console.error("Error marking combo item as served:", error);
+      toast.error(error.response?.data?.message || "Không thể đánh dấu món đã phục vụ!");
+    } finally {
+      const key = `${orderItemId}-${comboItemIndex}`;
+      setMarkingServed(prev => ({ ...prev, [key]: false }));
+    }
+  };
+
   return (
     <div className="min-vh-100 bg-light d-flex flex-column">
       <Header onLogout={logout} user={user} />
@@ -37,7 +109,6 @@ export default function TableDetail() {
       <Container className="flex-grow-1 mt-4 pb-5">
         <div className="d-flex flex-wrap justify-content-between align-items-center mb-3">
           <h4 className="fw-bold text-dark mb-3 mb-md-0">Chi tiết bàn</h4>
-          <NotificationBell />
         </div>
 
         {loading ? (
@@ -87,11 +158,6 @@ export default function TableDetail() {
                       {order.totalAmount?.toLocaleString()}₫
                     </span>
                   </p>
-                  {order.servedBy && (
-                    <p className="mb-1 text-muted">
-                      Phục vụ bởi: <span className="fw-semibold">{order.servedBy.name}</span>
-                    </p>
-                  )}
 
                   <div className="table-responsive mt-3">
                     <BSTable striped bordered hover size="sm" responsive>
@@ -104,14 +170,101 @@ export default function TableDetail() {
                         </tr>
                       </thead>
                       <tbody>
-                        {order.orderItems?.map((oi) => (
-                          <tr key={oi._id}>
-                            <td>{oi.itemId?.name || "N/A"}</td>
+                        {order.orderItems?.map((oi) => {
+                          const isCombo = oi.itemType === 'menu' && oi.comboItems && oi.comboItems.length > 0;
+                          const itemName = oi.itemName || oi.itemId?.name || "N/A";
+                          // Kiểm tra waiter có quyền phục vụ món này không (orderItem.servedBy)
+                          const canMarkItemServed = oi.servedBy && user && (
+                            (oi.servedBy._id && oi.servedBy._id.toString() === user.id?.toString()) ||
+                            (typeof oi.servedBy === 'string' && oi.servedBy === user.id?.toString()) ||
+                            (oi.servedBy.toString && oi.servedBy.toString() === user.id?.toString())
+                          );
+                          return (
+                            <React.Fragment key={oi._id}>
+                              <tr>
+                                <td>
+                                  <div className="fw-semibold">
+                                    {itemName}
+                                    {isCombo && <span className="badge bg-primary ms-2">Combo</span>}
+                                    {oi.servedBy && (
+                                      <div className="small text-muted mt-1">
+                                        Phục vụ: <span className="fw-semibold">
+                                          {oi.servedBy.name || oi.servedBy}
+                                        </span>
+                                      </div>
+                                    )}
+                                  </div>
+                                </td>
                             <td>{oi.quantity}</td>
                             <td>{oi.price?.toLocaleString()}₫</td>
-                            <td>{oi.status}</td>
-                          </tr>
-                        ))}
+                                <td>
+                                  <div className="d-flex align-items-center gap-2">
+                                    <span className={`badge ${
+                                      oi.status === 'ready' ? 'bg-success' :
+                                      oi.status === 'preparing' ? 'bg-warning' :
+                                      oi.status === 'served' ? 'bg-info' :
+                                      'bg-secondary'
+                                    }`}>
+                                      {oi.status}
+                                    </span>
+                                    {!isCombo && canMarkItemServed && oi.status === 'ready' && (
+                                      <Button
+                                        size="sm"
+                                        variant="success"
+                                        onClick={() => handleMarkItemServed(oi._id)}
+                                        disabled={markingServed[oi._id]}
+                                        className="ms-auto"
+                                      >
+                                        {markingServed[oi._id] ? "..." : "✓ Đã phục vụ"}
+                                      </Button>
+                                    )}
+                                  </div>
+                                </td>
+                              </tr>
+                              {/* Hiển thị các món trong combo */}
+                              {isCombo && oi.comboItems.map((comboItem, idx) => (
+                                <tr key={`${oi._id}-combo-${idx}`} className="bg-light">
+                                  <td className="ps-4">
+                                    <div className="d-flex align-items-center gap-2">
+                                      <small className="text-muted">└ {comboItem.itemName}</small>
+                                      {comboItem.servedBy && (
+                                        <small className="text-muted ms-2">
+                                          (Phục vụ: {comboItem.servedBy.name || comboItem.servedBy})
+                                        </small>
+                                      )}
+                                      {comboItem.servedBy && user && (
+                                        ((comboItem.servedBy._id && comboItem.servedBy._id.toString() === user.id?.toString()) ||
+                                        (typeof comboItem.servedBy === 'string' && comboItem.servedBy === user.id?.toString()))
+                                      ) && comboItem.status === 'ready' && (
+                                        <Button
+                                          size="sm"
+                                          variant="success"
+                                          onClick={() => handleMarkComboItemServed(oi._id, idx)}
+                                          disabled={markingServed[`${oi._id}-${idx}`]}
+                                          className="ms-auto"
+                                        >
+                                          {markingServed[`${oi._id}-${idx}`] ? "..." : "✓ Đã phục vụ"}
+                                        </Button>
+                                      )}
+                                    </div>
+                                  </td>
+                                  <td>-</td>
+                                  <td>-</td>
+                                  <td>
+                                    <small className={`badge ${
+                                      comboItem.status === 'ready' ? 'bg-success' :
+                                      comboItem.status === 'preparing' ? 'bg-warning' :
+                                      comboItem.status === 'served' ? 'bg-info' :
+                                      'bg-secondary'
+                                    }`}>
+                                      {comboItem.status}
+                                    </small>
+                                  </td>
+                                </tr>
+                              ))}
+                            </React.Fragment>
+                          );
+                        })}
                       </tbody>
                     </BSTable>
                   </div>

@@ -338,16 +338,22 @@
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
   gap: 20px;
-  max-width: 1200px;
-  margin: 0 auto;
+  width: 100%;
+  max-width: 100%;
+  margin: 0;
 }
 
-.menu-card {
+.menu-view .menu-card {
   background: white;
   border-radius: 12px;
   overflow: hidden;
   box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
   transition: transform 0.3s ease, box-shadow 0.3s ease;
+  display: flex;
+  flex-direction: column;
+  height: auto !important;
+  min-height: auto !important;
+  max-height: none !important;
 }
 
 .menu-card:hover {
@@ -410,8 +416,11 @@
   font-size: 48px;
 }
 
-.menu-info {
+.menu-view .menu-info {
   padding: 20px;
+  display: flex;
+  flex-direction: column;
+  flex: 1;
 }
 
 .menu-info h3 {
@@ -434,6 +443,7 @@
   font-size: 14px;
   margin: 0 0 10px 0;
   line-height: 1.4;
+  flex: 1;
 }
 
 .menu-category {
@@ -444,17 +454,26 @@
   margin-bottom: 10px;
 }
 
-.menu-price {
+.menu-view .menu-price {
   font-size: 20px;
   font-weight: 700;
-  color: #e74c3c;
+  color: #e74c3c !important;
   margin-bottom: 15px;
+  flex-shrink: 0;
+  display: block !important;
+  text-align: left !important;
+  height: auto !important;
 }
 
-.menu-actions {
-  display: flex;
+.menu-view .menu-actions {
+  display: flex !important;
   gap: 10px;
   margin-top: 15px;
+  flex-shrink: 0;
+  visibility: visible !important;
+  opacity: 1 !important;
+  position: relative !important;
+  width: 100% !important;
 }
 
 .view-detail-btn {
@@ -467,6 +486,9 @@
   cursor: pointer;
   font-weight: 600;
   transition: background 0.3s ease;
+  display: block !important;
+  visibility: visible !important;
+  opacity: 1 !important;
 }
 
 .view-detail-btn:hover {
@@ -483,6 +505,9 @@
   cursor: pointer;
   font-weight: 600;
   transition: background 0.3s ease;
+  display: block !important;
+  visibility: visible !important;
+  opacity: 1 !important;
 }
 
 .add-to-cart-btn:hover {

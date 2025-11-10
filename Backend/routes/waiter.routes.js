@@ -21,5 +21,14 @@ router.get("/orders/pending", authRequired, waiterOrderController.getPendingOrde
 router.get("/orders/active", authRequired, waiterOrderController.getActiveOrders);
 router.post("/orders/:orderId/respond", authRequired, waiterOrderController.respondToOrder);
 router.put("/orders/:orderId/status", authRequired, waiterOrderController.updateOrderStatus);
+// Lấy danh sách các order mà waiter này đã phục vụ (có phân trang, filter...)
+router.get("/orders/history", authRequired, waiterOrderController.getServingHistory);
+// Lấy chi tiết một order cụ thể trong lịch sử phục vụ
+router.get("/orders/history/:orderId", authRequired, waiterOrderController.getServingHistoryDetails);
+
+// Đánh dấu món đã phục vụ
+router.patch("/order-items/:orderItemId/served", authRequired, waiterOrderController.markOrderItemServed);
+router.patch("/order-items/:orderItemId/combo-items/:comboItemIndex/served", authRequired, waiterOrderController.markComboItemServed);
+
 
 module.exports = router;

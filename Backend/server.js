@@ -2,12 +2,18 @@ const dotenv = require("dotenv");
 const http = require("http");
 const app = require("./app");
 const webSocketService = require("./services/websocket.service");
+const { checkAndReassignStaleItems } = require("./utils/staleItemsChecker");
+const { checkUpcomingPreOrders } = require("./utils/preorderReminder");
 
 // Load .env file
 dotenv.config();
 
 const HOST = process.env.HOST || "localhost";
 const PORT = process.env.PORT || 5000;
+
+// Stale items configuration
+const STALE_ITEM_THRESHOLD_MINUTES = parseInt(process.env.STALE_ITEM_THRESHOLD_MINUTES) || 1;
+const STALE_CHECK_INTERVAL_MS = 1 * 60 * 1000; // Check every 2 minutes
 
 // Create HTTP server from Express app
 const server = http.createServer(app);
@@ -22,4 +28,34 @@ app.set("webSocketService", webSocketService);
 server.listen(PORT, HOST, () => {
   console.log(`🚀 Server running at http://${HOST}:${PORT}`);
   console.log(`🔌 WebSocket available at ws://${HOST}:${PORT}/ws`);
+  
+  // Start scheduled job to check and reassign stale items
+  // Wait a bit for MongoDB to be fully connected
+  setTimeout(() => {
+    console.log(`⏰ Starting stale items checker (threshold: ${STALE_ITEM_THRESHOLD_MINUTES} minutes, check interval: ${STALE_CHECK_INTERVAL_MS / 1000} seconds)`);
+    
+    // Run immediately once, then schedule recurring checks
+    checkAndReassignStaleItems(webSocketService, STALE_ITEM_THRESHOLD_MINUTES);
+    
+    // Schedule recurring checks
+    setInterval(() => {
+      checkAndReassignStaleItems(webSocketService, STALE_ITEM_THRESHOLD_MINUTES);
+    }, STALE_CHECK_INTERVAL_MS);
+  }, 5000); // Wait 5 seconds for MongoDB connection
+
+  // Pre-order reminder configuration
+  const PREORDER_REMINDER_MINUTES = 30; // Remind 30 minutes before scheduled time
+  const PREORDER_CHECK_INTERVAL_MS = 5 * 60 * 1000; // Check every 5 minutes
+  
+  setTimeout(() => {
+    console.log(`⏰ Starting pre-order reminder checker (reminder: ${PREORDER_REMINDER_MINUTES} minutes before, check interval: ${PREORDER_CHECK_INTERVAL_MS / 1000} seconds)`);
+    
+    // Run immediately once, then schedule recurring checks
+    checkUpcomingPreOrders(webSocketService, PREORDER_REMINDER_MINUTES);
+    
+    // Schedule recurring checks
+    setInterval(() => {
+      checkUpcomingPreOrders(webSocketService, PREORDER_REMINDER_MINUTES);
+    }, PREORDER_CHECK_INTERVAL_MS);
+  }, 5000); // Wait 5 seconds for MongoDB connection
 });

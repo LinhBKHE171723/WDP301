@@ -13,11 +13,18 @@ export default function InventoryManager({ ingredients, onRefresh }) {
     unit: "",
     stockQuantity: "",
     minStock: "",
-    priceNow: "",
   });
 
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState("");
+  const [copiedId, setCopiedId] = useState(null);
+
+  // ✅ Copy ID vào clipboard
+  const handleCopyId = (id) => {
+    navigator.clipboard.writeText(id);
+    setCopiedId(id);
+    setTimeout(() => setCopiedId(null), 2000);
+  };
 
   // ✅ Hiển thị định dạng tồn kho
   const displayQuantity = (ing) => {
@@ -40,7 +47,6 @@ export default function InventoryManager({ ingredients, onRefresh }) {
       ...newIng,
       stockQuantity: Number(newIng.stockQuantity) || 0,
       minStock: Number(newIng.minStock) || 0,
-      priceNow: Number(newIng.priceNow) || 0,
     };
 
     setLoading(true);
@@ -53,7 +59,6 @@ export default function InventoryManager({ ingredients, onRefresh }) {
         unit: "",
         stockQuantity: "",
         minStock: "",
-        priceNow: "",
       });
       if (onRefresh) await onRefresh();
     } catch (err) {
@@ -72,7 +77,7 @@ export default function InventoryManager({ ingredients, onRefresh }) {
     }
 
     const amount = Number(addAmount);
-    let price = Number(selectedIng.priceNow);
+    const price = Number(selectedIng.purchasePrice || 0); // Giá nhập từ form
 
     if (isNaN(amount) || amount <= 0) {
       alert("Vui lòng nhập số lượng hợp lệ!");
@@ -91,10 +96,13 @@ export default function InventoryManager({ ingredients, onRefresh }) {
         quantity: amount,
         unit: selectedIng.unit,
         price,
-        supplier: "Nhập trực tiếp",
-        note: `Nhập thêm ${amount} ${selectedIng.unit} cho ${
-          selectedIng.name
-        } (giá ${price.toLocaleString("vi-VN")}₫)`,
+        expiryDate: selectedIng.expiryDate || null,
+        status: selectedIng.status || "valid",
+        note:
+          selectedIng.note?.trim() ||
+          `Nhập thêm ${amount} ${selectedIng.unit} cho ${
+            selectedIng.name
+          } (giá ${price.toLocaleString("vi-VN")}₫)`,
       });
 
       setMessage(
@@ -131,7 +139,6 @@ export default function InventoryManager({ ingredients, onRefresh }) {
       await kitchenApi.updateIngredient(editIng._id, {
         name: editIng.name,
         unit: editIng.unit,
-        priceNow: Number(editIng.priceNow) || 0,
         stockQuantity: Number(editIng.stockQuantity) || 0,
         minStock: Number(editIng.minStock) || 0,
       });
@@ -199,10 +206,10 @@ export default function InventoryManager({ ingredients, onRefresh }) {
         <table className="w-full border-collapse text-sm text-gray-700">
           <thead className="bg-gray-100">
             <tr>
+              <th className="px-4 py-2 text-left">ID</th>
               <th className="px-4 py-2 text-left">Tên nguyên liệu</th>
               <th className="px-4 py-2 text-left">Đơn vị</th>
               <th className="px-4 py-2 text-left">Tồn kho</th>
-              <th className="px-4 py-2 text-left">💰 Giá nhập / đơn vị</th>
               <th className="px-4 py-2 text-left">Tối thiểu</th>
               <th className="px-4 py-2 text-left">Trạng thái</th>
               <th className="px-4 py-2 text-center">Hành động</th>
@@ -211,14 +218,27 @@ export default function InventoryManager({ ingredients, onRefresh }) {
           <tbody>
             {ingredients.map((ing) => (
               <tr key={ing._id} className="border-t hover:bg-gray-50">
+                <td className="px-4 py-2">
+                  <div className="flex items-center space-x-2">
+                    <code className="text-xs bg-gray-100 px-2 py-1 rounded border border-gray-300 font-mono">
+                      {ing._id.substring(0, 8)}...
+                    </code>
+                    <button
+                      onClick={() => handleCopyId(ing._id)}
+                      className={`px-2 py-1 text-xs rounded transition-colors ${
+                        copiedId === ing._id
+                          ? "bg-green-500 text-white"
+                          : "bg-blue-500 hover:bg-blue-600 text-white"
+                      }`}
+                      title={ing._id}
+                    >
+                      {copiedId === ing._id ? "✓" : "📋"}
+                    </button>
+                  </div>
+                </td>
                 <td className="px-4 py-2 font-medium">{ing.name}</td>
                 <td className="px-4 py-2">{ing.unit}</td>
                 <td className="px-4 py-2">{displayQuantity(ing)}</td>
-                <td className="px-4 py-2">
-                  {ing.priceNow
-                    ? `${ing.priceNow.toLocaleString("vi-VN")} ₫`
-                    : "—"}
-                </td>
                 <td className="px-4 py-2">
                   {ing.minStock.toLocaleString("vi-VN")}
                 </td>
@@ -273,7 +293,9 @@ export default function InventoryManager({ ingredients, onRefresh }) {
               Hiện tại: {displayQuantity(selectedIng)}
             </p>
 
+            {/* FORM NHẬP HÀNG */}
             <div className="space-y-4">
+              {/* Số lượng thêm */}
               <div>
                 <label className="block font-semibold text-gray-700 mb-1">
                   Số lượng thêm
@@ -287,25 +309,85 @@ export default function InventoryManager({ ingredients, onRefresh }) {
                 />
               </div>
 
+              {/* Giá nhập */}
               <div>
                 <label className="block font-semibold text-gray-700 mb-1">
-                  Giá nhập (VNĐ)
+                  Giá nhập (VNĐ) <span className="text-red-500">*</span>
                 </label>
                 <input
                   type="number"
-                  value={selectedIng.priceNow || ""}
+                  value={selectedIng.purchasePrice || ""}
                   onChange={(e) =>
                     setSelectedIng({
                       ...selectedIng,
-                      priceNow: e.target.value,
+                      purchasePrice: e.target.value,
                     })
                   }
                   className="w-full border rounded-lg px-4 py-2 focus:ring-2 focus:ring-blue-400 outline-none"
                   placeholder="Nhập giá nhập mới..."
+                  required
+                />
+              </div>
+
+              {/* Ngày hết hạn */}
+              <div>
+                <label className="block font-semibold text-gray-700 mb-1">
+                  Ngày hết hạn (nếu có)
+                </label>
+                <input
+                  type="date"
+                  value={selectedIng.expiryDate || ""}
+                  onChange={(e) =>
+                    setSelectedIng({
+                      ...selectedIng,
+                      expiryDate: e.target.value,
+                    })
+                  }
+                  className="w-full border rounded-lg px-4 py-2 focus:ring-2 focus:ring-blue-400 outline-none"
+                />
+              </div>
+
+              {/* Trạng thái */}
+              <div>
+                <label className="block font-semibold text-gray-700 mb-1">
+                  Trạng thái lô hàng
+                </label>
+                <select
+                  value={selectedIng.status || "valid"}
+                  onChange={(e) =>
+                    setSelectedIng({
+                      ...selectedIng,
+                      status: e.target.value,
+                    })
+                  }
+                  className="w-full border rounded-lg px-4 py-2 focus:ring-2 focus:ring-blue-400 outline-none"
+                >
+                  <option value="valid">✅ Còn hạn (valid)</option>
+                  <option value="expired">⚠️ Hết hạn (expired)</option>
+                </select>
+              </div>
+
+              {/* Ghi chú */}
+              <div>
+                <label className="block font-semibold text-gray-700 mb-1">
+                  Ghi chú
+                </label>
+                <textarea
+                  rows={2}
+                  value={selectedIng.note || ""}
+                  onChange={(e) =>
+                    setSelectedIng({
+                      ...selectedIng,
+                      note: e.target.value,
+                    })
+                  }
+                  className="w-full border rounded-lg px-4 py-2 focus:ring-2 focus:ring-blue-400 outline-none"
+                  placeholder="Ví dụ: Nhập trực tiếp, nhà cung cấp A, lô mới..."
                 />
               </div>
             </div>
 
+            {/* Nút hành động */}
             <div className="flex justify-end space-x-3 mt-6">
               <button
                 onClick={() => setSelectedIng(null)}
@@ -343,7 +425,6 @@ export default function InventoryManager({ ingredients, onRefresh }) {
                 { label: "Đơn vị tính", key: "unit", required: true },
                 { label: "Số lượng ban đầu", key: "stockQuantity" },
                 { label: "Mức tồn tối thiểu", key: "minStock" },
-                { label: "Giá nhập hiện tại (VNĐ)", key: "priceNow" },
               ].map((f) => (
                 <div key={f.key}>
                   <label className="block font-semibold mb-1 text-gray-700">
@@ -419,33 +500,18 @@ export default function InventoryManager({ ingredients, onRefresh }) {
                   className="w-full border rounded-lg px-4 py-2 focus:ring-2 focus:ring-blue-400 outline-none"
                 />
               </div>
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-gray-700 font-semibold mb-1">
-                    Giá nhập (VNĐ)
-                  </label>
-                  <input
-                    type="number"
-                    value={editIng.priceNow}
-                    onChange={(e) =>
-                      setEditIng({ ...editIng, priceNow: e.target.value })
-                    }
-                    className="w-full border rounded-lg px-4 py-2 focus:ring-2 focus:ring-blue-400 outline-none"
-                  />
-                </div>
-                <div>
-                  <label className="block text-gray-700 font-semibold mb-1">
-                    Mức tồn tối thiểu
-                  </label>
-                  <input
-                    type="number"
-                    value={editIng.minStock}
-                    onChange={(e) =>
-                      setEditIng({ ...editIng, minStock: e.target.value })
-                    }
-                    className="w-full border rounded-lg px-4 py-2 focus:ring-2 focus:ring-blue-400 outline-none"
-                  />
-                </div>
+              <div>
+                <label className="block text-gray-700 font-semibold mb-1">
+                  Mức tồn tối thiểu
+                </label>
+                <input
+                  type="number"
+                  value={editIng.minStock}
+                  onChange={(e) =>
+                    setEditIng({ ...editIng, minStock: e.target.value })
+                  }
+                  className="w-full border rounded-lg px-4 py-2 focus:ring-2 focus:ring-blue-400 outline-none"
+                />
               </div>
               <div>
                 <label className="block text-gray-700 font-semibold mb-1">

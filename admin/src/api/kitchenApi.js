@@ -10,8 +10,12 @@ const kitchenApi = {
     Client.patch(`/kitchen/orders/${orderId}/start-preparing`),
   assignChefToItem: (orderItemId, chefId) =>
     Client.patch(`/kitchen/order-items/${orderItemId}/assign-chef`, { chefId }),
+  assignChefToComboItem: (orderItemId, comboItemIndex, chefId) =>
+    Client.patch(`/kitchen/order-items/${orderItemId}/combo-items/${comboItemIndex}/assign-chef`, { chefId }),
   markItemReady: (orderItemId) =>
     Client.patch(`/kitchen/order-items/${orderItemId}/ready`),
+  updateComboItemStatus: (orderItemId, comboItemIndex, status) =>
+    Client.patch(`/kitchen/order-items/${orderItemId}/combo-items/${comboItemIndex}/status`, { status }),
 
   /* =========================
     ITEM (Món ăn)
@@ -24,6 +28,9 @@ const kitchenApi = {
     Client.patch(`/kitchen/items/${itemId}/available`),
   markItemUnavailable: (itemId) =>
     Client.patch(`/kitchen/items/${itemId}/unavailable`),
+  getItemsWithAvailability: () =>
+    Client.get("/kitchen/items-with-availability"),
+  getItemById: (itemId) => Client.get(`/kitchen/items/${itemId}`),
 
   /* =========================
      MENU (Combo / Thực đơn)
