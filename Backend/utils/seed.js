@@ -16,20 +16,20 @@ const seedDatabase = async () => {
   try {
     console.log("🚀 Bắt đầu seed database...");
 
-    // 1️⃣ Xóa toàn bộ dữ liệu cũ
-    await Promise.all([
-      User.deleteMany(),
-      Ingredient.deleteMany(),
-      Item.deleteMany(),
-      Menu.deleteMany(),
-      Table.deleteMany(),
-      Order.deleteMany(),
-      OrderItem.deleteMany(),
-      Payment.deleteMany(),
-      Feedback.deleteMany(),
-      PurchaseOrder.deleteMany(),
-    ]);
-    console.log("🧹 Đã xoá toàn bộ dữ liệu cũ.");
+    // 1️⃣ Drop tất cả các collections (bảng) trước
+    console.log("🗑️ Đang drop tất cả các collections...");
+    const db = mongoose.connection.db;
+    const collections = await db.listCollections().toArray();
+    
+    for (const collection of collections) {
+      try {
+        await db.dropCollection(collection.name);
+        console.log(`  ✅ Đã drop collection: ${collection.name}`);
+      } catch (error) {
+        console.warn(`  ⚠️ Không thể drop collection ${collection.name}:`, error.message);
+      }
+    }
+    console.log("🧹 Đã drop tất cả các collections.");
 
     // 2️⃣ Tạo user mẫu (dùng for để trigger pre-save hash)
     // Helper function để tạo tên ngẫu nhiên
