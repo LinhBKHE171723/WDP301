@@ -5,7 +5,9 @@ const Order = require("../models/Order");
 const OrderItem = require("../models/OrderItem");
 const Payment = require("../models/Payment");
 const Feedback = require("../models/Feedback");
-const { populateOrderItemDetails, validateTableAvailability, createOrderItemsFromCart } = require("../utils/customerHelpers");
+const User = require("../models/User");
+const { populateOrderItemDetails, validateTableAvailability, checkItemStock, createOrderItemsFromCart, createCustomerAccount } = require("../utils/customerHelpers");
+const { isLargeOrder } = require("../utils/preorderHelpers");
 
 // Lấy thông tin bàn theo số bàn
 exports.getTableByNumber = async (req, res) => {
@@ -37,12 +39,44 @@ exports.getTableByNumber = async (req, res) => {
 exports.getAvailableMenus = async (req, res) => {
   try {
     const menus = await Menu.find({ isAvailable: true })
-      .populate("items")
+      .populate({
+        path: "items",
+        populate: {
+          path: "ingredients.ingredient"
+        }
+      })
       .sort({ createdAt: -1 });
+    
+    // Lọc menus dựa trên stock của items
+    const menuChecks = await Promise.all(
+      menus.map(async (menu) => {
+        if (menu.type === 'combo') {
+          // Với combo: kiểm tra tất cả items trong combo
+          // Nếu BẤT KỲ item nào hết hàng → ẩn combo
+          if (menu.items && menu.items.length > 0) {
+            const stockChecks = await Promise.all(
+              menu.items.map(item => checkItemStock(item))
+            );
+            return stockChecks.every(hasStock => hasStock);
+          }
+          return true; // Combo không có items → hiển thị
+        } else {
+          // Với single: kiểm tra item đó
+          if (menu.items && menu.items.length > 0) {
+            const item = menu.items[0];
+            return await checkItemStock(item);
+          }
+          // Menu không có items → hiển thị
+          return true;
+        }
+      })
+    );
+    
+    const availableMenus = menus.filter((menu, index) => menuChecks[index]);
     
     res.status(200).json({
       success: true,
-      data: menus
+      data: availableMenus
     });
   } catch (error) {
     res.status(500).json({ 
@@ -81,12 +115,61 @@ exports.getMenuById = async (req, res) => {
 exports.getAvailableItems = async (req, res) => {
   try {
     const items = await Item.find({ isAvailable: true })
-      .populate("ingredients")
+      .populate("ingredients.ingredient")
+      .sort({ createdAt: -1 });
+    
+    // Lọc items dựa trên stock
+    const stockChecks = await Promise.all(
+      items.map(item => checkItemStock(item))
+    );
+    const availableItems = items.filter((item, index) => stockChecks[index]);
+    
+    res.status(200).json({
+      success: true,
+      data: availableItems
+    });
+  } catch (error) {
+    res.status(500).json({ 
+      success: false, 
+      message: error.message 
+    });
+  }
+};
+
+// Lấy tất cả món ăn (không lọc stock - cho preorder)
+exports.getAllItems = async (req, res) => {
+  try {
+    const items = await Item.find({ isAvailable: true })
+      .populate("ingredients.ingredient")
       .sort({ createdAt: -1 });
     
     res.status(200).json({
       success: true,
       data: items
+    });
+  } catch (error) {
+    res.status(500).json({ 
+      success: false, 
+      message: error.message 
+    });
+  }
+};
+
+// Lấy tất cả menu/combo (không lọc stock - cho preorder)
+exports.getAllMenus = async (req, res) => {
+  try {
+    const menus = await Menu.find({ isAvailable: true })
+      .populate({
+        path: "items",
+        populate: {
+          path: "ingredients.ingredient"
+        }
+      })
+      .sort({ createdAt: -1 });
+    
+    res.status(200).json({
+      success: true,
+      data: menus
     });
   } catch (error) {
     res.status(500).json({ 
@@ -276,7 +359,8 @@ exports.createOrder = async (req, res) => {
     const order = new Order({
       tableId: finalTableId,
       orderItems: createdOrderItems,
-      paymentId: payment._id,
+      paymentId: payment._id, // Backward compatibility
+      paymentIds: [payment._id], // Multiple payments support
       status: "pending",
       totalAmount: totalAmount,
       discount: 0,
@@ -363,6 +447,14 @@ exports.createOrder = async (req, res) => {
     console.log(`🍪 Updated cookie with ${activeOrderIds.length} orders: ${JSON.stringify(activeOrderIds)}`);
     console.log(`🍪 Cookie options: httpOnly=true, secure=${process.env.NODE_ENV === 'production'}, sameSite=lax, maxAge=24h`);
 
+    // Populate thông tin item trong orderItems
+    await populateOrderItemDetails(populatedOrder.orderItems);
+
+    // Gộp các OrderItem đã bị tách lại thành 1 dòng khi gửi cho customer qua WebSocket
+    const { groupSplitOrderItemsForCustomer } = require("../utils/customerHelpers");
+    const groupedOrderItems = groupSplitOrderItemsForCustomer(populatedOrder.orderItems);
+    populatedOrder.orderItems = groupedOrderItems;
+
     // Emit WebSocket event để thông báo waiter có đơn hàng mới cần xác nhận
     const webSocketService = req.app.get("webSocketService");
     if (webSocketService) {
@@ -385,6 +477,207 @@ exports.createOrder = async (req, res) => {
   }
 };
 
+// Tạo đơn hàng đặt trước (preorder)
+exports.createPreOrder = async (req, res) => {
+  try {
+    const { name, email, phone, orderItems, scheduledTime } = req.body;
+
+    // Validation
+    if (!name || !email || !phone) {
+      return res.status(400).json({
+        success: false,
+        message: "Tên, email và số điện thoại là bắt buộc"
+      });
+    }
+
+    if (!orderItems || !Array.isArray(orderItems) || orderItems.length === 0) {
+      return res.status(400).json({
+        success: false,
+        message: "Vui lòng chọn ít nhất một món"
+      });
+    }
+
+    if (!scheduledTime) {
+      return res.status(400).json({
+        success: false,
+        message: "Vui lòng chọn thời gian đến ăn"
+      });
+    }
+
+    // Validate scheduledTime is in the future
+    const scheduledDate = new Date(scheduledTime);
+    if (isNaN(scheduledDate.getTime())) {
+      return res.status(400).json({
+        success: false,
+        message: "Thời gian không hợp lệ"
+      });
+    }
+
+    if (scheduledDate < new Date()) {
+      return res.status(400).json({
+        success: false,
+        message: "Thời gian đặt trước phải trong tương lai"
+      });
+    }
+
+    // Tìm user theo email hoặc phone
+    let user = await User.findOne({
+      $or: [
+        { email: email.trim().toLowerCase() },
+        { phone: phone.trim() }
+      ]
+    });
+
+    // Nếu không tìm thấy, tạo tài khoản mới
+    if (!user) {
+      try {
+        user = await createCustomerAccount({ name, email: email.trim().toLowerCase(), phone: phone.trim() });
+      } catch (error) {
+        // Nếu email đã tồn tại (race condition), thử tìm lại
+        user = await User.findOne({
+          $or: [
+            { email: email.trim().toLowerCase() },
+            { phone: phone.trim() }
+          ]
+        });
+        
+        if (!user) {
+          return res.status(500).json({
+            success: false,
+            message: "Không thể tạo tài khoản: " + error.message
+          });
+        }
+      }
+    } else {
+      // Cập nhật thông tin nếu có thay đổi
+      const updateData = {};
+      if (user.name !== name) updateData.name = name;
+      if (user.email !== email.trim().toLowerCase()) updateData.email = email.trim().toLowerCase();
+      if (user.phone !== phone.trim()) updateData.phone = phone.trim();
+      
+      if (Object.keys(updateData).length > 0) {
+        await User.findByIdAndUpdate(user._id, updateData);
+        user = await User.findById(user._id);
+      }
+    }
+
+    // Tạo OrderItems từ cart data
+    const { createdOrderItems, totalAmount } = await createOrderItemsFromCart(orderItems);
+
+    // Tạo Payment
+    const payment = new Payment({
+      paymentMethod: "cash", // Mặc định thanh toán tiền mặt
+      status: "unpaid",
+      amountPaid: 0,
+      totalAmount: totalAmount
+    });
+    await payment.save();
+
+    // Tạo Order với status "preorder"
+    const order = new Order({
+      tableId: null, // Chưa có bàn khi đặt trước
+      orderItems: createdOrderItems,
+      paymentId: payment._id, // Backward compatibility
+      paymentIds: [payment._id], // Multiple payments support
+      status: "preorder",
+      scheduledTime: scheduledDate,
+      totalAmount: totalAmount,
+      discount: 0,
+      userId: user._id,
+      waiterResponse: {
+        status: "pending"
+      },
+      customerConfirmed: false,
+      confirmationHistory: [{
+        action: 'preorder_created',
+        timestamp: new Date(),
+        details: `Khách hàng đặt trước - Thời gian: ${scheduledDate.toLocaleString('vi-VN')}`
+      }]
+    });
+
+    await order.save();
+
+    // Cập nhật OrderItems với orderId
+    await OrderItem.updateMany(
+      { _id: { $in: createdOrderItems } },
+      { orderId: order._id }
+    );
+
+    // Cập nhật Payment với orderId
+    payment.orderId = order._id;
+    await payment.save();
+
+    // Populate để trả về thông tin đầy đủ
+    const populatedOrder = await Order.findById(order._id)
+      .populate({
+        path: "orderItems",
+        select: "itemName itemType quantity price"
+      })
+      .populate("tableId")
+      .populate("paymentId")
+      .populate("userId", "name email phone");
+
+    // Gửi email xác nhận đặt trước cho khách hàng
+    const { sendPreOrderConfirmationEmail } = require("../utils/mail");
+    try {
+      await sendPreOrderConfirmationEmail({
+        to: user.email,
+        name: user.name,
+        orderId: order._id.toString(),
+        orderItems: populatedOrder.orderItems,
+        scheduledTime: scheduledDate,
+        totalAmount: totalAmount
+      });
+      console.log(`✅ Email xác nhận đặt trước đã gửi đến: ${user.email}`);
+    } catch (emailError) {
+      console.error("❌ Lỗi gửi email xác nhận đặt trước:", emailError);
+      // Không throw error - order đã tạo thành công, chỉ là email không gửi được
+    }
+
+    // Populate thông tin item trong orderItems
+    await populateOrderItemDetails(populatedOrder.orderItems);
+
+    // Gộp các OrderItem đã bị tách lại thành 1 dòng khi gửi cho customer qua WebSocket
+    const { groupSplitOrderItemsForCustomer } = require("../utils/customerHelpers");
+    const groupedOrderItems = groupSplitOrderItemsForCustomer(populatedOrder.orderItems);
+    populatedOrder.orderItems = groupedOrderItems;
+
+    // Emit WebSocket event - phân loại đơn lớn/nhỏ để gửi đúng đối tượng
+    const webSocketService = req.app.get("webSocketService");
+    if (webSocketService) {
+      webSocketService.broadcastToOrder(order._id, "preorder:created", populatedOrder);
+      
+      // Kiểm tra đơn lớn hay nhỏ
+      const isLarge = await isLargeOrder(order);
+      console.log(`📦 PreOrder created - Order ID: ${order._id}, Total: ${order.totalAmount}, Is Large: ${isLarge}`);
+      
+      if (isLarge) {
+        // Đơn lớn → chỉ gửi cho Admin
+        console.log(`📤 Broadcasting preorder:new to ADMINS (large order)`);
+        webSocketService.broadcastToAllAdmins("preorder:new", populatedOrder);
+      } else {
+        // Đơn nhỏ → chỉ gửi cho Cashier (không gửi cho admin để tránh trùng)
+        console.log(`📤 Broadcasting preorder:new to CASHIERS (small order)`);
+        webSocketService.broadcastToAllCashiers("preorder:new", populatedOrder);
+      }
+    } else {
+      console.warn("⚠️ WebSocket service not available");
+    }
+
+    res.status(201).json({
+      success: true,
+      message: "Đặt trước thành công",
+      data: populatedOrder
+    });
+  } catch (error) {
+    console.error("Error creating preorder:", error);
+    res.status(500).json({ 
+      success: false, 
+      message: error.message 
+    });
+  }
+};
+
 // Lấy danh sách đơn hàng của user đã đăng nhập
 exports.getUserOrders = async (req, res) => {
   try {
@@ -396,9 +689,12 @@ exports.getUserOrders = async (req, res) => {
       .populate('paymentId')
       .sort({ createdAt: -1 }); // Sắp xếp theo thời gian tạo mới nhất
 
-    // Populate thông tin item trong orderItems
+    // Populate thông tin item trong orderItems và gộp các OrderItem đã bị tách
+    const { groupSplitOrderItemsForCustomer } = require("../utils/customerHelpers");
     for (const order of orders) {
       await populateOrderItemDetails(order.orderItems);
+      // Gộp các OrderItem đã bị tách lại thành 1 dòng khi hiển thị cho customer
+      order.orderItems = groupSplitOrderItemsForCustomer(order.orderItems);
     }
 
     res.status(200).json({
@@ -438,9 +734,66 @@ exports.getOrderById = async (req, res) => {
     // Populate thông tin item trong orderItems
     await populateOrderItemDetails(order.orderItems);
 
+    // Gộp các OrderItem đã bị tách lại thành 1 dòng khi hiển thị cho customer
+    const { groupSplitOrderItemsForCustomer } = require("../utils/customerHelpers");
+    const groupedOrderItems = groupSplitOrderItemsForCustomer(order.orderItems);
+    
+    // Đảm bảo groupedOrderItems là plain objects (convert từ Mongoose documents nếu cần)
+    const plainOrderItems = groupedOrderItems.map(item => {
+      // Nếu là Mongoose document, convert sang plain object
+      if (item && typeof item.toObject === 'function') {
+        return item.toObject({ getters: true, flattenMaps: true });
+      }
+      // Nếu đã là plain object, dùng trực tiếp
+      return item;
+    });
+    
+    // Gán plainOrderItems vào order (không phải Mongoose documents)
+    order.orderItems = plainOrderItems;
+
+    // Debug: log để kiểm tra groupedOrderItems có đầy đủ field không
+    if (plainOrderItems.length > 0) {
+      console.log(`📦 Grouped orderItems for response:`, plainOrderItems.map(item => ({
+        _id: item._id,
+        itemName: item.itemName,
+        quantity: item.quantity,
+        price: item.price,
+        itemId: item.itemId
+      })));
+    }
+
+    // Convert order sang plain object để đảm bảo serialize đúng
+    // Đặc biệt quan trọng: order.orderItems phải là plain objects, không phải Mongoose documents
+    let orderToSend;
+    if (order && typeof order.toObject === 'function') {
+      // Nếu order là Mongoose document, convert sang plain object
+      orderToSend = order.toObject({ getters: true, flattenMaps: true });
+      // Đảm bảo orderItems là plainOrderItems (đã convert ở trên)
+      orderToSend.orderItems = plainOrderItems;
+    } else {
+      // Nếu đã là plain object, chỉ cần serialize
+      orderToSend = JSON.parse(JSON.stringify(order));
+      // Đảm bảo orderItems là plainOrderItems
+      orderToSend.orderItems = plainOrderItems;
+    }
+    
+    // Debug: Kiểm tra orderToSend.orderItems
+    console.log(`📦 orderToSend.orderItems type:`, Array.isArray(orderToSend.orderItems) ? 'array' : typeof orderToSend.orderItems);
+    console.log(`📦 orderToSend.orderItems length:`, orderToSend.orderItems?.length);
+    if (orderToSend.orderItems && orderToSend.orderItems.length > 0) {
+      console.log(`📦 orderToSend.orderItems[0]:`, {
+        _id: orderToSend.orderItems[0]._id,
+        itemName: orderToSend.orderItems[0].itemName,
+        quantity: orderToSend.orderItems[0].quantity,
+        price: orderToSend.orderItems[0].price,
+        isString: typeof orderToSend.orderItems[0] === 'string',
+        keys: Object.keys(orderToSend.orderItems[0] || {})
+      });
+    }
+    
     res.status(200).json({
       success: true,
-      data: order
+      data: orderToSend
     });
   } catch (error) {
     res.status(500).json({
@@ -582,6 +935,62 @@ exports.addItemsToOrder = async (req, res) => {
       details: 'Customer thêm món vào đơn hàng'
     });
     
+    // 🔍 Tự động gán lại tableId nếu order hiện tại không có tableId
+    // (tương tự logic trong createOrder - khi customer sửa đơn và gửi lại)
+    if (!order.tableId) {
+      let finalTableId = null;
+      
+      // Case 1: Customer đã đăng nhập - tìm theo userId
+      if (order.userId) {
+        const latestActiveOrder = await Order.findOne({
+          userId: order.userId,
+          _id: { $ne: order._id }, // Loại trừ order hiện tại
+          status: { $in: ["confirmed", "preparing", "served"] },
+          tableId: { $ne: null }
+        })
+        .sort({ createdAt: -1 })
+        .limit(1);
+        
+        if (latestActiveOrder?.tableId) {
+          finalTableId = latestActiveOrder.tableId;
+          console.log(`✅ Auto-reassigned tableId from userId: ${finalTableId} (Order ID: ${latestActiveOrder._id})`);
+        }
+      }
+      
+      // Case 2: Customer chưa đăng nhập - tìm order gần nhất của guest user
+      if (!finalTableId && !order.userId) {
+        // Tìm order gần nhất của guest user (trong 2 giờ) có tableId
+        const twoHoursAgo = new Date(Date.now() - 2 * 60 * 60 * 1000);
+        const latestGuestOrder = await Order.findOne({
+          userId: null,
+          _id: { $ne: order._id }, // Loại trừ order hiện tại
+          createdAt: { $gte: twoHoursAgo },
+          status: { $in: ["confirmed", "preparing", "served"] },
+          tableId: { $ne: null }
+        })
+        .sort({ createdAt: -1 })
+        .limit(1);
+        
+        if (latestGuestOrder?.tableId) {
+          finalTableId = latestGuestOrder.tableId;
+          console.log(`✅ Auto-reassigned tableId from recent guest order: ${finalTableId}`);
+        }
+      }
+      
+      // Gán tableId nếu tìm thấy
+      if (finalTableId) {
+        order.tableId = finalTableId;
+        console.log(`✅ Auto-assigned tableId ${finalTableId} to order ${order._id} after modification`);
+        
+        // Kiểm tra bàn có tồn tại không
+        const table = await Table.findById(finalTableId);
+        if (!table) {
+          console.warn(`⚠️ Table ${finalTableId} not found, setting tableId to null`);
+          order.tableId = null;
+        }
+      }
+    }
+    
     await order.save();
 
     // Cập nhật Payment với totalAmount mới
@@ -602,6 +1011,14 @@ exports.addItemsToOrder = async (req, res) => {
       })
       .populate("tableId")
       .populate("paymentId");
+
+    // Populate thông tin item trong orderItems
+    await populateOrderItemDetails(populatedOrder.orderItems);
+
+    // Gộp các OrderItem đã bị tách lại thành 1 dòng khi gửi cho customer qua WebSocket
+    const { groupSplitOrderItemsForCustomer } = require("../utils/customerHelpers");
+    const groupedOrderItems = groupSplitOrderItemsForCustomer(populatedOrder.orderItems);
+    populatedOrder.orderItems = groupedOrderItems;
 
     // Emit WebSocket event để cập nhật real-time
     const webSocketService = req.app.get("webSocketService");
@@ -692,6 +1109,14 @@ exports.cancelOrderItem = async (req, res) => {
       .populate("orderItems")
       .populate("tableId")
       .populate("paymentId");
+
+    // Populate thông tin item trong orderItems
+    await populateOrderItemDetails(populatedOrder.orderItems);
+
+    // Gộp các OrderItem đã bị tách lại thành 1 dòng khi gửi cho customer qua WebSocket
+    const { groupSplitOrderItemsForCustomer } = require("../utils/customerHelpers");
+    const groupedOrderItems = groupSplitOrderItemsForCustomer(populatedOrder.orderItems);
+    populatedOrder.orderItems = groupedOrderItems;
 
     // Emit WebSocket event để cập nhật real-time
     const webSocketService = req.app.get("webSocketService");
@@ -851,6 +1276,14 @@ exports.updateOrderStatus = async (req, res) => {
       .populate("orderItems")
       .populate("tableId")
       .populate("paymentId");
+    
+    // Populate thông tin item trong orderItems
+    await populateOrderItemDetails(updatedOrder.orderItems);
+
+    // Gộp các OrderItem đã bị tách lại thành 1 dòng khi gửi cho customer qua WebSocket
+    const { groupSplitOrderItemsForCustomer } = require("../utils/customerHelpers");
+    const groupedOrderItems = groupSplitOrderItemsForCustomer(updatedOrder.orderItems);
+    updatedOrder.orderItems = groupedOrderItems;
     
     // Emit WebSocket với order đã cập nhật payment
     const webSocketService = req.app.get("webSocketService");
@@ -1206,24 +1639,65 @@ exports.confirmOrder = async (req, res) => {
 
     await order.save();
 
+    // Chia OrderItem lớn thành nhiều OrderItem nhỏ hơn để phân bổ workload cho waiter
+    const { splitLargeOrderItems } = require("../utils/customerHelpers");
+    const splitCount = await splitLargeOrderItems(order._id);
+    if (splitCount > 0) {
+      console.log(`✅ Đã chia ${splitCount} OrderItem lớn thành nhiều OrderItem nhỏ hơn sau khi customer confirm`);
+    }
+
+    // Reload order sau khi chia để có OrderItem mới
+    await order.populate("orderItems");
+    
     // Populate để trả về thông tin đầy đủ
     const populatedOrder = await Order.findById(order._id)
       .populate({
         path: "orderItems",
-        populate: {
-          path: "assignedChef",
-          select: "name username"
-        }
+        select: "itemName itemId quantity price note status assignedChef itemType comboItems", // ✅ THÊM itemType và comboItems
+        populate: [
+          {
+            path: "itemId",
+            select: "name"
+          },
+          {
+            path: "assignedChef",
+            select: "name username"
+          }
+        ]
       })
-      .populate("tableId")
+      .populate("tableId", "tableNumber number")
       .populate("paymentId");
+
+    // Populate thông tin item trong orderItems
+    await populateOrderItemDetails(populatedOrder.orderItems);
+
+    // Populate assignedChef cho comboItems (cần cho kitchen format)
+    const { populateComboItemsChefs, formatOrderForKitchen } = require("./kitchen.order.controller");
+    await populateComboItemsChefs(populatedOrder.orderItems);
+
+    // Format order cho kitchen (KHÔNG group items, format giống getConfirmedOrders)
+    const kitchenFormattedOrder = formatOrderForKitchen(populatedOrder);
+
+    // Gộp các OrderItem đã bị tách lại thành 1 dòng khi hiển thị cho customer
+    const { groupSplitOrderItemsForCustomer } = require("../utils/customerHelpers");
+    const groupedOrderItems = groupSplitOrderItemsForCustomer(populatedOrder.orderItems);
+    populatedOrder.orderItems = groupedOrderItems;
 
     // Emit WebSocket event để thông báo kitchen có đơn hàng mới
     const webSocketService = req.app.get("webSocketService");
     if (webSocketService) {
       webSocketService.broadcastToOrder(order._id, "order:confirmed", populatedOrder);
-      // Broadcast to all kitchen connections
-      webSocketService.broadcastToAllKitchen("order:confirmed", populatedOrder);
+      // Broadcast to all kitchen connections với format đúng cho kitchen
+      webSocketService.broadcastToAllKitchen("order:confirmed", kitchenFormattedOrder);
+      
+      // Broadcast to cashiers để hiển thị đơn chờ thanh toán ngay khi customer confirm
+      if (webSocketService.broadcastToAllCashiers) {
+        const { formatOrder } = require("./cashier.controller");
+        const payload = formatOrder(populatedOrder);
+        if (payload) {
+          webSocketService.broadcastToAllCashiers("cashier.orders.preparing", payload);
+        }
+      }
     }
 
     res.status(200).json({
@@ -1529,6 +2003,14 @@ exports.testUpdateOrderItemStatus = async (req, res) => {
       .populate("tableId")
       .populate("paymentId");
 
+    // Populate thông tin item trong orderItems
+    await populateOrderItemDetails(updatedOrder.orderItems);
+
+    // Gộp các OrderItem đã bị tách lại thành 1 dòng khi gửi cho customer qua WebSocket
+    const { groupSplitOrderItemsForCustomer } = require("../utils/customerHelpers");
+    const groupedOrderItems = groupSplitOrderItemsForCustomer(updatedOrder.orderItems);
+    updatedOrder.orderItems = groupedOrderItems;
+
     // Emit WebSocket event để cập nhật real-time
     const webSocketService = req.app.get("webSocketService");
     if (webSocketService) {
@@ -1572,6 +2054,11 @@ exports.getLatestOrder = async (req, res) => {
 
     // Populate thông tin item trong orderItems
     await populateOrderItemDetails(latestOrder.orderItems);
+
+    // Gộp các OrderItem đã bị tách lại thành 1 dòng khi hiển thị cho customer
+    const { groupSplitOrderItemsForCustomer } = require("../utils/customerHelpers");
+    const groupedOrderItems = groupSplitOrderItemsForCustomer(latestOrder.orderItems);
+    latestOrder.orderItems = groupedOrderItems;
 
     res.status(200).json({
       success: true,

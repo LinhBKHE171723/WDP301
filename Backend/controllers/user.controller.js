@@ -3,7 +3,8 @@ const cloudinary = require("../config/cloudinary");
 const jwt = require("jsonwebtoken");
 const bcrypt = require("bcryptjs");
 const nodemailer = require("nodemailer");
-
+const streamifier = require("streamifier");
+const Shift = require("../models/Shift");
 // Lấy thông tin profile người dùng hiện tại
 exports.getProfile = async (req, res) => {
     try {
@@ -20,28 +21,18 @@ exports.getProfile = async (req, res) => {
 // Cập nhật thông tin profile người dùng
 exports.updateProfile = async (req, res) => {
     try {
-        console.log("User ID từ JWT:", req.user);
-        console.log("📦 req.body:", req.body);
-        console.log("📁 req.file:", req.file);
-        const userId = req.user.id; // lấy từ JWT middleware
-        const { name, phone } = req.body;
-        let avatar = req.body.avatar;
-
-        // Nếu có file upload từ frontend (multer)
-        if (req.file) {
-            const result = await cloudinary.uploader.upload(req.file.path, {
-                folder: "restaurant_profiles",
-            });
-            avatar = result.secure_url;
-        }
+        const { name, phone, avatar } = req.body; // avatar là URL từ frontend (upload trực tiếp)
 
         const updatedUser = await User.findByIdAndUpdate(
-            userId,
+            req.user.id,
             { name, phone, avatar },
             { new: true, runValidators: true }
-        ).select("-password"); // Ẩn mật khẩu
+        ).select("-password");
 
-        // Tạo token mới với thông tin cập nhật để cậP nhật giao diện
+        if (!updatedUser)
+            return res.status(404).json({ success: false, message: "Không tìm thấy người dùng" });
+
+        // Tạo token mới (nếu muốn frontend cập nhật ngay)
         const newToken = jwt.sign(
             {
                 id: updatedUser._id,
@@ -56,24 +47,15 @@ exports.updateProfile = async (req, res) => {
             { expiresIn: process.env.JWT_EXPIRES_IN }
         );
 
-        if (!updatedUser) {
-            return res
-                .status(404)
-                .json({ success: false, message: "Không tìm thấy người dùng" });
-        }
-
-        // Trả về user đã cập nhật
         res.status(200).json({
             success: true,
             message: "Cập nhật thông tin thành công",
             user: updatedUser,
-            token: newToken, // 👈 trả token mới về
+            token: newToken,
         });
     } catch (err) {
         console.error("❌ Lỗi cập nhật profile:", err);
-        res
-            .status(500)
-            .json({ success: false, message: err.message || "Lỗi server" });
+        res.status(500).json({ success: false, message: err.message });
     }
 };
 
@@ -142,3 +124,109 @@ exports.resetPassword = async (req, res) => {
     }
 };
 
+// ===================== Lấy shift hôm nay =====================
+// helper: lấy start và end của ngày hôm nay
+const getTodayRange = () => {
+    const startOfDay = new Date();
+    startOfDay.setHours(0, 0, 0, 0);
+
+    const endOfDay = new Date();
+    endOfDay.setHours(23, 59, 59, 999);
+
+    return { startOfDay, endOfDay };
+};
+
+exports.getTodayShift = async (req, res) => {
+    try {
+        const userId = req.user.id;
+        const { startOfDay, endOfDay } = getTodayRange();
+
+        // Tìm shift trong ngày hôm nay
+        const shift = await Shift.findOne({
+            userId,
+            date: { $gte: startOfDay, $lte: endOfDay }
+        }).populate("workShiftId");
+
+        res.json({ success: true, shift });
+    } catch (err) {
+        console.error("❌ Lỗi getTodayShift:", err);
+        res.status(500).json({ success: false, message: err.message });
+    }
+};
+
+// ===================== Check-in =====================
+exports.checkIn = async (req, res) => {
+    try {
+        const userId = req.user.id;
+        const { startOfDay, endOfDay } = getTodayRange();
+
+        const shift = await Shift.findOne({
+            userId,
+            date: { $gte: startOfDay, $lte: endOfDay }
+        }).populate("workShiftId");
+
+        if (!shift) return res.status(404).json({ success: false, message: "Không có ca làm hôm nay." });
+
+        if (shift.startTime)
+            return res.status(400).json({ success: false, message: "Bạn đã check-in rồi." });
+
+        const now = new Date();
+
+        // Tính thời gian bắt đầu ca làm chuẩn
+        const scheduledStart = new Date(shift.date);
+        const [h, m] = shift.workShiftId.startTime.split(":").map(Number);
+        scheduledStart.setHours(h, m, 0, 0);
+
+        shift.startTime = now;
+        shift.status = now > scheduledStart ? "late" : "checked_in";
+
+        await shift.save();
+
+        // Cập nhật status user → active khi check-in
+        await User.findByIdAndUpdate(userId, { status: "active" });
+
+        res.json({ success: true, message: "✅ Check-in thành công!", shift });
+    } catch (err) {
+        console.error("❌ Lỗi checkIn:", err);
+        res.status(500).json({ success: false, message: err.message });
+    }
+};
+
+// ===================== Check-out =====================
+exports.checkOut = async (req, res) => {
+    try {
+        const userId = req.user.id;
+        const { startOfDay, endOfDay } = getTodayRange();
+
+        const shift = await Shift.findOne({
+            userId,
+            date: { $gte: startOfDay, $lte: endOfDay }
+        }).populate("workShiftId");
+
+        if (!shift || !shift.startTime)
+            return res.status(400).json({ success: false, message: "Bạn chưa check-in." });
+
+        if (shift.endTime)
+            return res.status(400).json({ success: false, message: "Bạn đã check-out rồi." });
+
+        const now = new Date();
+
+        // Tính thời gian kết thúc ca làm chuẩn
+        const scheduledEnd = new Date(shift.date);
+        const [eh, em] = shift.workShiftId.endTime.split(":").map(Number);
+        scheduledEnd.setHours(eh, em, 0, 0);
+
+        shift.endTime = now;
+        shift.status = now < scheduledEnd ? "early_leave" : "checked_out";
+
+        await shift.save();
+
+        // Cập nhật status user → inactive sau check-out
+        await User.findByIdAndUpdate(userId, { status: "inactive" });
+
+        res.json({ success: true, message: "✅ Check-out thành công!", shift });
+    } catch (err) {
+        console.error("❌ Lỗi checkOut:", err);
+        res.status(500).json({ success: false, message: err.message });
+    }
+};

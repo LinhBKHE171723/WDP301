@@ -309,11 +309,54 @@ class WebSocketService {
       timestamp: new Date().toISOString()
     };
 
+    let sentCount = 0;
     this.wss.clients.forEach(ws => {
       if (ws.readyState === WebSocket.OPEN && ws.userRole === 'kitchen_manager') {
         ws.send(JSON.stringify(message));
+        sentCount++;
       }
     });
+    console.log(`📡 Broadcasted ${eventType} to ${sentCount} kitchen manager(s)`, data);
+  }
+
+  // ==================================================
+  // 📢 Gửi broadcast cho tất cả cashier
+  // ==================================================
+  broadcastToAllCashiers(eventType, data) {
+    const message = {
+      type: eventType,
+      data,
+      timestamp: new Date().toISOString()
+    };
+
+    let sentCount = 0;
+    this.wss.clients.forEach(ws => {
+      if (ws.readyState === WebSocket.OPEN && ws.userRole === 'cashier') {
+        ws.send(JSON.stringify(message));
+        sentCount++;
+      }
+    });
+    console.log(`📡 Broadcasted ${eventType} to ${sentCount} cashier(s)`, data);
+  }
+
+  // ==================================================
+  // 📢 Gửi broadcast cho tất cả admin
+  // ==================================================
+  broadcastToAllAdmins(eventType, data) {
+    const message = {
+      type: eventType,
+      data,
+      timestamp: new Date().toISOString()
+    };
+
+    let sentCount = 0;
+    this.wss.clients.forEach(ws => {
+      if (ws.readyState === WebSocket.OPEN && ws.userRole === 'admin') {
+        ws.send(JSON.stringify(message));
+        sentCount++;
+      }
+    });
+    console.log(`📡 Broadcasted ${eventType} to ${sentCount} admin(s)`, data);
   }
 
   // ==================================================

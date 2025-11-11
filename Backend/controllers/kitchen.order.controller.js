@@ -29,6 +29,79 @@ async function populateComboItemsChefs(orderItems) {
     }
   }
 }
+
+// Export để có thể sử dụng ở file khác
+exports.populateComboItemsChefs = populateComboItemsChefs;
+
+// Helper function để format order cho kitchen (giống format trong getConfirmedOrders)
+exports.formatOrderForKitchen = (order) => {
+  if (!order || !order.orderItems) {
+    return null;
+  }
+
+  const pendingItems = order.orderItems.filter(
+    (oi) => oi.status === "pending" || oi.status === "preparing"
+  ).length;
+
+  return {
+    _id: order._id,
+    tableNumber: order.tableId ? (order.tableId.number || order.tableId.tableNumber) : "N/A",
+    createdAt: order.createdAt,
+    status: order.status,
+    totalItems: order.orderItems.length,
+    itemsRemaining: pendingItems,
+    items: order.orderItems.map((orderItem) => {
+      // Convert orderItem sang plain object nếu là Mongoose document
+      const plainOrderItem = orderItem && typeof orderItem.toObject === 'function' 
+        ? orderItem.toObject({ getters: true }) 
+        : orderItem;
+      
+      // Format assignedChef: lấy name nếu là object đã populate, null nếu là string/ObjectId
+      let assignedChefFormatted = null;
+      if (plainOrderItem.assignedChef) {
+        if (typeof plainOrderItem.assignedChef === 'object' && plainOrderItem.assignedChef.name) {
+          // Đã được populate, giữ nguyên object hoặc chỉ lấy name
+          assignedChefFormatted = plainOrderItem.assignedChef;
+        } else {
+          // Chưa populate hoặc là ObjectId string, set null (sẽ được populate ở nơi khác)
+          assignedChefFormatted = null;
+        }
+      }
+
+      return {
+        orderItemId: plainOrderItem._id,
+        itemName: plainOrderItem.itemName || (plainOrderItem.itemId ? (plainOrderItem.itemId.name || "Món đã xóa") : "Món đã xóa"),
+        quantity: plainOrderItem.quantity,
+        note: plainOrderItem.note,
+        status: plainOrderItem.status,
+        assignedChef: assignedChefFormatted, // ✅ Format đúng assignedChef
+        itemType: plainOrderItem.itemType,
+        // Đảm bảo comboItems có đầy đủ thông tin (itemName, status, assignedChef, etc.)
+        comboItems: (plainOrderItem.comboItems || []).map((ci) => {
+          // Format assignedChef cho comboItem
+          let comboItemAssignedChef = null;
+          if (ci.assignedChef) {
+            if (typeof ci.assignedChef === 'object' && ci.assignedChef.name) {
+              comboItemAssignedChef = ci.assignedChef;
+            } else {
+              comboItemAssignedChef = null;
+            }
+          }
+          
+          return {
+            itemId: ci.itemId,
+            itemName: ci.itemName || (ci.itemId && typeof ci.itemId === 'object' ? ci.itemId.name : null) || "Món đã xóa",
+            status: ci.status || "pending",
+            assignedChef: comboItemAssignedChef, // ✅ Format đúng assignedChef
+            servedBy: ci.servedBy,
+            readyAt: ci.readyAt,
+          };
+        }),
+      };
+    }),
+  };
+};
+
 exports.getConfirmedOrders = async (req, res) => {
   try {
     // 1. Chỉ lấy các order có trạng thái là 'confirmed'
@@ -211,13 +284,24 @@ exports.assignChefToItem = async (req, res) => {
           .populate({
             path: "orderItems",
             select: "itemName itemType comboItems quantity note status assignedChef", // Đảm bảo có itemName
-            populate: {
-              path: "assignedChef",
-              select: "name username"
-            }
+            populate: [
+              {
+                path: "itemId",  // ✅ THÊM populate itemId để frontend có thể lấy tên món
+                select: "name"
+              },
+              {
+                path: "assignedChef",
+                select: "name username"
+              }
+            ]
           })
           .populate("tableId")
           .populate("paymentId");
+        
+        // Populate assignedChef cho comboItems
+        if (fullOrder && fullOrder.orderItems) {
+          await populateComboItemsChefs(fullOrder.orderItems);
+        }
         
         if (fullOrder) {
           webSocketService.broadcastToOrder(orderItem.orderId, "order:updated", fullOrder);
@@ -439,6 +523,10 @@ exports.markItemReady = async (req, res) => {
           select: "itemName itemType comboItems quantity note status assignedChef servedBy", // Đảm bảo có itemName và servedBy
           populate: [
             {
+              path: "itemId",  // ✅ THÊM populate itemId để frontend có thể lấy tên món
+              select: "name"
+            },
+            {
               path: "assignedChef",
               select: "name username"
             },
@@ -577,6 +665,10 @@ exports.updateComboItemStatus = async (req, res) => {
           path: "orderItems",
           select: "itemName itemType comboItems quantity note status assignedChef servedBy", // Đảm bảo có itemName và servedBy
           populate: [
+            {
+              path: "itemId",  // ✅ THÊM populate itemId để frontend có thể lấy tên món
+              select: "name"
+            },
             {
               path: "assignedChef",
               select: "name username"
@@ -730,10 +822,16 @@ exports.assignChefToComboItem = async (req, res) => {
           .populate({
             path: "orderItems",
             select: "itemName itemType comboItems quantity note status assignedChef",
-            populate: {
-              path: "assignedChef",
-              select: "name username"
-            }
+            populate: [
+              {
+                path: "itemId",  // ✅ THÊM populate itemId để frontend có thể lấy tên món
+                select: "name"
+              },
+              {
+                path: "assignedChef",
+                select: "name username"
+              }
+            ]
           })
           .populate("tableId")
           .populate("paymentId");

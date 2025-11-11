@@ -10,25 +10,26 @@ const Payment = require("../models/Payment");
 const Feedback = require("../models/Feedback");
 const PurchaseOrder = require("../models/PurchaseOrder");
 const Shift = require("../models/Shift");
+const WorkShift = require("../models/WorkShift");
 
 const seedDatabase = async () => {
   try {
     console.log("🚀 Bắt đầu seed database...");
 
-    // 1️⃣ Xóa toàn bộ dữ liệu cũ
-    await Promise.all([
-      User.deleteMany(),
-      Ingredient.deleteMany(),
-      Item.deleteMany(),
-      Menu.deleteMany(),
-      Table.deleteMany(),
-      Order.deleteMany(),
-      OrderItem.deleteMany(),
-      Payment.deleteMany(),
-      Feedback.deleteMany(),
-      PurchaseOrder.deleteMany(),
-    ]);
-    console.log("🧹 Đã xoá toàn bộ dữ liệu cũ.");
+    // 1️⃣ Drop tất cả các collections (bảng) trước
+    console.log("🗑️ Đang drop tất cả các collections...");
+    const db = mongoose.connection.db;
+    const collections = await db.listCollections().toArray();
+    
+    for (const collection of collections) {
+      try {
+        await db.dropCollection(collection.name);
+        console.log(`  ✅ Đã drop collection: ${collection.name}`);
+      } catch (error) {
+        console.warn(`  ⚠️ Không thể drop collection ${collection.name}:`, error.message);
+      }
+    }
+    console.log("🧹 Đã drop tất cả các collections.");
 
     // 2️⃣ Tạo user mẫu (dùng for để trigger pre-save hash)
     // Helper function để tạo tên ngẫu nhiên
@@ -49,7 +50,7 @@ const seedDatabase = async () => {
     };
     
     const userData = [
-      // Waiters (chỉ waiter01 và waiter02 active, còn lại inactive)
+      // Waiters (waiter01-04 active, waiter05 inactive)
       {
         name: "Trần Thị Phục Vụ 1",
         username: "waiter01",
@@ -75,7 +76,7 @@ const seedDatabase = async () => {
         email: "waiter3@example.com",
         phone: "0987654323",
         role: "waiter",
-        status: "inactive",
+        status: "active",
       },
       {
         name: "Nguyễn Văn Phục Vụ 4",
@@ -84,7 +85,7 @@ const seedDatabase = async () => {
         email: "waiter4@example.com",
         phone: "0987654324",
         role: "waiter",
-        status: "inactive",
+        status: "active",
       },
       {
         name: "Hoàng Thị Phục Vụ 5",
@@ -103,6 +104,7 @@ const seedDatabase = async () => {
         email: "chef@example.com",
         phone: "0908888999",
         role: "chef",
+        status: "active",
       },
       {
         name: "Phan Tiến Mạnh",
@@ -111,6 +113,7 @@ const seedDatabase = async () => {
         email: "chef02@example.com",
         phone: "0908888998",
         role: "chef",
+        status: "active",
       },
       {
         name: "Minh Chúc",
@@ -119,6 +122,7 @@ const seedDatabase = async () => {
         email: "chef03@example.com",
         phone: "0908888997",
         role: "chef",
+        status: "active",
       },
       // Kitchen Managers
       {
@@ -128,6 +132,7 @@ const seedDatabase = async () => {
         email: "kitchen@example.com",
         phone: "0908888988",
         role: "kitchen_manager",
+        status: "active",
       },
       {
         name: "Phó Quản Lý Bếp",
@@ -136,6 +141,7 @@ const seedDatabase = async () => {
         email: "kitchen02@example.com",
         phone: "0908888987",
         role: "kitchen_manager",
+        status: "active",
       },
       // Admin
       {
@@ -145,6 +151,34 @@ const seedDatabase = async () => {
         email: "admin@example.com",
         phone: "0909999000",
         role: "admin",
+      },
+      // Cashiers
+      {
+        name: "Nguyễn Thị Thu Ngân 1",
+        username: "cashier01",
+        password: "cashier@123",
+        email: "cashier1@example.com",
+        phone: "0911111111",
+        role: "cashier",
+        status: "active",
+      },
+      {
+        name: "Trần Văn Thu Ngân 2",
+        username: "cashier02",
+        password: "cashier@123",
+        email: "cashier2@example.com",
+        phone: "0911111112",
+        role: "cashier",
+        status: "active",
+      },
+      {
+        name: "Lê Thị Thu Ngân 3",
+        username: "cashier03",
+        password: "cashier@123",
+        email: "cashier3@example.com",
+        phone: "0911111113",
+        role: "cashier",
+        status: "inactive",
       },
     ];
 
@@ -157,15 +191,15 @@ const seedDatabase = async () => {
 
     // 2.1️⃣ Tạo nhiều customers với các loại khác nhau
     console.log("👥 Bắt đầu tạo customers với các loại khác nhau...");
-    const TOTAL_CUSTOMERS = 400; // Tổng số customers
+    const TOTAL_CUSTOMERS = 20; // Tổng số customers
     const customerTypes = {
-      VIP: { count: 30, minOrders: 15, maxOrders: 25, minPoints: 500, maxPoints: 1000, cancelRate: 0.05 }, // VIP: nhiều orders, điểm cao, ít cancel
-      BAD: { count: 20, minOrders: 1, maxOrders: 4, minPoints: 0, maxPoints: 50, cancelRate: 0.45 }, // Bad: ít orders, điểm thấp, nhiều cancel
-      FREQUENT_HIGH_VALUE: { count: 50, minOrders: 10, maxOrders: 18, minPoints: 200, maxPoints: 400, cancelRate: 0.1 }, // Thường xuyên, giá trị cao
-      FREQUENT_LOW_VALUE: { count: 50, minOrders: 8, maxOrders: 15, minPoints: 100, maxPoints: 250, cancelRate: 0.15 }, // Thường xuyên, giá trị thấp
-      INFREQUENT_HIGH_VALUE: { count: 50, minOrders: 3, maxOrders: 8, minPoints: 150, maxPoints: 300, cancelRate: 0.2 }, // Không thường xuyên, giá trị cao
-      INFREQUENT_LOW_VALUE: { count: 50, minOrders: 1, maxOrders: 5, minPoints: 50, maxPoints: 150, cancelRate: 0.25 }, // Không thường xuyên, giá trị thấp
-      REGULAR: { count: 150, minOrders: 2, maxOrders: 10, minPoints: 80, maxPoints: 200, cancelRate: 0.15 } // Bình thường
+      VIP: { count: 2, minOrders: 5, maxOrders: 10, minPoints: 500, maxPoints: 1000, cancelRate: 0.05 }, // VIP: nhiều orders, điểm cao, ít cancel
+      BAD: { count: 1, minOrders: 1, maxOrders: 2, minPoints: 0, maxPoints: 50, cancelRate: 0.45 }, // Bad: ít orders, điểm thấp, nhiều cancel
+      FREQUENT_HIGH_VALUE: { count: 3, minOrders: 4, maxOrders: 8, minPoints: 200, maxPoints: 400, cancelRate: 0.1 }, // Thường xuyên, giá trị cao
+      FREQUENT_LOW_VALUE: { count: 3, minOrders: 3, maxOrders: 7, minPoints: 100, maxPoints: 250, cancelRate: 0.15 }, // Thường xuyên, giá trị thấp
+      INFREQUENT_HIGH_VALUE: { count: 3, minOrders: 2, maxOrders: 5, minPoints: 150, maxPoints: 300, cancelRate: 0.2 }, // Không thường xuyên, giá trị cao
+      INFREQUENT_LOW_VALUE: { count: 3, minOrders: 1, maxOrders: 3, minPoints: 50, maxPoints: 150, cancelRate: 0.25 }, // Không thường xuyên, giá trị thấp
+      REGULAR: { count: 5, minOrders: 3, maxOrders: 7, minPoints: 80, maxPoints: 200, cancelRate: 0.15 } // Bình thường
     };
     
     const allCustomers = [];
@@ -231,17 +265,39 @@ const seedDatabase = async () => {
     const waiters = users.filter((u) => u.role === "waiter");
     const chefs = users.filter((u) => u.role === "chef");
     const kitchenManagers = users.filter((u) => u.role === "kitchen_manager");
+    const cashiers = users.filter((u) => u.role === "cashier");
 
     // 2.5️⃣ Tạo Shift Data cho nhân viên
     console.log("📅 Bắt đầu tạo Shift data...");
+    
+    // Tạo WorkShift trước (Ca sáng và Ca chiều)
+    console.log("📋 Tạo WorkShift...");
+    const morningWorkShift = await WorkShift.create({
+      name: "Ca sáng",
+      startTime: "07:00",
+      endTime: "15:00",
+      daysOfWeek: [0, 1, 2, 3, 4, 5, 6],
+      isActive: true,
+    });
+    
+    const afternoonWorkShift = await WorkShift.create({
+      name: "Ca chiều",
+      startTime: "15:00",
+      endTime: "23:00",
+      daysOfWeek: [0, 1, 2, 3, 4, 5, 6],
+      isActive: true,
+    });
+    
+    console.log(`✅ Đã tạo 2 WorkShift: ${morningWorkShift.name} và ${afternoonWorkShift.name}`);
+    
     const shifts = [];
-    const shiftThreeMonthsAgo = new Date();
-    shiftThreeMonthsAgo.setMonth(shiftThreeMonthsAgo.getMonth() - 3);
+    const shiftOneMonthAgo = new Date();
+    shiftOneMonthAgo.setMonth(shiftOneMonthAgo.getMonth() - 1);
     const shiftToday = new Date();
-    const shiftTotalDays = Math.floor((shiftToday - shiftThreeMonthsAgo) / (1000 * 60 * 60 * 24));
+    const shiftTotalDays = Math.floor((shiftToday - shiftOneMonthAgo) / (1000 * 60 * 60 * 24));
 
     // Helper function để tạo shifts cho một nhân viên
-    const createShiftsForEmployee = (employee, daysToWork) => {
+    const createShiftsForEmployee = (employee, daysToWork, morningWorkShiftId, afternoonWorkShiftId) => {
       const employeeShifts = [];
       const shiftDays = [];
       
@@ -255,29 +311,46 @@ const seedDatabase = async () => {
       shiftDays.sort((a, b) => a - b);
 
       for (const dayOffset of shiftDays) {
-        const shiftDate = new Date(shiftThreeMonthsAgo);
+        const shiftDate = new Date(shiftOneMonthAgo);
         shiftDate.setDate(shiftDate.getDate() + dayOffset);
         
         // Chọn ca làm việc: ca sáng (7h-15h) hoặc ca chiều (15h-23h)
         const isMorningShift = Math.random() > 0.5;
-        const startHour = isMorningShift ? 7 + Math.floor(Math.random() * 2) : 15 + Math.floor(Math.random() * 2);
+        let startHour, endHour, workShiftId;
+        
+        if (isMorningShift) {
+          // Ca sáng: 7:00-15:00
+          startHour = 7 + Math.floor(Math.random() * 2); // 7-8 giờ
+          endHour = 14 + Math.floor(Math.random() * 2); // 14-15 giờ
+          workShiftId = morningWorkShiftId;
+        } else {
+          // Ca chiều: 15:00-23:00
+          startHour = 15 + Math.floor(Math.random() * 2); // 15-16 giờ
+          endHour = 22 + Math.floor(Math.random() * 2); // 22-23 giờ
+          workShiftId = afternoonWorkShiftId;
+        }
+        
         const startMinute = Math.floor(Math.random() * 60);
+        const endMinute = Math.floor(Math.random() * 60);
         
         const startTime = new Date(shiftDate);
         startTime.setHours(startHour, startMinute, 0);
         
-        // End time: sau startTime 6-8 giờ
-        const durationHours = 6 + Math.floor(Math.random() * 3); // 6-8 giờ
-        const endTime = new Date(startTime);
-        endTime.setHours(endTime.getHours() + durationHours);
+        const endTime = new Date(shiftDate);
+        endTime.setHours(endHour, endMinute, 0);
+        
+        // Đảm bảo endTime sau startTime
+        if (endTime <= startTime) {
+          endTime.setHours(endTime.getHours() + 1);
+        }
         
         employeeShifts.push({
           userId: employee._id,
+          workShiftId: workShiftId,
           date: shiftDate,
           startTime: startTime,
           endTime: endTime,
           status: "checked_out", // Đã check out
-          duration: durationHours * 60, // Phút
         });
       }
 
@@ -287,26 +360,34 @@ const seedDatabase = async () => {
     // Tạo shifts cho waiters (active waiters)
     const activeWaitersForShift = waiters.filter(w => w.status === "active");
     for (const waiter of activeWaitersForShift) {
-      const daysToWork = 20 + Math.floor(Math.random() * 11); // 20-30 ngày
-      const waiterShifts = createShiftsForEmployee(waiter, daysToWork);
+      const daysToWork = 10 + Math.floor(Math.random() * 6); // 10-15 ngày
+      const waiterShifts = createShiftsForEmployee(waiter, daysToWork, morningWorkShift._id, afternoonWorkShift._id);
       shifts.push(...waiterShifts);
     }
 
     // Tạo shifts cho chefs
     for (const chef of chefs) {
-      const daysToWork = 20 + Math.floor(Math.random() * 11); // 20-30 ngày
-      const chefShifts = createShiftsForEmployee(chef, daysToWork);
+      const daysToWork = 10 + Math.floor(Math.random() * 6); // 10-15 ngày
+      const chefShifts = createShiftsForEmployee(chef, daysToWork, morningWorkShift._id, afternoonWorkShift._id);
       shifts.push(...chefShifts);
     }
 
     // Tạo shifts cho kitchen managers
     for (const manager of kitchenManagers) {
-      const daysToWork = 20 + Math.floor(Math.random() * 11); // 20-30 ngày
-      const managerShifts = createShiftsForEmployee(manager, daysToWork);
+      const daysToWork = 10 + Math.floor(Math.random() * 6); // 10-15 ngày
+      const managerShifts = createShiftsForEmployee(manager, daysToWork, morningWorkShift._id, afternoonWorkShift._id);
       shifts.push(...managerShifts);
     }
 
-    await Shift.insertMany(shifts);
+    // Tạo shifts cho cashiers (active cashiers)
+    const activeCashiersForShift = cashiers.filter(c => c.status === "active");
+    for (const cashier of activeCashiersForShift) {
+      const daysToWork = 10 + Math.floor(Math.random() * 6); // 10-15 ngày
+      const cashierShifts = createShiftsForEmployee(cashier, daysToWork, morningWorkShift._id, afternoonWorkShift._id);
+      shifts.push(...cashierShifts);
+    }
+
+    await Shift.create(shifts);
     console.log(`✅ Đã tạo ${shifts.length} shifts cho nhân viên.`);
 
     // 3️⃣ Nguyên liệu
@@ -1016,14 +1097,14 @@ const seedDatabase = async () => {
     console.log("🍽️ Đã tạo các Menu mẫu.");
 
     // ===============================
-    // 🪑 5️⃣ Tạo bàn ăn (35 bàn)
+    // 🪑 5️⃣ Tạo bàn ăn (20 bàn)
     // ===============================
     const tables = await Promise.all(
-      Array.from({ length: 35 }, (_, i) =>
+      Array.from({ length: 20 }, (_, i) =>
         Table.create({
           tableNumber: i + 1,
           qrCode: `QR_TABLE_${i + 1}`,
-          status: i < 15 ? "occupied" : "available",
+          status: i < 8 ? "occupied" : "available",
           orderNow: [],
         })
       )
@@ -1074,95 +1155,95 @@ const seedDatabase = async () => {
     };
 
     // Tạo PurchaseOrders cho từng ingredient, chia thành nhiều lô để test FIFO
-    // LƯU Ý: Tăng số lượng lên nhiều lần (x20-30) để đủ cho ~2000 orders trong 90 ngày
-    // Ví dụ: Thịt bò có 50kg ban đầu → tăng lên 1000kg để đủ cho tất cả orders
+    // LƯU Ý: Tăng số lượng lên nhiều lần (x3-5) để đủ cho ~100-200 orders trong 30 ngày
+    // Ví dụ: Thịt bò có 50kg ban đầu → tăng lên 200kg để đủ cho tất cả orders
     
-    // Thịt bò: 50kg × 20 = 1000kg
+    // Thịt bò: 50kg × 4 = 200kg
     createPurchaseOrdersForIngredient(
       ingredients.find((i) => i.name === "Thịt bò"),
       [
-        { quantity: 400, daysAgo: 10, daysFromNow: 15, price: 95000 }, // Lô cũ, hết hạn sau 15 ngày
-        { quantity: 600, daysAgo: 2, daysFromNow: 30, price: 105000 }  // Lô mới, hết hạn sau 30 ngày
+        { quantity: 80, daysAgo: 10, daysFromNow: 15, price: 95000 }, // Lô cũ, hết hạn sau 15 ngày
+        { quantity: 120, daysAgo: 2, daysFromNow: 30, price: 105000 }  // Lô mới, hết hạn sau 30 ngày
       ]
     );
 
-    // Cá hồi: 30kg × 20 = 600kg
+    // Cá hồi: 30kg × 4 = 120kg
     createPurchaseOrdersForIngredient(
       ingredients.find((i) => i.name === "Cá hồi"),
       [
-        { quantity: 300, daysAgo: 8, daysFromNow: 7, price: 95000 },   // Lô cũ, hết hạn sau 7 ngày
-        { quantity: 300, daysAgo: 1, daysFromNow: 20, price: 105000 } // Lô mới, hết hạn sau 20 ngày
+        { quantity: 60, daysAgo: 8, daysFromNow: 7, price: 95000 },   // Lô cũ, hết hạn sau 7 ngày
+        { quantity: 60, daysAgo: 1, daysFromNow: 20, price: 105000 } // Lô mới, hết hạn sau 20 ngày
       ]
     );
 
-    // Khoai tây: 40kg × 20 = 800kg
+    // Khoai tây: 40kg × 4 = 160kg
     createPurchaseOrdersForIngredient(
       ingredients.find((i) => i.name === "Khoai tây"),
       [
-        { quantity: 400, daysAgo: 15, daysFromNow: 45, price: 19000 },
-        { quantity: 400, daysAgo: 3, daysFromNow: 60, price: 21000 }
+        { quantity: 80, daysAgo: 15, daysFromNow: 45, price: 19000 },
+        { quantity: 80, daysAgo: 3, daysFromNow: 60, price: 21000 }
       ]
     );
 
-    // Rau xà lách: 60 bó × 20 = 1200 bó
+    // Rau xà lách: 60 bó × 4 = 240 bó
     createPurchaseOrdersForIngredient(
       ingredients.find((i) => i.name === "Rau xà lách"),
       [
-        { quantity: 600, daysAgo: 5, daysFromNow: 3, price: 9500 },  // Lô cũ, hết hạn sau 3 ngày
-        { quantity: 600, daysAgo: 1, daysFromNow: 7, price: 10500 } // Lô mới, hết hạn sau 7 ngày
+        { quantity: 120, daysAgo: 5, daysFromNow: 3, price: 9500 },  // Lô cũ, hết hạn sau 3 ngày
+        { quantity: 120, daysAgo: 1, daysFromNow: 7, price: 10500 } // Lô mới, hết hạn sau 7 ngày
       ]
     );
 
-    // Trứng gà: 100 quả × 20 = 2000 quả
+    // Trứng gà: 100 quả × 4 = 400 quả
     createPurchaseOrdersForIngredient(
       ingredients.find((i) => i.name === "Trứng gà"),
       [
-        { quantity: 1000, daysAgo: 7, daysFromNow: 14, price: 2900 },
-        { quantity: 1000, daysAgo: 2, daysFromNow: 21, price: 3100 }
+        { quantity: 200, daysAgo: 7, daysFromNow: 14, price: 2900 },
+        { quantity: 200, daysAgo: 2, daysFromNow: 21, price: 3100 }
       ]
     );
 
-    // Tôm tươi: 45kg × 20 = 900kg
+    // Tôm tươi: 45kg × 4 = 180kg
     createPurchaseOrdersForIngredient(
       ingredients.find((i) => i.name === "Tôm tươi"),
       [
-        { quantity: 400, daysAgo: 6, daysFromNow: 4, price: 95000 },   // Lô cũ, hết hạn sau 4 ngày
-        { quantity: 500, daysAgo: 1, daysFromNow: 15, price: 105000 }  // Lô mới, hết hạn sau 15 ngày
+        { quantity: 80, daysAgo: 6, daysFromNow: 4, price: 95000 },   // Lô cũ, hết hạn sau 4 ngày
+        { quantity: 100, daysAgo: 1, daysFromNow: 15, price: 105000 }  // Lô mới, hết hạn sau 15 ngày
       ]
     );
 
-    // Phô mai: 25kg × 20 = 500kg
+    // Phô mai: 25kg × 4 = 100kg
     createPurchaseOrdersForIngredient(
       ingredients.find((i) => i.name === "Phô mai"),
       [
-        { quantity: 200, daysAgo: 12, daysFromNow: 18, price: 75000 },
-        { quantity: 300, daysAgo: 3, daysFromNow: 30, price: 85000 }
+        { quantity: 40, daysAgo: 12, daysFromNow: 18, price: 75000 },
+        { quantity: 60, daysAgo: 3, daysFromNow: 30, price: 85000 }
       ]
     );
 
-    // Bột mì: 30kg × 20 = 600kg
+    // Bột mì: 30kg × 4 = 120kg
     createPurchaseOrdersForIngredient(
       ingredients.find((i) => i.name === "Bột mì"),
       [
-        { quantity: 300, daysAgo: 20, daysFromNow: 100, price: 11500 },
-        { quantity: 300, daysAgo: 5, daysFromNow: 120, price: 12500 }
+        { quantity: 60, daysAgo: 20, daysFromNow: 100, price: 11500 },
+        { quantity: 60, daysAgo: 5, daysFromNow: 120, price: 12500 }
       ]
     );
 
-    // Thịt gà: 35kg × 20 = 700kg
+    // Thịt gà: 35kg × 4 = 140kg
     createPurchaseOrdersForIngredient(
       ingredients.find((i) => i.name === "Thịt gà"),
       [
-        { quantity: 300, daysAgo: 10, daysFromNow: 10, price: 68000 },
-        { quantity: 400, daysAgo: 2, daysFromNow: 25, price: 72000 }
+        { quantity: 60, daysAgo: 10, daysFromNow: 10, price: 68000 },
+        { quantity: 80, daysAgo: 2, daysFromNow: 25, price: 72000 }
       ]
     );
 
-    // Thịt heo: 8kg × 20 = 160kg (vẫn thấp để test cảnh báo)
+    // Thịt heo: 8kg × 4 = 32kg (vẫn thấp để test cảnh báo)
     createPurchaseOrdersForIngredient(
       ingredients.find((i) => i.name === "Thịt heo"),
       [
-        { quantity: 160, daysAgo: 3, daysFromNow: 5, price: 70000 }
+        { quantity: 32, daysAgo: 3, daysFromNow: 5, price: 70000 }
       ]
     );
 
@@ -1171,7 +1252,7 @@ const seedDatabase = async () => {
     createPurchaseOrdersForIngredient(
       ingredients.find((i) => i.name === "Rau xà lách"),
       [
-        { quantity: 50, daysAgo: 5, daysFromNow: -2, price: 9000 } // Đã hết hạn 2 ngày trước
+        { quantity: 10, daysAgo: 5, daysFromNow: -2, price: 9000 } // Đã hết hạn 2 ngày trước
       ]
     );
 
@@ -1179,7 +1260,7 @@ const seedDatabase = async () => {
     createPurchaseOrdersForIngredient(
       ingredients.find((i) => i.name === "Cá hồi"),
       [
-        { quantity: 50, daysAgo: 3, daysFromNow: 1, price: 98000 } // Sắp hết hạn (1 ngày)
+        { quantity: 10, daysAgo: 3, daysFromNow: 1, price: 98000 } // Sắp hết hạn (1 ngày)
       ]
     );
 
@@ -1187,7 +1268,7 @@ const seedDatabase = async () => {
     createPurchaseOrdersForIngredient(
       ingredients.find((i) => i.name === "Tôm tươi"),
       [
-        { quantity: 30, daysAgo: 10, daysFromNow: -5, price: 93000 } // Đã hết hạn 5 ngày trước
+        { quantity: 5, daysAgo: 10, daysFromNow: -5, price: 93000 } // Đã hết hạn 5 ngày trước
       ]
     );
 
@@ -1195,7 +1276,7 @@ const seedDatabase = async () => {
     createPurchaseOrdersForIngredient(
       ingredients.find((i) => i.name === "Trứng gà"),
       [
-        { quantity: 100, daysAgo: 5, daysFromNow: 2, price: 2800 } // Sắp hết hạn (2 ngày)
+        { quantity: 20, daysAgo: 5, daysFromNow: 2, price: 2800 } // Sắp hết hạn (2 ngày)
       ]
     );
 
@@ -1203,7 +1284,7 @@ const seedDatabase = async () => {
     createPurchaseOrdersForIngredient(
       ingredients.find((i) => i.name === "Thịt bò"),
       [
-        { quantity: 50, daysAgo: 8, daysFromNow: -3, price: 92000 } // Đã hết hạn 3 ngày trước
+        { quantity: 10, daysAgo: 8, daysFromNow: -3, price: 92000 } // Đã hết hạn 3 ngày trước
       ]
     );
 
@@ -1230,13 +1311,13 @@ const seedDatabase = async () => {
     remainingIngredients.forEach(ingredient => {
       const defaultPrice = defaultPrices[ingredient.name] || 10000; // Giá mặc định 10000 nếu không có
       
-      // Tăng số lượng lên 20 lần để đủ cho ~2000 orders
+      // Tăng số lượng lên 3-5 lần để đủ cho ~100-200 orders
       // Lấy giá trị ban đầu từ originalStockQuantities (trước khi set = 0)
       const originalStockQty = originalStockQuantities[ingredient.name] || 0;
-      // Tạm thời dùng multiplier 20-30 tùy theo loại nguyên liệu
+      // Tạm thời dùng multiplier 3-5 tùy theo loại nguyên liệu
       // Đồ uống và gạo có multiplier thấp hơn vì số lượng ban đầu đã lớn
       const multiplier = ingredient.name.includes('Coca') || ingredient.name.includes('Pepsi') || 
-                        ingredient.name.includes('Nước suối') || ingredient.name.includes('Gạo') ? 10 : 20;
+                        ingredient.name.includes('Nước suối') || ingredient.name.includes('Gạo') ? 3 : 4;
       
       const totalQuantity = originalStockQty * multiplier;
       
@@ -1478,6 +1559,83 @@ const seedDatabase = async () => {
       return selectedItems;
     };
 
+    // Helper function để tạo combo order items
+    const createComboOrderItems = async (menus, items, status, assignedChef = null, waiter = null) => {
+      const selectedItems = [];
+      // Chỉ chọn các combo available
+      const availableMenus = menus.filter(menu => menu.isAvailable && menu.type === "combo");
+      if (availableMenus.length === 0) {
+        console.log("⚠️ No available combos found, skipping combo order items");
+        return selectedItems;
+      }
+      
+      // Chọn 1-2 combos
+      const numCombos = getRandomInt(1, 2);
+      
+      for (let j = 0; j < numCombos; j++) {
+        const randomMenu = availableMenus[Math.floor(Math.random() * availableMenus.length)];
+        
+        // Populate menu items để lấy thông tin
+        const populatedMenu = await Menu.findById(randomMenu._id).populate('items');
+        if (!populatedMenu || !populatedMenu.items || populatedMenu.items.length === 0) continue;
+        
+        const quantity = getRandomInt(1, 2);
+        
+        // Tính expense cho combo: tổng expense của tất cả items trong combo
+        let totalExpense = 0;
+        let allIngredientUsage = [];
+        
+        for (const comboItemId of populatedMenu.items) {
+          const comboItem = await Item.findById(comboItemId).populate('ingredients.ingredient');
+          if (!comboItem) continue;
+          
+          // Trừ kho cho từng item trong combo
+          const ingredientUsage = await deductIngredientsFromStock(comboItem, quantity);
+          const expense = ingredientUsage.reduce((sum, usage) => sum + (usage.quantity * usage.price), 0);
+          totalExpense += expense;
+          allIngredientUsage = allIngredientUsage.concat(ingredientUsage);
+        }
+        
+        // Tạo comboItems array
+        const comboItemsData = [];
+        for (const comboItemId of populatedMenu.items) {
+          const comboItem = await Item.findById(comboItemId);
+          if (comboItem) {
+            // Set status, assignedChef, và servedBy cho comboItems dựa trên status của OrderItem
+            const comboItemStatus = (status === "served" || status === "paid") ? "served" : status;
+            const comboItemAssignedChef = assignedChef || null;
+            const comboItemServedBy = (comboItemStatus === "served" && waiter) ? waiter._id : null;
+            
+            comboItemsData.push({
+              itemId: comboItem._id,
+              itemName: comboItem.name,
+              status: comboItemStatus,
+              assignedChef: comboItemAssignedChef,
+              servedBy: comboItemServedBy,
+            });
+          }
+        }
+        
+        const servedBy = (status === "served" || status === "paid") && waiter ? waiter._id : null;
+        
+        const orderItem = await OrderItem.create({
+          itemId: randomMenu._id, // itemId trỏ đến Menu collection
+          itemName: randomMenu.name,
+          itemType: "menu", // Quan trọng: itemType = "menu" để nhận biết combo
+          quantity: quantity,
+          price: randomMenu.price,
+          expense: totalExpense,
+          ingredientUsage: allIngredientUsage,
+          comboItems: comboItemsData, // Thêm comboItems array
+          assignedChef,
+          servedBy,
+          status,
+        });
+        selectedItems.push(orderItem);
+      }
+      return selectedItems;
+    };
+
     // ===============================
     // 📌 Cập nhật table theo order
     // ===============================
@@ -1511,6 +1669,20 @@ const seedDatabase = async () => {
     // ===============================
     let orderCount = 0;
     const activeWaiters = waiters.filter(w => w.status === "active"); // Chỉ dùng active waiters
+    const activeCashiers = cashiers.filter(c => c.status === "active"); // Active cashiers
+    let waiterIndex = 0; // Round-robin index cho waiters
+    let cashierIndex = 0; // Round-robin index cho cashiers
+    const getNextWaiter = () => {
+      const waiter = activeWaiters[waiterIndex % activeWaiters.length];
+      waiterIndex++;
+      return waiter;
+    };
+    const getNextCashier = () => {
+      if (activeCashiers.length === 0) return null;
+      const cashier = activeCashiers[cashierIndex % activeCashiers.length];
+      cashierIndex++;
+      return cashier;
+    };
 
     // A. pending orders đã được xóa để test hệ thống sạch
 
@@ -1524,7 +1696,7 @@ const seedDatabase = async () => {
     for (let i = 0; i < 5; i++) {
       const table = tables[i];
       const customer = customers[i % customers.length];
-      const waiter = waiters[i % waiters.length];
+      const waiter = getNextWaiter(); // Round-robin distribution
       const chef = chefs[i % chefs.length];
 
       const orderItems = await createOrderItems(items, "preparing", chef._id);
@@ -1581,7 +1753,7 @@ const seedDatabase = async () => {
     for (let i = 5; i < 9; i++) {
       const table = tables[i];
       const customer = customers[i % customers.length];
-      const waiter = activeWaiters[Math.floor(Math.random() * activeWaiters.length)]; // Random waiter
+      const waiter = getNextWaiter(); // Round-robin distribution
       const chef = chefs[i % chefs.length];
 
       const orderItems = await createOrderItems(items, "served", chef._id, waiter);
@@ -1636,27 +1808,38 @@ const seedDatabase = async () => {
     for (let i = 9; i < 15; i++) {
       const table = tables[i];
       const customer = customers[i % customers.length];
-      const waiter = activeWaiters[Math.floor(Math.random() * activeWaiters.length)]; // Random waiter
+      const waiter = getNextWaiter(); // Round-robin distribution
       const chef = chefs[i % chefs.length];
 
-      const orderItems = await createOrderItems(items, "served", chef._id, waiter);
-      const totalAmount = orderItems.reduce(
+      // 20% orders sẽ có combo (khoảng 1-2 orders trong 6 orders)
+      const isComboOrder = (i === 9 || i === 12); // 2 orders có combo
+      const orderItems = isComboOrder 
+        ? await createComboOrderItems(menus, items, "served", chef._id, waiter)
+        : await createOrderItems(items, "served", chef._id, waiter);
+      
+      // Fallback nếu không có combo available
+      const finalOrderItems = orderItems.length === 0 
+        ? await createOrderItems(items, "served", chef._id, waiter)
+        : orderItems;
+      const totalAmount = finalOrderItems.reduce(
         (sum, oi) => sum + oi.price * oi.quantity,
         0
       );
 
+      const cashier = getNextCashier(); // Round-robin distribution
       const payment = await Payment.create({
         paymentMethod: "card",
         status: "paid",
         amountPaid: totalAmount,
         totalAmount: totalAmount,
+        cashierId: cashier ? cashier._id : null,
       });
 
       const order = await Order.create({
         userId: customer._id,
         servedBy: waiter._id,
         tableId: table._id,
-        orderItems: orderItems.map((oi) => oi._id),
+        orderItems: finalOrderItems.map((oi) => oi._id),
         paymentId: payment._id,
         status: "paid",
         waiterResponse: { status: "approved", respondedAt: new Date() },
@@ -1666,7 +1849,7 @@ const seedDatabase = async () => {
       });
 
       await OrderItem.updateMany(
-        { _id: { $in: orderItems.map((oi) => oi._id) } },
+        { _id: { $in: finalOrderItems.map((oi) => oi._id) } },
         { orderId: order._id }
       );
 
@@ -1689,10 +1872,10 @@ const seedDatabase = async () => {
 
     // I. Tạo orders cho tất cả customers dựa trên customerType và expectedOrders
     console.log("🔄 Bắt đầu tạo orders cho tất cả customers dựa trên loại...");
-    const threeMonthsAgo = new Date();
-    threeMonthsAgo.setMonth(threeMonthsAgo.getMonth() - 3);
+    const oneMonthAgo = new Date();
+    oneMonthAgo.setMonth(oneMonthAgo.getMonth() - 1);
     const today = new Date();
-    const totalDays = Math.floor((today - threeMonthsAgo) / (1000 * 60 * 60 * 24));
+    const totalDays = Math.floor((today - oneMonthAgo) / (1000 * 60 * 60 * 24));
     
     // Helper function để tạo orders cho một customer
     const createOrdersForCustomer = async (customer, customerType) => {
@@ -1723,11 +1906,11 @@ const seedDatabase = async () => {
       
       for (let i = 0; i < expectedOrders; i++) {
         const randomTable = tables[Math.floor(Math.random() * tables.length)];
-        const randomWaiter = activeWaiters[Math.floor(Math.random() * activeWaiters.length)];
+        const randomWaiter = getNextWaiter(); // Round-robin distribution
         const randomChef = chefs[Math.floor(Math.random() * chefs.length)];
         
         const dayOffset = orderDays[i];
-        const orderDate = new Date(threeMonthsAgo);
+        const orderDate = new Date(oneMonthAgo);
         orderDate.setDate(orderDate.getDate() + dayOffset);
         const orderCreatedAt = getRandomTimeInDay(orderDate);
         const orderUpdatedAt = new Date(orderCreatedAt.getTime() + getRandomInt(30, 120) * 60 * 1000);
@@ -1737,8 +1920,29 @@ const seedDatabase = async () => {
         const orderStatus = isCancelled ? "cancelled" : "paid";
         
         // Chọn helper function dựa trên customerType
+        // 20% orders sẽ có combo
+        const isComboOrder = Math.random() < 0.2;
         let orderItems;
-        if (customerType.includes('HIGH_VALUE') || customerType === 'VIP') {
+        
+        if (isComboOrder) {
+          // Tạo combo order items
+          orderItems = await createComboOrderItems(
+            menus,
+            items,
+            isCancelled ? "pending" : "served",
+            randomChef._id,
+            isCancelled ? null : randomWaiter
+          );
+          // Nếu không có combo available, fallback về items thông thường
+          if (orderItems.length === 0) {
+            orderItems = await createOrderItemsWithVariableExpense(
+              items,
+              isCancelled ? "pending" : "served",
+              randomChef._id,
+              isCancelled ? null : randomWaiter
+            );
+          }
+        } else if (customerType.includes('HIGH_VALUE') || customerType === 'VIP') {
           orderItems = await createHighValueOrderItems(
             items,
             isCancelled ? "pending" : "served",
@@ -1766,12 +1970,16 @@ const seedDatabase = async () => {
         const paymentMethods = ["cash", "card", "momo", "zaloPay"];
         const paymentMethod = paymentMethods[getRandomInt(0, paymentMethods.length - 1)];
         
+        // Set cashierId cho paid payments
+        const cashier = !isCancelled ? getNextCashier() : null;
+        
         const payment = await Payment.create({
           paymentMethod: paymentMethod,
           status: isCancelled ? "unpaid" : "paid",
           amountPaid: isCancelled ? 0 : totalAmount,
           totalAmount: totalAmount,
           payTime: isCancelled ? null : paymentTime,
+          cashierId: cashier ? cashier._id : null,
         });
         
         const order = await Order.create({
@@ -1826,7 +2034,7 @@ const seedDatabase = async () => {
     console.log(`✅ Đã tạo tổng cộng ${totalOrdersCreated} orders cho ${customers.length} customers.`);
 
     // I. cancelled - 3 orders (sample cancelled orders không liên kết với customers cụ thể)
-    for (let i = 15; i < 18 && i < tables.length; i++) {
+    for (let i = 10; i < 13 && i < tables.length; i++) {
       const table = tables[i];
       const customer = customers[Math.floor(Math.random() * customers.length)];
       const waiter = waiters[i % waiters.length];
@@ -1880,11 +2088,11 @@ const seedDatabase = async () => {
 
     console.log(`📋 Đã tạo ${orderCount} orders với các trạng thái khác nhau.`);
 
-    // J. Tạo bàn có nhiều orders đang hoạt động - 3 bàn (table 18, 19, 20)
+    // J. Tạo bàn có nhiều orders đang hoạt động - 3 bàn (table 17, 18, 19)
     // Mỗi bàn sẽ có 2-3 orders với status preparing/served
-    for (let tableIdx = 18; tableIdx < 21; tableIdx++) {
+    for (let tableIdx = 17; tableIdx < 20 && tableIdx < tables.length; tableIdx++) {
       const table = tables[tableIdx];
-      const numOrders = tableIdx === 18 ? 2 : 3; // Bàn 18 có 2 orders, bàn 19-20 có 3 orders
+      const numOrders = tableIdx === 17 ? 2 : 3; // Bàn 17 có 2 orders, bàn 18-19 có 3 orders
       
       for (let orderIdx = 0; orderIdx < numOrders; orderIdx++) {
         const customer = customers[(tableIdx + orderIdx) % customers.length];
@@ -1893,7 +2101,7 @@ const seedDatabase = async () => {
         
         // Random status: preparing hoặc served
         const orderStatus = orderIdx % 2 === 0 ? "preparing" : "served";
-        const waiterForOrder = activeWaiters[Math.floor(Math.random() * activeWaiters.length)]; // Random waiter
+        const waiterForOrder = getNextWaiter(); // Round-robin distribution
         const orderItems = await createOrderItems(items, orderStatus, chef._id, orderStatus === "served" ? waiterForOrder : null);
         const totalAmount = orderItems.reduce((sum, oi) => sum + oi.price * oi.quantity, 0);
         
@@ -2035,51 +2243,83 @@ const seedDatabase = async () => {
       
       // Lấy order items để tìm waiters và chefs đã phục vụ
       const orderItems = await OrderItem.find({ orderId: order._id })
-        .populate('servedBy', '_id')
-        .populate('assignedChef', '_id');
+        .populate('servedBy', '_id name')
+        .populate('assignedChef', '_id name');
       
       // Tìm tất cả waiters đã phục vụ (từ order items và combo items)
       const waiterIds = new Set();
       const chefIds = new Set();
       
       for (const item of orderItems) {
-        // Lấy waiter từ OrderItem chính
+        // Lấy waiter từ OrderItem chính (chỉ khi status là "served")
         if (item.servedBy && item.status === "served") {
-          waiterIds.add(item.servedBy._id.toString());
+          const waiterId = item.servedBy._id ? item.servedBy._id.toString() : item.servedBy.toString();
+          waiterIds.add(waiterId);
         }
         
-        // Lấy chef từ OrderItem chính
+        // Lấy chef từ OrderItem chính (chỉ khi có assignedChef)
         if (item.assignedChef) {
-          chefIds.add(item.assignedChef._id.toString());
+          const chefId = item.assignedChef._id ? item.assignedChef._id.toString() : item.assignedChef.toString();
+          chefIds.add(chefId);
         }
         
-        // Lấy waiter và chef từ comboItems
+        // Lấy waiter và chef từ comboItems (comboItems không được populate, nên cần fetch từ DB nếu cần)
         if (item.comboItems && Array.isArray(item.comboItems)) {
           for (const comboItem of item.comboItems) {
-            if (comboItem.servedBy && comboItem.status === "served") {
-              waiterIds.add(comboItem.servedBy.toString());
-            }
-            if (comboItem.assignedChef) {
-              chefIds.add(comboItem.assignedChef.toString());
+            // Chỉ lấy waiter/chef từ comboItems có status "served"
+            if (comboItem.status === "served") {
+              if (comboItem.servedBy) {
+                // comboItem.servedBy là ObjectId (string hoặc ObjectId)
+                const waiterId = comboItem.servedBy.toString ? comboItem.servedBy.toString() : comboItem.servedBy;
+                waiterIds.add(waiterId);
+              }
+              if (comboItem.assignedChef) {
+                // comboItem.assignedChef là ObjectId (string hoặc ObjectId)
+                const chefId = comboItem.assignedChef.toString ? comboItem.assignedChef.toString() : comboItem.assignedChef;
+                chefIds.add(chefId);
+              }
             }
           }
         }
       }
       
       // Tạo waiterRating và chefRating (70-80% feedback có rating cho waiter/chef)
+      // waiterRating và chefRating cũng phản ánh customer type (VIP cao, BAD thấp)
       let waiterRating = null;
       let chefRating = null;
       
       if (waiterIds.size > 0 && Math.random() > 0.2) { // 80% có waiterRating
         // waiterRating thường gần với rating tổng thể, nhưng có thể chênh lệch 1 sao
-        const baseWaiterRating = rating;
+        // Đảm bảo waiterRating phản ánh customer type: VIP cao, BAD thấp
+        let baseWaiterRating = rating;
+        
+        // Điều chỉnh baseWaiterRating dựa trên customer type
+        if (vipCustomerIds.includes(customerId)) {
+          // VIP customers: waiterRating thường cao hơn hoặc bằng rating tổng thể
+          baseWaiterRating = Math.max(rating, rating + (Math.random() > 0.7 ? 1 : 0));
+        } else if (badCustomerIds.includes(customerId)) {
+          // BAD customers: waiterRating thường thấp hơn hoặc bằng rating tổng thể
+          baseWaiterRating = Math.min(rating, rating - (Math.random() > 0.7 ? 1 : 0));
+        }
+        
         const variation = Math.random() > 0.5 ? (Math.random() > 0.5 ? 1 : -1) : 0;
         waiterRating = Math.max(1, Math.min(5, baseWaiterRating + variation));
       }
       
       if (chefIds.size > 0 && Math.random() > 0.2) { // 80% có chefRating
         // chefRating thường gần với rating tổng thể, nhưng có thể chênh lệch 1 sao
-        const baseChefRating = rating;
+        // Đảm bảo chefRating phản ánh customer type: VIP cao, BAD thấp
+        let baseChefRating = rating;
+        
+        // Điều chỉnh baseChefRating dựa trên customer type
+        if (vipCustomerIds.includes(customerId)) {
+          // VIP customers: chefRating thường cao hơn hoặc bằng rating tổng thể
+          baseChefRating = Math.max(rating, rating + (Math.random() > 0.7 ? 1 : 0));
+        } else if (badCustomerIds.includes(customerId)) {
+          // BAD customers: chefRating thường thấp hơn hoặc bằng rating tổng thể
+          baseChefRating = Math.min(rating, rating - (Math.random() > 0.7 ? 1 : 0));
+        }
+        
         const variation = Math.random() > 0.5 ? (Math.random() > 0.5 ? 1 : -1) : 0;
         chefRating = Math.max(1, Math.min(5, baseChefRating + variation));
       }

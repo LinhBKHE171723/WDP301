@@ -11,7 +11,7 @@ import {
 import { useAuth } from "../../context/AuthContext";
 import Header from "../waiter/Header";
 import userApi from "../../api/userApi";
-import { toast, ToastContainer } from "react-toastify";
+import { toast } from "react-toastify";
 import "react-toastify/dist/ReactToastify.css";
 
 export default function Profile() {
@@ -38,26 +38,76 @@ export default function Profile() {
         const url = URL.createObjectURL(f);
         setPreview(url);
     };
+    // 🧩 Upload ảnh lên Cloudinary và trả về URL
+    const handleUpload = async (file) => {
+        try {
+            const token = localStorage.getItem("token");
+            // 1️⃣ Lấy signature từ backend
+            const sigRes = await fetch(`${process.env.REACT_APP_API_URL}/cloudinary/upload/signature`, {
+                headers: { Authorization: `Bearer ${token}` },
+            });
+
+            if (!sigRes.ok) {
+                throw new Error(`Lấy signature thất bại: ${sigRes.status}`);
+            }
+
+            const sigData = await sigRes.json();
+            const { signature, timestamp, apiKey, cloudName } = sigData;
+
+            // 2️⃣ Tạo FormData để gửi trực tiếp Cloudinary
+            const formData = new FormData();
+            formData.append("file", file);
+            formData.append("api_key", apiKey);
+            formData.append("timestamp", timestamp);
+            formData.append("signature", signature);
+
+            // 3️⃣ Upload trực tiếp từ FE lên Cloudinary
+            const cloudRes = await fetch(`https://api.cloudinary.com/v1_1/${cloudName}/image/upload`, {
+                method: "POST",
+                body: formData,
+            });
+
+            const text = await cloudRes.text(); // lấy text raw
+            try {
+                const data = JSON.parse(text); // parse JSON
+                return data.secure_url; // URL trả về lưu vào DB
+            } catch (err) {
+                console.error("❌ Cloudinary upload thất bại:", text); // in ra HTML nếu có lỗi
+                throw err;
+            }
+
+        } catch (err) {
+            console.error("❌ Upload error:", err);
+            throw err;
+        }
+    };
+
+
 
     // 💾 Lưu thông tin hồ sơ (gửi tới backend)
     const handleSave = async () => {
         setSaving(true);
         try {
-            // Tạo FormData để gửi file và các trường khác
-            const formData = new FormData();
-            formData.append("name", form.name);
-            formData.append("phone", form.phone);
-            if (file) formData.append("avatar", file); // chỉ thêm khi có file
+            let avatarUrl = user?.avatar;
 
-            // Gọi API backend cập nhật
-            const res = await userApi.updateProfile(formData, true); // thêm flag true để gửi multipart
+            if (file) {
+                avatarUrl = await handleUpload(file);
+                setPreview(avatarUrl); // cập nhật preview ngay
+            }
 
-            toast.success("Cập nhật hồ sơ thành công!");
-            setUser?.(res.user); // Cập nhật context
-            // ✅ Cập nhật localStorage để khi reload vẫn thấy đúng
+            const res = await userApi.updateProfile({
+                name: form.name,
+                phone: form.phone,
+                avatar: avatarUrl, // gửi URL
+            });
+
+            setUser?.(res.user);
             localStorage.setItem("user", JSON.stringify(res.user));
             if (res.token) localStorage.setItem("token", res.token);
-            setShowModal(false);
+
+            // Hiện toast trước, delay đóng modal để tránh lỗi
+            toast.success("Cập nhật hồ sơ thành công!");
+            setTimeout(() => setShowModal(false), 100);
         } catch (err) {
             console.error("❌ Lỗi cập nhật hồ sơ:", err);
             toast.error("Không thể lưu hồ sơ, vui lòng thử lại!");
@@ -65,6 +115,7 @@ export default function Profile() {
             setSaving(false);
         }
     };
+
 
     return (
         <Container className="py-4">
@@ -152,7 +203,6 @@ export default function Profile() {
                     </Button>
                 </Modal.Footer>
             </Modal>
-            <ToastContainer position="top-right" autoClose={2000} />
         </Container>
     );
 }

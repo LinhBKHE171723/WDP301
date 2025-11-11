@@ -9,6 +9,7 @@ const kitchenRoutes = require("./routes/kitchen.routes");
 const customerRoutes = require("./routes/customer.routes");
 const authRoutes = require("./routes/auth.route");
 const waiterRoutes = require("./routes/waiter.routes");
+const cashierRoutes = require("./routes/cashier.routes");
 const cloudinary = require("./routes/cloudinary.route");
 const userRoutes = require("./routes/user.route");
 // load env
@@ -28,9 +29,15 @@ app.disable("etag");
 mongoose
   // .connect(process.env.MONGO_URI)
   .connect(process.env.MONGO_URI)
-  .then(() => {
-   
+  .then(async () => {
     console.log("✅ MongoDB connected");
+     
+    console.log("✅ Database seeding completed");
+    // Sau khi DB đã có dữ liệu, require cron
+    require("./utils/cron");
+    console.log("⏰ Cron jobs started");
+
+
   })
   .catch((err) => console.error(" MongoDB connection error:", err));
 
@@ -58,6 +65,9 @@ app.use("/api/customer", customerRoutes);
 
 // waiter
 app.use("/api/waiter", waiterRoutes);
+
+// cashier
+app.use("/api/cashier", cashierRoutes);
 
 // export app để server.js dùng
 module.exports = app;

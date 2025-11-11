@@ -258,6 +258,20 @@ const MenuView = ({ table, onBack }) => {
           <h1>Thực đơn nhà hàng</h1>
         </div>
         <div className="header-actions">
+          <button onClick={() => navigate('/preorder')} className="preorder-btn" style={{
+            background: '#4CAF50',
+            color: 'white',
+            border: 'none',
+            padding: '10px 20px',
+            borderRadius: '8px',
+            cursor: 'pointer',
+            fontWeight: '600',
+            fontSize: '14px',
+            transition: 'all 0.3s ease',
+            marginRight: '10px'
+          }}>
+            🍽️ Đặt bàn trước
+          </button>
           {isLoggedIn ? (
             <div className="user-info">
               <span className="welcome-text">Xin chào, {user?.name || user?.username || 'Khách hàng'}!</span>

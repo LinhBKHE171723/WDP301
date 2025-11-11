@@ -1,12 +1,13 @@
 import { Link, useLocation } from "react-router-dom";
-import { BarChart3, Utensils, Users, MessageSquare, Settings, LayoutDashboard, PieChart } from 'lucide-react';
+import { BarChart3, Utensils, Users, MessageSquare, Settings, LayoutDashboard, PieChart, Calendar, History } from 'lucide-react';
 
 export default function Sidebar() {
   const { pathname } = useLocation();
   
   // Cập nhật lại các mục menu - thêm prefix /admin/
   const items = [
-    { to: "/admin/", label: "Dashboard", icon: LayoutDashboard },
+    { to: "/admin/preorders", label: "Đặt trước", icon: Calendar },
+    { to: "/admin/orders", label: "Lịch sử đơn hàng", icon: History },
     { to: "/admin/analytics", label: "Báo cáo Doanh thu", icon: BarChart3 },
     { to: "/admin/item-report", label: "Báo cáo Món ăn", icon: Utensils },
     { to: "/admin/accounts", label: "Tài khoản", icon: Users },

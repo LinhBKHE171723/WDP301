@@ -70,19 +70,11 @@ export default function ItemTrendAnalytics({ itemId, itemName = "Chi Tiết Món
           to: filters.to,
         });
 
-        const res = await fetch(`${API_BASE_URL}/items/trend?${params.toString()}`);
-        const rawText = await res.text();
-        if (!res.ok) {
-          try {
-            const maybeJson = safeJsonParse(rawText);
-            throw new Error(maybeJson?.message || `HTTP ${res.status}`);
-          } catch {
-            throw new Error(`HTTP ${res.status}`);
-          }
-        }
+       const res = await fetch(`${API_BASE_URL}/items/trend?${params.toString()}`);
+if (!res.ok) throw new Error(`HTTP ${res.status}`);
+const parsed = await res.json(); 
+const payload = parsed.data || {};
 
-        const parsed = safeJsonParse(rawText);
-        const payload = parsed?.data || {};
         let trend = Array.isArray(payload.trend) ? payload.trend : [];
         const summary = payload.summary || null;
 

@@ -3,6 +3,12 @@
 const Item = require("../models/Item");
 const Menu = require("../models/Menu");
 const Ingredient = require("../models/Ingredient");
+const User = require("../models/User");
+const bcrypt = require("bcryptjs");
+const nodemailer = require("nodemailer");
+
+// Config: Ngưỡng số lượng tối đa cho mỗi OrderItem trước khi chia nhỏ
+const MAX_QUANTITY_PER_ORDER_ITEM = 5;
 
 /**
  * Populates order item details by finding items in both Item and Menu collections
@@ -18,7 +24,26 @@ const populateOrderItemDetails = async (orderItems) => {
       if (!item) {
         item = await Menu.findById(orderItem.itemId);
       }
-      orderItem.itemId = item;
+      // Chỉ populate itemId nếu chưa có itemName (đảm bảo itemName luôn có)
+      if (item) {
+        orderItem.itemId = item;
+        // Đảm bảo itemName luôn có (ưu tiên từ database, nếu không có thì lấy từ item)
+        if (!orderItem.itemName && item.name) {
+          orderItem.itemName = item.name;
+        }
+      }
+    }
+    
+    // Populate itemName cho comboItems nếu thiếu
+    if (orderItem.comboItems && Array.isArray(orderItem.comboItems)) {
+      for (const comboItem of orderItem.comboItems) {
+        if (!comboItem.itemName && comboItem.itemId) {
+          const comboItemDoc = await Item.findById(comboItem.itemId);
+          if (comboItemDoc && comboItemDoc.name) {
+            comboItem.itemName = comboItemDoc.name;
+          }
+        }
+      }
     }
   }
   return orderItems;
@@ -62,6 +87,32 @@ const validateTableAvailability = (table) => {
     success: true,
     message: "Bàn có thể sử dụng"
   };
+};
+
+/**
+ * Kiểm tra xem item có đủ nguyên liệu để làm ít nhất 1 phần không
+ * @param {Object} item - Item object đã populate ingredients.ingredient
+ * @returns {Boolean} true nếu có thể làm được ít nhất 1 phần, false nếu hết hàng
+ */
+const checkItemStock = async (item) => {
+  if (!item || !item.ingredients || item.ingredients.length === 0) {
+    return true; // Không có ingredients → không thể xác định → hiển thị
+  }
+  
+  let minServings = Infinity;
+  for (const ing of item.ingredients) {
+    const ingDoc = ing.ingredient;
+    if (!ingDoc || ingDoc.stockQuantity <= 0 || ing.quantity <= 0) {
+      return false; // Hết hàng
+    }
+    const possible = ingDoc.stockQuantity / ing.quantity;
+    if (possible < minServings) minServings = possible;
+  }
+  
+  // Chỉ hiển thị khi có thể làm được ít nhất 1 phần đầy đủ
+  // Nếu maxServings = 0.1 → Math.floor(0.1) = 0 → không hiển thị
+  // Nếu maxServings = 1.5 → Math.floor(1.5) = 1 → hiển thị (có thể làm 1 phần)
+  return Math.floor(minServings) > 0;
 };
 
 /**
@@ -752,15 +803,407 @@ const updateComboStatusBasedOnComboItems = (orderItem) => {
   return null;
 };
 
+/**
+ * Generate temporary password for new customer accounts
+ * @param {number} length - Password length (default: 10)
+ * @returns {string} Generated password
+ */
+const genTempPassword = (length = 10) => {
+  const chars = "ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz23456789!@#$%^&*";
+  let pwd = "";
+  for (let i = 0; i < length; i++) pwd += chars[Math.floor(Math.random() * chars.length)];
+  return pwd;
+};
+
+/**
+ * Create customer account automatically with temporary password
+ * @param {Object} customerData - Customer information { name, email, phone }
+ * @returns {Object} Created user object
+ */
+const createCustomerAccount = async ({ name, email, phone }) => {
+  // Generate username from email
+  const base = email.split("@")[0];
+  let candidate = base.toLowerCase().replace(/[^a-z0-9_]/g, "_");
+  let i = 1;
+  
+  // Ensure username is unique
+  while (true) {
+    const exists = await User.findOne({ username: candidate });
+    if (!exists) break;
+    candidate = `${base}_${i++}`;
+  }
+  
+  // Generate temporary password
+  const tempPassword = genTempPassword(10);
+  const salt = await bcrypt.genSalt(10);
+  const passwordHash = await bcrypt.hash(tempPassword, salt);
+  
+  // Create user
+  const user = await User.create({
+    name,
+    email,
+    username: candidate,
+    phone: phone || "",
+    password: passwordHash,
+    role: "customer",
+    point: 0,
+    status: "active",
+    accountStatus: "active"
+  });
+  
+  // Send email with temporary password
+  const transporter = nodemailer.createTransport({
+    host: process.env.SMTP_HOST,
+    port: Number(process.env.SMTP_PORT || 587),
+    secure: false,
+    auth: { user: process.env.SMTP_USER, pass: process.env.SMTP_PASS },
+  });
+  
+  const appUrl = process.env.APP_URL || "http://localhost:3000";
+  const html = `
+    <p><b>Tài khoản của bạn đã được tạo</b></p>
+    <p>Cảm ơn bạn đã đặt trước tại nhà hàng của chúng tôi!</p>
+    <p>Email đăng nhập: ${email}<br/>
+    Mật khẩu tạm: <b>${tempPassword}</b></p>
+    <p>Vui lòng đăng nhập tại <a href="${appUrl}">${appUrl}</a> và đổi mật khẩu.</p>
+  `;
+  
+  try {
+    await transporter.sendMail({
+      from: `"Restaurant System" <${process.env.SMTP_USER}>`,
+      to: email,
+      subject: "Tài khoản khách hàng đã được tạo",
+      html,
+    });
+  } catch (error) {
+    console.error("Error sending email:", error);
+    // Don't throw error - account is created, just email failed
+  }
+  
+  return user;
+};
+
+/**
+ * Gộp các OrderItem có cùng itemId, itemType và note thành 1 OrderItem khi hiển thị cho customer
+ * Dùng để gộp các OrderItem đã bị tách (split) lại thành 1 dòng
+ * Logic đơn giản: nếu itemId trùng nhau → cộng quantity, giữ nguyên các field khác
+ * @param {Array} orderItems - Array of OrderItem objects
+ * @returns {Array} Array of grouped OrderItems
+ */
+const groupSplitOrderItemsForCustomer = (orderItems) => {
+  if (!orderItems || !Array.isArray(orderItems) || orderItems.length === 0) {
+    return orderItems || [];
+  }
+
+  const groupedMap = new Map();
+
+  orderItems.forEach((item) => {
+    // Bỏ qua nếu item null/undefined
+    if (!item) {
+      return;
+    }
+    
+    // Bỏ qua nếu là buffer
+    if (Buffer.isBuffer(item)) {
+      console.warn(`⚠️ Skipping buffer item`);
+      return;
+    }
+    
+    // Bỏ qua nếu là string (ObjectId string)
+    if (typeof item === 'string') {
+      console.warn(`⚠️ Skipping string ObjectId:`, item);
+      return;
+    }
+    
+    // Bỏ qua nếu không phải object
+    if (typeof item !== 'object') {
+      console.warn(`⚠️ Skipping non-object item:`, typeof item);
+      return;
+    }
+    
+    // Kiểm tra xem có phải là OrderItem document không
+    // Nếu có các field của OrderItem (quantity, price, itemId, status, itemName), thì là OrderItem
+    // Nếu chỉ có _id và không có field nào khác, có thể là ObjectId
+    const hasOrderItemFields = item.quantity !== undefined || 
+                               item.price !== undefined || 
+                               item.itemId !== undefined || 
+                               item.status !== undefined ||
+                               item.itemName !== undefined ||
+                               item.toObject !== undefined; // Mongoose document có toObject
+    
+    if (!hasOrderItemFields) {
+      // Nếu không có field nào của OrderItem, có thể là ObjectId
+      const mongoose = require('mongoose');
+      if (mongoose.Types.ObjectId.isValid(item) && item.constructor?.name === 'ObjectId') {
+        console.warn(`⚠️ Skipping pure ObjectId:`, item);
+        return;
+      }
+      // Nếu vẫn không phải ObjectId và không có field nào, bỏ qua
+      if (!item._id || Object.keys(item).length <= 1) {
+        console.warn(`⚠️ Skipping item without OrderItem fields:`, Object.keys(item));
+        return;
+      }
+    }
+    
+    // Convert Mongoose document sang plain object để đảm bảo có tất cả field
+    let plainItem;
+    if (item && typeof item.toObject === 'function') {
+      // Nếu là Mongoose document, dùng toObject() với getters để có tất cả field
+      plainItem = item.toObject({ getters: true, flattenMaps: true });
+    } else if (item && typeof item === 'object' && !Buffer.isBuffer(item)) {
+      // Nếu đã là plain object, dùng trực tiếp
+      plainItem = item;
+    } else {
+      // Bỏ qua nếu không phải object hợp lệ
+      console.warn(`⚠️ Skipping invalid item type:`, typeof item);
+      return;
+    }
+    
+    // Đảm bảo có các field cần thiết (ít nhất phải có _id hoặc quantity để xác định là OrderItem)
+    if (!plainItem || (!plainItem._id && !plainItem.quantity)) {
+      console.warn(`⚠️ PlainItem missing required fields:`, plainItem ? Object.keys(plainItem) : 'null');
+      return;
+    }
+    
+    // Đảm bảo itemName và price có giá trị (fallback nếu thiếu)
+    if (!plainItem.itemName && plainItem.itemId) {
+      if (typeof plainItem.itemId === 'object' && plainItem.itemId !== null) {
+        plainItem.itemName = plainItem.itemId.name || plainItem.itemName || '';
+      }
+    }
+    
+    // Debug: log plainItem để kiểm tra
+    if (orderItems.length > 1 && (!plainItem.itemName || !plainItem.price)) {
+      console.log(`⚠️ PlainItem missing fields:`, {
+        hasItemName: !!plainItem.itemName,
+        hasPrice: !!plainItem.price,
+        keys: Object.keys(plainItem)
+      });
+    }
+    
+    // Lấy itemId string để làm key (xử lý cả ObjectId và object đã populate)
+    let itemIdStr = '';
+    if (plainItem.itemId) {
+      if (typeof plainItem.itemId === 'object' && plainItem.itemId !== null) {
+        // Nếu là object đã populate, lấy _id
+        itemIdStr = (plainItem.itemId._id || plainItem.itemId).toString();
+      } else {
+        // Nếu là string hoặc ObjectId, convert sang string
+        itemIdStr = String(plainItem.itemId);
+      }
+    }
+
+    // Tạo key để nhóm: itemId + itemType + note
+    const key = `${itemIdStr}-${plainItem.itemType || 'item'}-${(plainItem.note || '').trim()}`;
+    
+    if (!groupedMap.has(key)) {
+      // Lần đầu gặp → giữ nguyên tất cả field từ item này (dùng spread)
+      groupedMap.set(key, { ...plainItem });
+    } else {
+      // Đã có item cùng key → chỉ cộng quantity
+      const groupedItem = groupedMap.get(key);
+      groupedItem.quantity = (Number(groupedItem.quantity) || 0) + (Number(plainItem.quantity) || 0);
+    }
+  });
+
+  // Trả về array các item đã group
+  const result = Array.from(groupedMap.values());
+  
+  // Debug log
+  if (orderItems.length > 1 && result.length < orderItems.length) {
+    console.log(`✅ Grouped ${orderItems.length} items into ${result.length} items`);
+    result.forEach(item => {
+      console.log(`   - ${item.itemName || 'N/A'}: quantity=${item.quantity}, price=${item.price || 'N/A'}`);
+    });
+  }
+  
+  return result;
+};
+
+/**
+ * Chia OrderItem có quantity lớn (> MAX_QUANTITY_PER_ORDER_ITEM) thành nhiều OrderItem nhỏ hơn
+ * Được gọi khi customer confirm order để phân bổ workload cho nhiều waiter
+ * @param {String|ObjectId} orderId - ID của Order
+ * @returns {Number} Số OrderItem đã được chia
+ */
+const splitLargeOrderItems = async (orderId) => {
+  try {
+    const Order = require("../models/Order");
+    const OrderItem = require("../models/OrderItem");
+    
+    // Tìm order và populate orderItems
+    const order = await Order.findById(orderId);
+    if (!order) {
+      console.error(`Order ${orderId} not found`);
+      return 0;
+    }
+
+    // Lấy tất cả OrderItem của order (có thể là ObjectIds hoặc đã populate)
+    let orderItems;
+    if (order.orderItems && order.orderItems.length > 0) {
+      // Kiểm tra xem có phải là ObjectIds không
+      if (typeof order.orderItems[0] === 'object' && order.orderItems[0].quantity !== undefined) {
+        // Đã được populate
+        orderItems = order.orderItems;
+      } else {
+        // Chưa populate, cần populate
+        orderItems = await OrderItem.find({ _id: { $in: order.orderItems } });
+      }
+    } else {
+      orderItems = [];
+    }
+
+    // Tìm tất cả OrderItem có quantity > MAX_QUANTITY_PER_ORDER_ITEM
+    const largeOrderItems = orderItems.filter(
+      (item) => item.quantity > MAX_QUANTITY_PER_ORDER_ITEM
+    );
+
+    if (largeOrderItems.length === 0) {
+      console.log(`No large OrderItems to split in order ${orderId}`);
+      return 0;
+    }
+
+    console.log(`🔄 Chia ${largeOrderItems.length} OrderItem lớn trong order ${orderId}`);
+
+    let totalSplitCount = 0;
+    const newOrderItemIds = [];
+    const itemsToRemove = [];
+
+    for (const originalItem of largeOrderItems) {
+      try {
+        // Tính số OrderItem con cần tạo
+        const numChildItems = Math.ceil(originalItem.quantity / MAX_QUANTITY_PER_ORDER_ITEM);
+        console.log(`  📦 Chia OrderItem ${originalItem._id}: ${originalItem.quantity} → ${numChildItems} OrderItem con`);
+
+        // Hoàn nguyên liệu từ OrderItem gốc
+        await returnIngredientsToStock(originalItem);
+        console.log(`  ✅ Đã hoàn nguyên liệu từ OrderItem gốc ${originalItem._id}`);
+
+        // Xác định item hoặc menu để tính expense
+        let itemOrMenu;
+        if (originalItem.itemType === 'menu') {
+          itemOrMenu = await Menu.findById(originalItem.itemId).populate('items');
+        } else {
+          itemOrMenu = await Item.findById(originalItem.itemId).populate('ingredients.ingredient');
+        }
+
+        if (!itemOrMenu) {
+          console.error(`⚠️ Không tìm thấy item/menu với ID: ${originalItem.itemId}`);
+          continue;
+        }
+
+        // Tạo các OrderItem con
+        for (let i = 0; i < numChildItems; i++) {
+          // Tính quantity cho OrderItem con này
+          const childQuantity = i === numChildItems - 1 
+            ? (originalItem.quantity % MAX_QUANTITY_PER_ORDER_ITEM || MAX_QUANTITY_PER_ORDER_ITEM)
+            : MAX_QUANTITY_PER_ORDER_ITEM;
+
+          // Tính expense và ingredientUsage cho OrderItem con
+          const expenseResult = await calculateExpenseWithTracking(
+            itemOrMenu, 
+            originalItem.itemType, 
+            childQuantity
+          );
+
+          // Tạo OrderItem con
+          const childOrderItemData = {
+            orderId: orderId,
+            itemId: originalItem.itemId,
+            itemName: originalItem.itemName,
+            itemType: originalItem.itemType,
+            quantity: childQuantity,
+            price: originalItem.price,
+            expense: expenseResult.expense,
+            ingredientUsage: expenseResult.ingredientUsage,
+            status: "pending",
+            note: originalItem.note || "",
+          };
+
+          // Nếu là combo, copy comboItems
+          if (originalItem.comboItems && originalItem.comboItems.length > 0) {
+            childOrderItemData.comboItems = originalItem.comboItems.map(comboItem => ({
+              itemId: comboItem.itemId,
+              itemName: comboItem.itemName,
+              status: "pending",
+              assignedChef: null,
+            }));
+          }
+
+          const childOrderItem = new OrderItem(childOrderItemData);
+          await childOrderItem.save();
+          newOrderItemIds.push(childOrderItem._id);
+
+          // Trừ nguyên liệu cho OrderItem con
+          try {
+            if (originalItem.itemType === 'item') {
+              await deductIngredientsFromStock(itemOrMenu, childQuantity);
+            } else if (originalItem.itemType === 'menu' && itemOrMenu.type === 'combo' && itemOrMenu.items) {
+              // Trừ nguyên liệu cho từng item trong combo
+              for (const comboItemId of itemOrMenu.items) {
+                const comboItem = await Item.findById(comboItemId).populate('ingredients.ingredient');
+                if (comboItem) {
+                  await deductIngredientsFromStock(comboItem, childQuantity);
+                }
+              }
+            }
+          } catch (error) {
+            console.error(`❌ Lỗi khi trừ nguyên liệu cho OrderItem con ${childOrderItem._id}:`, error);
+          }
+
+          console.log(`    ✅ Đã tạo OrderItem con: quantity=${childQuantity}, expense=${expenseResult.expense}`);
+        }
+
+        // Đánh dấu OrderItem gốc để xóa
+        itemsToRemove.push(originalItem._id);
+        totalSplitCount += numChildItems;
+
+      } catch (error) {
+        console.error(`❌ Lỗi khi chia OrderItem ${originalItem._id}:`, error);
+        // Tiếp tục với OrderItem tiếp theo
+      }
+    }
+
+    // Cập nhật order: xóa OrderItem gốc, thêm OrderItem con
+    if (itemsToRemove.length > 0 || newOrderItemIds.length > 0) {
+      // Xóa OrderItem gốc khỏi order.orderItems
+      order.orderItems = order.orderItems.filter(
+        (itemId) => !itemsToRemove.some(id => id.toString() === itemId.toString())
+      );
+
+      // Thêm OrderItem con vào order.orderItems
+      order.orderItems.push(...newOrderItemIds);
+
+      await order.save();
+      console.log(`✅ Đã cập nhật order ${orderId}: xóa ${itemsToRemove.length} OrderItem gốc, thêm ${newOrderItemIds.length} OrderItem con`);
+
+      // Xóa các OrderItem gốc khỏi database
+      await OrderItem.deleteMany({ _id: { $in: itemsToRemove } });
+      console.log(`✅ Đã xóa ${itemsToRemove.length} OrderItem gốc khỏi database`);
+    }
+
+    console.log(`✅ Hoàn thành chia OrderItem: ${totalSplitCount} OrderItem con được tạo từ ${largeOrderItems.length} OrderItem gốc`);
+    return totalSplitCount;
+
+  } catch (error) {
+    console.error(`❌ Lỗi khi chia OrderItem cho order ${orderId}:`, error);
+    return 0;
+  }
+};
+
 module.exports = {
   populateOrderItemDetails,
   validateTableAvailability,
+  checkItemStock,
   createOrderItemsFromCart,
   calculateExpense,
   calculateExpenseWithTracking,
   deductIngredientsFromStock,
   returnIngredientsToStock,
   returnIngredientsForUnservedItems,
-  updateComboStatusBasedOnComboItems
+  updateComboStatusBasedOnComboItems,
+  createCustomerAccount,
+  splitLargeOrderItems,
+  groupSplitOrderItemsForCustomer
 };
 
