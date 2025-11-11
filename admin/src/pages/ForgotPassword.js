@@ -35,7 +35,7 @@ export default function ForgotPassword() {
                 />
 
                 <button type="submit" className="w-full bg-orange-500 text-white py-2 rounded hover:bg-orange-600">
-                    Gửi link đặt lại mật khẩu
+                    Yêu cầu đặt lại mật khẩu
                 </button>
             </form>
         </div>

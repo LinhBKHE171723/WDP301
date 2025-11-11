@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import './LoginModal.css';
 
-const LoginModal = ({ isOpen, onClose, onLogin, onSwitchToRegister }) => {
+const LoginModal = ({ isOpen, onClose, onLogin, onSwitchToRegister, onSwitchToForgotPassword }) => {
   const [form, setForm] = useState({ email: "", password: "" });
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
@@ -108,6 +108,19 @@ const LoginModal = ({ isOpen, onClose, onLogin, onSwitchToRegister }) => {
 
           <div className="login-footer">
             <p>Chưa có tài khoản? <span className="register-link" onClick={onSwitchToRegister}>Đăng ký ngay</span></p>
+            <p style={{ marginTop: "10px" }}>
+              <span 
+                className="register-link" 
+                onClick={() => {
+                  if (onSwitchToForgotPassword) {
+                    onSwitchToForgotPassword();
+                  }
+                }}
+                style={{ fontSize: "14px", cursor: "pointer" }}
+              >
+                Quên mật khẩu?
+              </span>
+            </p>
           </div>
         </div>
       </div>

@@ -7,6 +7,7 @@ import OrderHistory from "./components/OrderHistory"
 import GuestOrderHistory from "./components/GuestOrderHistory"
 import OrderStatus from "./components/OrderStatus"
 import PreOrder from "./components/PreOrder"
+import ResetPassword from "./components/ResetPassword"
 
 import "./App.css"
 
@@ -59,6 +60,12 @@ function App() {
             <Route
               path="/preorder"
               element={<PreOrder />}
+            />
+
+            {/* Reset password */}
+            <Route
+              path="/reset-password"
+              element={<ResetPassword />}
             />
 
             {/* Lịch sử đơn hàng */}
