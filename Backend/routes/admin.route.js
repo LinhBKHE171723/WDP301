@@ -5,6 +5,7 @@ const { authRequired, roleRequired } = require("../middlewares/auth.middleware")
 const userCtrl = require("../controllers/admin/user.controller");
 const feedbackController = require("../controllers/admin/feedback.controller");
 const preorderController = require("../controllers/admin/preorder.controller");
+const orderController = require("../controllers/admin/order.controller");
 const statsCtrl = require("../controllers/admin/adminStats.controller");
 const performanceController = require("../controllers/admin/performance.controller");
 const itemCtrl = require("../controllers/admin/item.controller");
@@ -14,10 +15,8 @@ const customerReportCtrl = require("../controllers/admin/customerReport.controll
 const settingsController = require("../controllers/admin/settings.controller");
 const workShiftController = require("../controllers/admin/workShift.controller");
 const { checkPreOrderPermission } = require("../middlewares/preorderPermission.middleware");
+const shiftController = require("../controllers/admin/shift.controller");
 
-// =======================================================
-// NHÓM 1: CÁC ROUTE QUẢN LÝ CHUNG (Đã có & chạy tốt)
-// =======================================================
 
 // --- USERS ROUTES (/api/admin/users) ---
 router.get("/users", userCtrl.list);
@@ -45,8 +44,12 @@ router.post("/work-shifts", authRequired, roleRequired("admin"), workShiftContro
 router.put("/work-shifts/:id", authRequired, roleRequired("admin"), workShiftController.updateWorkShift);
 router.delete("/work-shifts/:id", authRequired, roleRequired("admin"), workShiftController.deleteWorkShift);
 
+// --- ORDER HISTORY ROUTES (/api/admin/orders) ---
+router.get("/orders", authRequired, roleRequired("admin"), orderController.getOrdersHistory);
+
 // --- PREORDER ROUTES (/api/admin/preorders) ---
 router.get("/preorders", authRequired, roleRequired("admin", "cashier"), preorderController.getPreOrders);
+router.get("/preorders/:orderId/ingredients", authRequired, roleRequired("admin", "cashier"), preorderController.getPreOrderIngredients);
 router.get("/customers/:userId/info", authRequired, roleRequired("admin", "cashier"), preorderController.getCustomerInfo);
 router.patch("/preorders/:orderId/approve", authRequired, roleRequired("admin", "cashier"), checkPreOrderPermission, preorderController.approvePreOrder);
 router.patch("/preorders/:orderId/cancel", authRequired, roleRequired("admin", "cashier"), checkPreOrderPermission, preorderController.cancelPreOrder);
@@ -59,9 +62,6 @@ router.patch("/preorders/:orderId/notes/:noteId", authRequired, roleRequired("ad
 router.get("/preorders/export", authRequired, roleRequired("admin"), preorderController.exportPreOrders);
 router.post("/preorders/bulk-action", authRequired, roleRequired("admin", "cashier"), preorderController.bulkActionPreOrders);
 
-// =======================================================
-// NHÓM 2: CÁC ROUTE THỐNG KÊ & BÁO CÁO
-// =======================================================
 
 // --- API cho Trang "Doanh thu Tổng quan" (Trang hiện tại của bạn) ---
 router.get("/revenue", statsCtrl.getRevenueStats); // <-- API này bạn nói đang chạy mượt
@@ -83,8 +83,7 @@ router.get("/items/sales-by-time", statsCtrl.getItemsSalesByTimePeriod);
 // trang khách hàng thân thiết
 router.get("/reports/customers", customerReportCtrl.getCustomerReport);
 
-// hieu suat nhan vien 
-router.get("/waiters", performanceController.getWaiterStats);
+
 
 // Test endpoint để trigger stale items reassignment (chỉ dùng để debug)
 router.post("/test/reassign-stale-items", async (req, res) => {
@@ -107,9 +106,14 @@ router.post("/test/reassign-stale-items", async (req, res) => {
     });
   }
 });
+// hieu suat nhan vien 
+router.get("/waiters", performanceController.getWaiterStats);
 router.get("/chefs", performanceController.getChefStats);
 router.get("/cashiers", performanceController.getCashierStats);
+
+
 // ca lam viec
 router.get("/performance/shifts/:userId", performanceDetailCtrl.getUserShifts);
+router.put("/performance/shifts/:shiftId", shiftController.updateShift);
 
 module.exports = router;

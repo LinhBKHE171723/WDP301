@@ -276,7 +276,7 @@ const calculateExpense = async (itemOrMenu, type) => {
  * @param {Array} orderItems - Cart items
  * @returns {Object} Result with created order items and total amount
  */
-const createOrderItemsFromCart = async (orderItems) => {
+const createOrderItemsFromCart = async (orderItems, skipDeductIngredients = false) => {
   const createdOrderItems = [];
   let totalAmount = 0;
 
@@ -339,29 +339,31 @@ const createOrderItemsFromCart = async (orderItems) => {
     createdOrderItems.push(newOrderItem._id);
     totalAmount += item.price * orderItem.quantity; // Tính tổng tiền theo số lượng
 
-    // Trừ nguyên liệu từ kho khi đặt món (actual deduction)
-    try {
-      // Xử lý món đơn (itemType === 'item')
-      if (orderItem.type === 'item') {
-        // Item đã được populate ingredients ở trên
-        await deductIngredientsFromStock(item, orderItem.quantity);
-      }
-      
-      // Xử lý combo (itemType === 'menu' và có comboItems)
-      if (orderItem.type === 'menu' && item.type === 'combo' && item.items && item.items.length > 0) {
-        // Trừ nguyên liệu cho từng item trong combo
-        for (const comboItemId of item.items) {
-          const comboItem = await Item.findById(comboItemId).populate('ingredients.ingredient');
-          if (comboItem) {
-            // Số lượng mỗi comboItem = orderItem.quantity (mỗi combo có bao nhiêu phần comboItem)
-            await deductIngredientsFromStock(comboItem, orderItem.quantity);
+    // Trừ nguyên liệu từ kho khi đặt món (actual deduction) - bỏ qua nếu skipDeductIngredients = true
+    if (!skipDeductIngredients) {
+      try {
+        // Xử lý món đơn (itemType === 'item')
+        if (orderItem.type === 'item') {
+          // Item đã được populate ingredients ở trên
+          await deductIngredientsFromStock(item, orderItem.quantity);
+        }
+        
+        // Xử lý combo (itemType === 'menu' và có comboItems)
+        if (orderItem.type === 'menu' && item.type === 'combo' && item.items && item.items.length > 0) {
+          // Trừ nguyên liệu cho từng item trong combo
+          for (const comboItemId of item.items) {
+            const comboItem = await Item.findById(comboItemId).populate('ingredients.ingredient');
+            if (comboItem) {
+              // Số lượng mỗi comboItem = orderItem.quantity (mỗi combo có bao nhiêu phần comboItem)
+              await deductIngredientsFromStock(comboItem, orderItem.quantity);
+            }
           }
         }
+      } catch (error) {
+        console.error(`❌ Lỗi khi trừ nguyên liệu cho OrderItem:`, error);
+        // Không throw error để không làm gián đoạn quá trình tạo order
+        // Có thể log và báo admin sau
       }
-    } catch (error) {
-      console.error(`❌ Lỗi khi trừ nguyên liệu cho OrderItem:`, error);
-      // Không throw error để không làm gián đoạn quá trình tạo order
-      // Có thể log và báo admin sau
     }
   }
 

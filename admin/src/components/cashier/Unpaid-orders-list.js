@@ -77,9 +77,7 @@ function UnpaidOrdersList({
   const handlePaymentComplete = async (orderId, paymentMethod) => {
     const paidOrder = unpaidOrders.find((order) => order.id === orderId)
     if (paidOrder) {
-      const VAT_RATE = 0.1
-      const subtotal = paidOrder.items.reduce((sum, item) => sum + item.price * item.quantity, 0)
-      const total = subtotal * (1 + VAT_RATE)
+      const total = paidOrder.items.reduce((sum, item) => sum + item.price * item.quantity, 0)
 
       try {
         const methodToSend = paymentMethod || "cash"

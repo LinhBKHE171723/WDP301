@@ -47,7 +47,7 @@ const FeedbackForm = ({ orderId, onFeedbackSubmitted }) => {
       if (!orderId) return;
       try {
         setLoadingEmployees(true);
-        const response = await fetch(`http://localhost:5000/api/customer/orders/${orderId}/employees`);
+        const response = await fetch(API_ENDPOINTS.CUSTOMER.ORDER_EMPLOYEES(orderId));
         const data = await response.json();
         if (data.success) {
           setEmployees(data.data || { waiters: [], chefs: [] });

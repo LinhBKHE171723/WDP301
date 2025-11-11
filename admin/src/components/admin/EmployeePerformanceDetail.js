@@ -1,6 +1,21 @@
 import React, { useEffect, useState } from "react";
 import axios from "axios";
 import { Loader2, CalendarDays } from "lucide-react";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+  DialogFooter,
+} from "../ui/admin/dialog";
+import Client from "../../api/Client";
+function toDatetimeLocal(d) {
+  if (!d) return "";
+  const date = new Date(d);
+  date.setMinutes(date.getMinutes() - date.getTimezoneOffset());
+  return date.toISOString().slice(0, 16);
+}
 
 export default function ShiftDetail({ userId }) {
   const today = new Date();
@@ -9,28 +24,31 @@ export default function ShiftDetail({ userId }) {
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+  const [editShift, setEditShift] = useState(null);
+  const [saving, setSaving] = useState(false);
 
-  // Hàm tạo from/to theo tháng-năm
   const getRange = (month, year) => {
     const from = new Date(year, month - 1, 1);
-    const to = new Date(year, month, 0); // ngày cuối tháng
+    const to = new Date(year, month, 0);
     return {
       from: from.toISOString().split("T")[0],
       to: to.toISOString().split("T")[0],
     };
   };
 
-  // Gọi API
   useEffect(() => {
     const fetchData = async () => {
       setLoading(true);
       const { from, to } = getRange(month, year);
       try {
-        const res = await axios.get(
-          `http://localhost:5000/api/admin/performance/shifts/${userId}?from=${from}&to=${to}`
-        );
-        if (res.data.success) setData(res.data.data);
-        else throw new Error(res.data.message);
+        const res = await Client.get(
+  `/admin/performance/shifts/${userId}`,
+  { params: { from, to } }
+);
+
+if (res.success) setData(res.data);
+else throw new Error(res.message);
+
       } catch (err) {
         setError(err.message);
       } finally {
@@ -40,7 +58,6 @@ export default function ShiftDetail({ userId }) {
     fetchData();
   }, [userId, month, year]);
 
-  // loading & error
   if (loading)
     return (
       <div className="flex items-center justify-center py-10 text-gray-600">
@@ -62,7 +79,6 @@ export default function ShiftDetail({ userId }) {
       </div>
     );
 
-  // ====== Tính toán hiển thị =======
   const totalHours = (data.totalWorkedMinutes / 60).toFixed(1);
   const validShifts = data.totalShifts - data.absentCount;
   const onTimeCount =
@@ -74,7 +90,6 @@ export default function ShiftDetail({ userId }) {
       ? ((onTimeCount / data.totalShifts) * 100).toFixed(1)
       : 0;
 
-  // ====== Giao diện =======
   return (
     <div className="p-6 bg-white rounded-2xl shadow-md">
       <div className="flex items-center justify-between mb-4">
@@ -83,7 +98,6 @@ export default function ShiftDetail({ userId }) {
           Thống kê tháng {month}/{year}
         </h2>
 
-        {/* Bộ chọn tháng + năm */}
         <div className="flex gap-2">
           <select
             value={month}
@@ -117,8 +131,16 @@ export default function ShiftDetail({ userId }) {
       <div className="grid grid-cols-2 md:grid-cols-3 gap-4 mb-6">
         <Stat label="Tổng ca" value={data.totalShifts} />
         <Stat label="Giờ làm" value={`${totalHours}h`} />
-        <Stat label="Đi trễ" value={`${data.totalLate} phút`} />
-        <Stat label="Về sớm" value={`${data.totalEarly} phút`} />
+        <Stat
+          label="Đi trễ"
+          value={`${data.totalLate || 0} phút (${data.lateCount || 0} ngày)`}
+        />
+
+        <Stat
+          label="Về sớm"
+          value={`${data.totalEarly || 0} phút (${data.earlyCount || 0} ngày)`}
+        />
+
         <Stat label="Nghỉ" value={`${data.absentCount} buổi`} />
         <Stat label="Tỉ lệ đúng giờ" value={`${onTimeRate}%`} />
       </div>
@@ -132,8 +154,8 @@ export default function ShiftDetail({ userId }) {
               <th className="py-2 px-3 text-left">Ca làm</th>
               <th className="py-2 px-3 text-left">Giờ check-in</th>
               <th className="py-2 px-3 text-left">Giờ check-out</th>
-              <th className="py-2 px-3 text-center">Trễ</th>
-              <th className="py-2 px-3 text-center">Sớm</th>
+              <th className="py-2 px-3 text-center">Đi Trễ (phút)</th>
+              <th className="py-2 px-3 text-center">Về Sớm (phút)</th>
               <th className="py-2 px-3 text-center">Trạng thái</th>
               <th className="py-2 px-3 text-left">Ghi chú</th>
             </tr>
@@ -148,6 +170,7 @@ export default function ShiftDetail({ userId }) {
               >
                 <td className="py-2 px-3">
                   {new Date(shift.date).toLocaleDateString("vi-VN")}
+                  <div className="text-xs text-gray-500">{shift.dayOfWeek}</div>
                 </td>
                 <td className="py-2 px-3">{shift.workShiftId?.name}</td>
                 <td className="py-2 px-3">
@@ -176,16 +199,40 @@ export default function ShiftDetail({ userId }) {
                   <StatusBadge status={shift.status} />
                 </td>
                 <td className="py-2 px-3">{shift.note || "--"}</td>
+                <td className="py-2 px-3 text-left">
+                  <button
+                    onClick={() => setEditShift(shift)}
+                    className="text-blue-600 underline text-sm"
+                  >
+                    Sửa
+                  </button>
+                </td>
               </tr>
             ))}
           </tbody>
         </table>
       </div>
+      {editShift && (
+        <EditShiftModal
+          shift={editShift}
+          onClose={() => setEditShift(null)}
+          onSaved={() => {
+            setEditShift(null);
+            // Reload data
+            const { from, to } = getRange(month, year);
+            Client.get(
+  `/admin/performance/shifts/${userId}`,
+  { params: { from, to } }
+).then((res) => setData(res.data));
+
+          }
+          }
+        />
+      )}
     </div>
   );
 }
 
-/* Components phụ */
 const Stat = ({ label, value }) => (
   <div className="bg-indigo-50 border border-indigo-100 rounded-xl p-3 text-center shadow-sm">
     <div className="text-indigo-600 text-sm">{label}</div>
@@ -218,3 +265,94 @@ const StatusBadge = ({ status }) => {
     </span>
   );
 };
+function EditShiftModal({ shift, onClose, onSaved }) {
+  const [startTime, setStartTime] = useState(
+    shift.startTime ? toDatetimeLocal(shift.startTime) : ""
+  );
+  const [endTime, setEndTime] = useState(
+    shift.endTime ? toDatetimeLocal(shift.endTime) : ""
+  );
+  const [note, setNote] = useState(shift.note || "");
+  const [loading, setLoading] = useState(false);
+
+  const handleSave = async () => {
+    setLoading(true);
+    try {
+      await Client.put(
+  `/admin/performance/shifts/${shift._id}`,
+  {
+    startTime: startTime || null,
+    endTime: endTime || null,
+    note,
+  }
+);
+
+      onSaved();
+    } catch (err) {
+      alert("Lỗi cập nhật: " + err.message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return (
+    <Dialog open={true} onOpenChange={onClose}>
+      <DialogContent className="max-w-md rounded-xl shadow-xl bg-white">
+        <DialogHeader>
+          <DialogTitle>Chỉnh sửa ca làm</DialogTitle>
+          <DialogDescription>
+            Cập nhật giờ check-in, check-out và ghi chú
+          </DialogDescription>
+        </DialogHeader>
+
+        <div className="space-y-4 mt-2">
+          <div>
+            <label className="block text-sm font-medium mb-1">
+              Giờ check-in
+            </label>
+            <input
+              type="datetime-local"
+              value={startTime}
+              onChange={(e) => setStartTime(e.target.value)}
+              className="w-full border rounded-lg px-3 py-2"
+            />
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium mb-1">
+              Giờ check-out
+            </label>
+            <input
+              type="datetime-local"
+              value={endTime}
+              onChange={(e) => setEndTime(e.target.value)}
+              className="w-full border rounded-lg px-3 py-2"
+            />
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium mb-1">Ghi chú</label>
+            <textarea
+              value={note}
+              onChange={(e) => setNote(e.target.value)}
+              className="w-full border rounded-lg px-3 py-2"
+            />
+          </div>
+        </div>
+
+        <DialogFooter>
+          <button className="px-4 py-2 rounded-lg border" onClick={onClose}>
+            Hủy
+          </button>
+          <button
+            className="px-4 py-2 rounded-lg bg-indigo-600 text-white"
+            onClick={handleSave}
+            disabled={loading}
+          >
+            {loading ? "Đang lưu..." : "Lưu thay đổi"}
+          </button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+}

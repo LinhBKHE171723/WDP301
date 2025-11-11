@@ -387,7 +387,7 @@ const seedDatabase = async () => {
       shifts.push(...cashierShifts);
     }
 
-    await Shift.insertMany(shifts);
+    await Shift.create(shifts);
     console.log(`✅ Đã tạo ${shifts.length} shifts cho nhân viên.`);
 
     // 3️⃣ Nguyên liệu

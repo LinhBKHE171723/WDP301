@@ -15,7 +15,7 @@ export default function OrderCard({
   const { tableId, status, totalAmount, orderItems } = order;
   const [showRejectModal, setShowRejectModal] = useState(false);
   const [rejectReason, setRejectReason] = useState("");
-  const [selectedTable, setSelectedTable] = useState("");
+  const [selectedTables, setSelectedTables] = useState([]); // Mảng các bàn đã chọn
   const [loading, setLoading] = useState(false);
   const [markingServed, setMarkingServed] = useState({}); // Track which item is being marked
   const { user } = useAuth();
@@ -44,34 +44,49 @@ export default function OrderCard({
     );
   };
 
-  // Tự động chọn bàn hiện tại nếu order đã có tableId
+  // Tự động chọn bàn hiện tại nếu order đã có tableId hoặc tableIds
   useEffect(() => {
-    if (tableId && !selectedTable) {
-      setSelectedTable(tableId._id);
+    if (order.tableIds && order.tableIds.length > 0 && selectedTables.length === 0) {
+      // Nếu có tableIds, sử dụng tableIds
+      setSelectedTables(order.tableIds.map(t => t._id || t));
+    } else if (tableId && selectedTables.length === 0) {
+      // Fallback về tableId cũ
+      setSelectedTables([tableId._id]);
     }
-  }, [tableId, selectedTable]);
+  }, [order.tableIds, tableId, selectedTables.length]);
 
   // ✅ Xác nhận đơn hàng
   const handleApprove = async () => {
-    // Chỉ validate nếu order chưa có tableId và waiter không chọn bàn
-    if (!selectedTable && !tableId) {
-      toast.warning("⚠️ Vui lòng chọn bàn trước khi xác nhận!");
-      return;
+    // Validate: cần chọn ít nhất 1 bàn
+    if (selectedTables.length === 0) {
+      // Fallback: nếu có tableId hoặc tableIds từ order
+      if (order.tableIds && order.tableIds.length > 0) {
+        // Sử dụng tableIds hiện có
+      } else if (tableId) {
+        // Sử dụng tableId cũ
+      } else {
+        toast.warning("⚠️ Vui lòng chọn ít nhất 1 bàn trước khi xác nhận!");
+        return;
+      }
     }
 
     try {
       setLoading(true);
-      // Nếu không có selectedTable nhưng có tableId, sử dụng tableId
-      const finalSelectedTable = selectedTable || (tableId ? tableId._id : null);
+      // Gửi selectedTables[] (mảng các bàn)
+      const finalSelectedTables = selectedTables.length > 0 
+        ? selectedTables 
+        : (order.tableIds && order.tableIds.length > 0 
+            ? order.tableIds.map(t => t._id || t)
+            : (tableId ? [tableId._id] : []));
       
-      const response = await waiterApi.respondToOrder(order._id, true, null, finalSelectedTable);
+      const response = await waiterApi.respondToOrder(order._id, true, null, null, finalSelectedTables);
       onWaiterResponse(order._id, "approved");
-      toast.success("✅ Đã xác nhận đơn hàng và gán bàn thành công!");
+      toast.success(`✅ Đã xác nhận đơn hàng và gán ${finalSelectedTables.length} bàn thành công!`);
     } catch (error) {
       console.error('❌ Error details:', error);
       
       if (error.response?.status === 409) {
-        toast.error("❌ Bàn này đã được chọn bởi waiter khác!");
+        toast.error("❌ Một hoặc nhiều bàn đã được chọn bởi waiter khác!");
       } else {
         toast.error("❌ Lỗi khi xác nhận đơn hàng!");
       }
@@ -275,34 +290,112 @@ export default function OrderCard({
             })}
           </div>
 
-          {/* ✅ Chọn bàn phục vụ (chỉ hiện khi isPending) */}
+          {/* ✅ Chọn bàn phục vụ (chỉ hiện khi isPending) - Badge/Tag UI */}
           {isPending && (
             <Form.Group className="mb-3">
               <Form.Label className="small fw-bold text-secondary">
-                Chọn bàn phục vụ:
+                Chọn bàn phục vụ (có thể chọn nhiều bàn):
               </Form.Label>
-              <Form.Select
-                value={selectedTable}
-                onChange={(e) => setSelectedTable(e.target.value)}
-                disabled={loading}
-              >
-                <option value="">-- Chọn bàn trống --</option>
-                {/* Hiển thị bàn hiện tại nếu có */}
-                {tableId && (
-                  <option value={tableId._id} style={{backgroundColor: '#e8f5e8'}}>
-                    Bàn {tableId.tableNumber} (Đã gán tự động)
-                  </option>
-                )}
-                {availableTables.map((t) => (
-                  <option key={t?._id} value={t?._id}>
-                    Bàn {t?.tableNumber}
-                  </option>
-                ))}
-              </Form.Select>
-              {/* Thông báo nếu order đã có bàn */}
-              {tableId && (
-                <Form.Text className="text-success small">
-                  ✅ Đơn hàng đã được gán tự động cho bàn {tableId.tableNumber}. Bạn có thể chọn bàn khác nếu cần.
+              
+              {/* Hiển thị các bàn đã chọn dưới dạng Badge */}
+              {selectedTables.length > 0 && (
+                <div className="mb-3 p-2" style={{backgroundColor: '#f8f9fa', borderRadius: '0.375rem', border: '1px solid #dee2e6'}}>
+                  <div className="small text-muted mb-2">✅ Đã chọn {selectedTables.length} bàn:</div>
+                  <div className="d-flex flex-wrap gap-2">
+                    {selectedTables.map((tableIdStr) => {
+                      const table = availableTables.find(t => t._id === tableIdStr) || 
+                                    (order.tableIds && order.tableIds.find(t => (t._id || t) === tableIdStr)) ||
+                                    (tableId && tableId._id === tableIdStr ? tableId : null);
+                      if (!table) return null;
+                      const tableNumber = table.tableNumber || 'N/A';
+                      const isAutoAssigned = (order.tableIds && order.tableIds.some(tid => (tid._id || tid) === tableIdStr)) ||
+                                           (tableId && tableId._id === tableIdStr);
+                      
+                      return (
+                        <Badge
+                          key={tableIdStr}
+                          bg={isAutoAssigned ? "success" : "primary"}
+                          className="d-flex align-items-center gap-1"
+                          style={{fontSize: '0.875rem', padding: '0.5rem 0.75rem', cursor: loading ? 'not-allowed' : 'pointer'}}
+                        >
+                          <span>Bàn {tableNumber}{isAutoAssigned ? ' (Tự động)' : ''}</span>
+                          {!loading && (
+                            <span
+                              onClick={() => {
+                                setSelectedTables(selectedTables.filter(id => id !== tableIdStr));
+                              }}
+                              style={{cursor: 'pointer', marginLeft: '0.25rem', fontSize: '1.2rem', fontWeight: 'bold'}}
+                            >
+                              ×
+                            </span>
+                          )}
+                        </Badge>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
+
+              {/* Dropdown để thêm bàn mới */}
+              <div className="mb-2">
+                <Form.Select
+                  value=""
+                  onChange={(e) => {
+                    const newTableId = e.target.value;
+                    if (newTableId && !selectedTables.includes(newTableId)) {
+                      setSelectedTables([...selectedTables, newTableId]);
+                    }
+                    e.target.value = ""; // Reset dropdown
+                  }}
+                  disabled={loading}
+                  size="sm"
+                >
+                  <option value="">+ Thêm bàn phục vụ</option>
+                  {/* Hiển thị bàn đã gán tự động nếu chưa được chọn */}
+                  {order.tableIds && order.tableIds.length > 0 && (
+                    <>
+                      {order.tableIds.map((t) => {
+                        const tableIdStr = t._id || t;
+                        if (selectedTables.includes(tableIdStr)) return null;
+                        const tableNumber = t.tableNumber || (typeof t === 'object' && t.tableNumber) || 'N/A';
+                        return (
+                          <option key={tableIdStr} value={tableIdStr}>
+                            Bàn {tableNumber} (Đã gán tự động)
+                          </option>
+                        );
+                      })}
+                    </>
+                  )}
+                  {/* Fallback: hiển thị tableId cũ nếu chưa được chọn */}
+                  {(!order.tableIds || order.tableIds.length === 0) && tableId && !selectedTables.includes(tableId._id) && (
+                    <option value={tableId._id}>
+                      Bàn {tableId.tableNumber} (Đã gán tự động)
+                    </option>
+                  )}
+                  {/* Danh sách các bàn available */}
+                  {availableTables.map((t) => {
+                    const tableIdStr = t?._id;
+                    if (!tableIdStr) return null;
+                    // Bỏ qua bàn đã được chọn
+                    if (selectedTables.includes(tableIdStr)) return null;
+                    // Bỏ qua bàn đã có trong tableIds hoặc tableId
+                    const isAlreadyInOrder = (order.tableIds && order.tableIds.some(tid => (tid._id || tid) === tableIdStr)) ||
+                                           (tableId && tableId._id === tableIdStr);
+                    if (isAlreadyInOrder) return null;
+                    
+                    return (
+                      <option key={tableIdStr} value={tableIdStr}>
+                        Bàn {t?.tableNumber}
+                      </option>
+                    );
+                  })}
+                </Form.Select>
+              </div>
+
+              {/* Thông báo nếu chưa chọn bàn nào */}
+              {selectedTables.length === 0 && (
+                <Form.Text className="text-warning small d-block">
+                  ⚠️ Vui lòng chọn ít nhất 1 bàn trước khi xác nhận
                 </Form.Text>
               )}
             </Form.Group>

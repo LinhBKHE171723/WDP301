@@ -37,7 +37,10 @@ export default function ItemTrendAnalytics({ itemId, itemName = "Chi Tiết Món
     metric: "totalQuantity",
   });
 
-  const API_BASE_URL = "http://localhost:5000/api/admin";
+  // Get API base URL from environment variable
+  const API_BASE_URL = process.env.REACT_APP_API_URL 
+    ? `${process.env.REACT_APP_API_URL}/admin`
+    : "http://localhost:5000/api/admin";
 
   const safeJsonParse = (text) => {
     let clean = text.replace(/^\uFEFF/, "");

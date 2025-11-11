@@ -1,5 +1,33 @@
 import { useEffect, useRef, useState } from 'react';
 
+// Helper function to resolve WebSocket URL
+function resolveWebSocketUrl() {
+  const envUrl = process.env.REACT_APP_WS_URL;
+  if (envUrl) return envUrl;
+
+  const apiUrl = process.env.REACT_APP_API_URL;
+  if (apiUrl) {
+    try {
+      const url = new URL(apiUrl);
+      url.protocol = url.protocol === "https:" ? "wss:" : "ws:";
+      url.pathname = url.pathname.replace(/\/api\/?$/, "");
+      if (!url.pathname.endsWith("/")) url.pathname += "/";
+      url.pathname += "ws";
+      return url.toString();
+    } catch (error) {
+      console.warn("Không thể phân tích REACT_APP_API_URL để tạo websocket URL", error);
+    }
+  }
+
+  if (typeof window !== "undefined" && window.location) {
+    const { protocol, host } = window.location;
+    const wsProtocol = protocol === "https:" ? "wss:" : "ws:";
+    return `${wsProtocol}//${host}/ws`;
+  }
+
+  return "ws://localhost:5000/ws"; // Fallback
+}
+
 /**
  * ✅ useWaiterWebSocket Hook
  * Dùng cho giao diện Waiter để:
@@ -32,8 +60,8 @@ const useWaiterWebSocket = (userId = null) => {
     try {
       setConnectionState('connecting');
 
-      // Kết nối tới server WebSocket (chạy ở port 5000)
-      const ws = new WebSocket('ws://localhost:5000/ws');
+      // Kết nối tới server WebSocket
+      const ws = new WebSocket(resolveWebSocketUrl());
       wsRef.current = ws;
 
       // Khi kết nối thành công

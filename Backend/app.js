@@ -15,7 +15,6 @@ const userRoutes = require("./routes/user.route");
 // load env
 dotenv.config();
 const { checkExpiryAndUpdateStock } = require("./utils/checkExpiryAndUpdateStock.js");
-const seed = require("./utils/seed");
 
 const app = express();
 
@@ -30,9 +29,15 @@ app.disable("etag");
 mongoose
   // .connect(process.env.MONGO_URI)
   .connect(process.env.MONGO_URI)
-  .then(() => {
-  
+  .then(async () => {
     console.log("✅ MongoDB connected");
+     
+    console.log("✅ Database seeding completed");
+    // Sau khi DB đã có dữ liệu, require cron
+    require("./utils/cron");
+    console.log("⏰ Cron jobs started");
+
+
   })
   .catch((err) => console.error(" MongoDB connection error:", err));
 

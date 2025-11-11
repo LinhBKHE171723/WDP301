@@ -9,6 +9,7 @@ import TableDetail from "../components/waiter/TableDetail";
 import Profile from "../components/user/Profile";
 import ServingHistory from "../components/waiter/ServingHistory";
 import ServingHistoryDetail from "../components/waiter/ServingHistoryDetail";
+import Attendance from "../components/user/Attendance";
 // Admin components
 import Sidebar from "../components/admin/Sidebar";
 import { Header } from "../components/admin/Header";
@@ -24,6 +25,7 @@ import CustomerReportPage from "../pages/admin/CustomerReportPage";
 import PerformancePage from "../pages/admin/PerformancePage";
 import PerformanceDetailPage from "../pages/admin/PerformancePageDetail";
 import PreOrderPage from "../pages/admin/PreOrderPage";
+import OrderHistoryPage from "../pages/admin/OrderHistoryPage";
 import AdminPreOrderNotification from "../components/admin/AdminPreOrderNotification";
 import CashierShiftManager from "../components/cashier/CashierShiftManager";
 import CashierDashboard from "../components/cashier/CashierDashboard";
@@ -31,7 +33,7 @@ import OrderPayment from "../components/cashier/order-payment";
 import TableManagement from "../components/cashier/table-management";
 import UnpaidOrdersList from "../components/cashier/Unpaid-orders-list";
 
-// auth 
+// auth
 import ForgotPassword from "../pages/ForgotPassword";
 import ResetPassword from "../pages/ResetPassword";
 
@@ -58,7 +60,10 @@ function AdminCashierDashboardRoute() {
   const handleAddPettyCash = (transaction) => {
     setShiftData((prev) => ({
       ...prev,
-      pettyCashTransactions: [transaction, ...(prev.pettyCashTransactions || [])],
+      pettyCashTransactions: [
+        transaction,
+        ...(prev.pettyCashTransactions || []),
+      ],
     }));
   };
 
@@ -86,12 +91,19 @@ function AdminCashierUnpaidOrdersRoute() {
     navigate("/admin/cashier/dashboard");
   };
 
-  return <UnpaidOrdersList onBack={handleBack} onPaymentComplete={handlePaymentComplete} />;
+  return (
+    <UnpaidOrdersList
+      onBack={handleBack}
+      onPaymentComplete={handlePaymentComplete}
+    />
+  );
 }
 
 function AdminCashierTableManagementRoute() {
   const navigate = useNavigate();
-  return <TableManagement onBack={() => navigate("/admin/cashier/dashboard")} />;
+  return (
+    <TableManagement onBack={() => navigate("/admin/cashier/dashboard")} />
+  );
 }
 
 function AdminCashierOrderPaymentRoute() {
@@ -152,7 +164,9 @@ export default function AppRouter() {
   if (loading) {
     return (
       <div className="flex items-center justify-center min-h-screen">
-        <p className="text-gray-600 text-lg">Đang kiểm tra phiên đăng nhập...</p>
+        <p className="text-gray-600 text-lg">
+          Đang kiểm tra phiên đăng nhập...
+        </p>
       </div>
     );
   }
@@ -165,22 +179,14 @@ export default function AppRouter() {
       <Route
         path="forgot-password"
         element={
-          isLoggedIn && token ? (
-            <Navigate to="/" replace />
-          ) : (
-            <ForgotPassword />
-          )
+          isLoggedIn && token ? <Navigate to="/" replace /> : <ForgotPassword />
         }
       />
 
       <Route
         path="/reset-password"
         element={
-          isLoggedIn && token ? (
-            <Navigate to="/" replace />
-          ) : (
-            <ResetPassword />
-          )
+          isLoggedIn && token ? <Navigate to="/" replace /> : <ResetPassword />
         }
       />
 
@@ -218,17 +224,32 @@ export default function AppRouter() {
                     <Header />
                     <div className="container-page">
                       <Routes>
-                        <Route path="/" element={<DashboardPage />} />
                         <Route path="/preorders" element={<PreOrderPage />} />
+                        <Route path="/orders" element={<OrderHistoryPage />} />
                         <Route path="/analytics" element={<AnalyticsPage />} />
-                        <Route path="/item-report" element={<ItemReportPage />} />
-                        <Route path="item-analytics/:itemId" element={<AnalyticsPage2 />} />
+                        <Route
+                          path="/item-report"
+                          element={<ItemReportPage />}
+                        />
+                        <Route
+                          path="item-analytics/:itemId"
+                          element={<AnalyticsPage2 />}
+                        />
                         <Route path="/accounts" element={<AccountsPage />} />
                         <Route path="/feedback" element={<FeedbackPage />} />
                         <Route path="/settings" element={<SettingsPage />} />
-                        <Route path="/customers" element={<CustomerReportPage />} />
-                        <Route path="/performance" element={<PerformancePage />} />
-                        <Route path="performance/:userId" element={<PerformanceDetailPage />} />
+                        <Route
+                          path="/customers"
+                          element={<CustomerReportPage />}
+                        />
+                        <Route
+                          path="/performance"
+                          element={<PerformancePage />}
+                        />
+                        <Route
+                          path="performance/:userId"
+                          element={<PerformanceDetailPage />}
+                        />
                       </Routes>
                     </div>
                   </main>
@@ -242,7 +263,11 @@ export default function AppRouter() {
 
       {/* Nếu đã đăng nhập và có quyền kitchen_manager */}
       {isLoggedIn && user?.role === "kitchen_manager" && token && (
-        <Route path="/kitchen/dashboard" element={<KitchenDashboard />} />
+        <>
+          <Route path="/kitchen/dashboard" element={<KitchenDashboard />} />
+          <Route path="/profile" element={<Profile />} />
+          <Route path="/user/attendance" element={<Attendance />} />
+        </>
       )}
 
       {/* Nếu đã đăng nhập và có quyền waiter */}
@@ -250,10 +275,17 @@ export default function AppRouter() {
         <>
           <Route path="/waiter/dashboard" element={<WaiterDashboard />} />
           <Route path="/waiter/tables" element={<TableMap />} />
-          <Route path="/waiter/tables/details/:tableId" element={<TableDetail />} />
+          <Route
+            path="/waiter/tables/details/:tableId"
+            element={<TableDetail />}
+          />
           <Route path="/waiter/orders/history" element={<ServingHistory />} />
-          <Route path="/waiter/orders/history/:orderId" element={<ServingHistoryDetail />} />
+          <Route
+            path="/waiter/orders/history/:orderId"
+            element={<ServingHistoryDetail />}
+          />
           <Route path="/profile" element={<Profile />} />
+          <Route path="/user/attendance" element={<Attendance />} />
         </>
       )}
 

@@ -12,7 +12,8 @@ import ChefModal from "../components/kitchenmanager/ChefModal";
 import AddItemModal from "../components/kitchenmanager/AddItemModal";
 import AddMenuModal from "../components/kitchenmanager/AddMenuModal";
 import InventoryManager from "../components/kitchenmanager/InventoryManager";
-import PurchaseHistoryManager from "../components/kitchenmanager/PurchaseHistoryManager"; // ✅ import mới
+import PurchaseHistoryManager from "../components/kitchenmanager/PurchaseHistoryManager";
+import ChefAttendanceManager from "../components/kitchenmanager/ChefAttendanceManager"; // ✅ import mới
 
 export default function KitchenDashboard() {
   const navigate = useNavigate();
@@ -31,6 +32,7 @@ export default function KitchenDashboard() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [chefs, setChefs] = useState([]);
+  const [showProfileMenu, setShowProfileMenu] = useState(false);
 
   // ✅ WebSocket hook cho real-time updates
   const {
@@ -45,6 +47,18 @@ export default function KitchenDashboard() {
     logout();
     navigate("/auth/login");
   };
+
+  // ✅ Đóng dropdown khi click bên ngoài
+  useEffect(() => {
+    const handleClickOutside = (event) => {
+      if (showProfileMenu && !event.target.closest(".profile-dropdown")) {
+        setShowProfileMenu(false);
+      }
+    };
+
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, [showProfileMenu]);
 
   // ✅ Fetch orders function
   const fetchOrders = async () => {
@@ -285,9 +299,13 @@ export default function KitchenDashboard() {
   useEffect(() => {
     const fetchChefs = async () => {
       try {
-        const res = await kitchenApi.getAllChefs();
+        // ✅ Chỉ lấy danh sách chef đã check-in (đang làm việc)
+        const res = await kitchenApi.getActiveChefs();
 
-        setChefs(res?.chefs || []);
+        console.log("Active chefs response:", res);
+        console.log("Active chefs data:", res?.data);
+
+        setChefs(res?.data || []);
       } catch (err) {
         console.error("❌ Lỗi khi tải danh sách đầu bếp:", err);
       }
@@ -377,7 +395,14 @@ export default function KitchenDashboard() {
 
           <div className="flex items-center space-x-4">
             <nav className="flex space-x-2">
-              {["kds", "items", "menus", "inventory", "purchase"].map((tab) => (
+              {[
+                "kds",
+                "items",
+                "menus",
+                "inventory",
+                "purchase",
+                "attendance",
+              ].map((tab) => (
                 <button
                   key={tab}
                   onClick={() => setActiveTab(tab)}
@@ -395,14 +420,17 @@ export default function KitchenDashboard() {
                     ? "Quản lý Combo"
                     : tab === "inventory"
                     ? "Quản lý Kho"
-                    : "Lịch sử Nhập hàng"}
+                    : tab === "purchase"
+                    ? "Lịch sử Nhập hàng"
+                    : "Quản lý Nhân viên"}
                 </button>
               ))}
             </nav>
 
-            {/* User info và nút đăng xuất */}
+            {/* User info và nút profile/đăng xuất */}
             <div className="flex items-center space-x-3 border-l pl-4">
-              <div className="text-right">
+              {/* User Info */}
+              <div className="text-right hidden md:block">
                 <p className="text-sm font-semibold text-gray-900">
                   {user?.name || "Kitchen Manager"}
                 </p>
@@ -410,12 +438,112 @@ export default function KitchenDashboard() {
                   {user?.role === "kitchen_manager" ? "Bếp trưởng" : user?.role}
                 </p>
               </div>
-              <button
-                onClick={handleLogout}
-                className="px-4 py-2 bg-red-500 text-white rounded-lg hover:bg-red-600 transition-colors font-medium text-sm"
-              >
-                Đăng xuất
-              </button>
+
+              {/* Profile Button with Dropdown */}
+              <div className="relative profile-dropdown">
+                <button
+                  onClick={() => setShowProfileMenu(!showProfileMenu)}
+                  className="group relative flex items-center justify-center w-10 h-10 rounded-full bg-gradient-to-br from-orange-400 to-orange-600 hover:from-orange-500 hover:to-orange-700 transition-all duration-200 shadow-md hover:shadow-lg ring-2 ring-white ring-offset-2"
+                  title="Menu Profile"
+                >
+                  {user?.avatar ? (
+                    <img
+                      src={user.avatar}
+                      alt="Avatar"
+                      className="w-full h-full rounded-full object-cover"
+                    />
+                  ) : (
+                    <svg
+                      className="w-5 h-5 text-white"
+                      fill="none"
+                      stroke="currentColor"
+                      viewBox="0 0 24 24"
+                    >
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        strokeWidth={2}
+                        d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"
+                      />
+                    </svg>
+                  )}
+
+                  {/* Online status indicator */}
+                  <span className="absolute bottom-0 right-0 w-3 h-3 bg-green-500 border-2 border-white rounded-full"></span>
+                </button>
+
+                {/* Dropdown Menu */}
+                {showProfileMenu && (
+                  <div className="absolute right-0 mt-2 w-56 bg-white rounded-lg shadow-lg border border-gray-200 py-1 z-50">
+                    {/* User Info trong dropdown (mobile) */}
+                    <div className="md:hidden px-4 py-3 border-b border-gray-100">
+                      <p className="text-sm font-semibold text-gray-900">
+                        {user?.name || "Kitchen Manager"}
+                      </p>
+                      <p className="text-xs text-gray-500">
+                        {user?.email || ""}
+                      </p>
+                    </div>
+
+                    {/* Menu Items */}
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        navigate("/profile");
+                        setShowProfileMenu(false);
+                      }}
+                      className="w-full text-left px-4 py-2 hover:bg-orange-50 flex items-center space-x-3 transition-colors"
+                    >
+                      <svg
+                        className="w-5 h-5 text-orange-500"
+                        fill="none"
+                        stroke="currentColor"
+                        viewBox="0 0 24 24"
+                      >
+                        <path
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          strokeWidth={2}
+                          d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"
+                        />
+                      </svg>
+                      <span className="text-sm text-gray-700">Xem Profile</span>
+                    </button>
+
+                    <hr className="my-1 border-gray-200" />
+
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        handleLogout();
+                        setShowProfileMenu(false);
+                      }}
+                      className="w-full text-left px-4 py-2 hover:bg-red-50 flex items-center space-x-3 transition-colors"
+                    >
+                      <svg
+                        className="w-5 h-5 text-red-500"
+                        fill="none"
+                        stroke="currentColor"
+                        viewBox="0 0 24 24"
+                      >
+                        <path
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          strokeWidth={2}
+                          d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1"
+                        />
+                      </svg>
+                      <span className="text-sm text-red-600 font-medium">
+                        Đăng xuất
+                      </span>
+                    </button>
+                  </div>
+                )}
+              </div>
             </div>
           </div>
         </div>
@@ -477,6 +605,11 @@ export default function KitchenDashboard() {
             purchaseOrders={purchaseOrders}
             onRefresh={handleRefreshPurchaseOrders}
           />
+        )}
+
+        {/* TAB: Quản lý điểm danh nhân viên */}
+        {!loading && !error && activeTab === "attendance" && (
+          <ChefAttendanceManager />
         )}
       </main>
 

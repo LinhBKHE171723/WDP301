@@ -263,8 +263,8 @@ const PreOrder = () => {
       <div className="preorder-container">
         <div className="success-message">
           <h2>✅ Đặt trước thành công!</h2>
-          <p>Tài khoản của bạn đã được tạo và mật khẩu đã được gửi đến email của bạn.</p>
-          <p>Vui lòng kiểm tra email để lấy mật khẩu đăng nhập.</p>
+          <p>Thông tin chi tiết đơn đặt trước của bạn đã được gửi đến email.</p>
+          <p>Vui lòng kiểm tra email để xem chi tiết đơn đặt trước.</p>
           <p>Đang chuyển về trang chủ...</p>
         </div>
       </div>

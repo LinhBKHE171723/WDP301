@@ -135,9 +135,61 @@ export default function OrderDetails({
 
   return (
     <div className="col-span-7 bg-white rounded-xl shadow-lg p-6">
-      <h2 className="text-xl font-bold text-gray-900 mb-4">
-        Chi tiết Order #{selectedOrder._id?.slice(-4)}
-      </h2>
+      <div className="flex items-center justify-between mb-4">
+        <h2 className="text-xl font-bold text-gray-900">
+          Chi tiết Order #{selectedOrder._id?.slice(-4)}
+        </h2>
+        {selectedOrder.isPreOrder && (
+          <span className="px-3 py-1 bg-blue-100 text-blue-700 text-sm font-medium rounded-full">
+            📅 Đơn đặt trước
+          </span>
+        )}
+      </div>
+      
+      {/* Thông tin pre-order */}
+      {selectedOrder.isPreOrder && (
+        <div className="mb-4 p-3 bg-blue-50 border border-blue-200 rounded-lg">
+          <h3 className="text-sm font-semibold text-blue-900 mb-2">Thông tin đặt trước:</h3>
+          <div className="space-y-1 text-sm">
+            {selectedOrder.scheduledTime && (
+              <p className="text-blue-700">
+                <span className="font-medium">🕐 Thời gian đến ăn:</span>{" "}
+                {new Date(selectedOrder.scheduledTime).toLocaleString('vi-VN', {
+                  day: '2-digit',
+                  month: '2-digit',
+                  year: 'numeric',
+                  hour: '2-digit',
+                  minute: '2-digit'
+                })}
+              </p>
+            )}
+            {selectedOrder.preparationStartTime && (
+              <p className="text-purple-700">
+                <span className="font-medium">⏰ Bắt đầu chuẩn bị:</span>{" "}
+                {new Date(selectedOrder.preparationStartTime).toLocaleString('vi-VN', {
+                  day: '2-digit',
+                  month: '2-digit',
+                  year: 'numeric',
+                  hour: '2-digit',
+                  minute: '2-digit'
+                })}
+              </p>
+            )}
+            {selectedOrder.reservedEndTime && (
+              <p className="text-purple-700">
+                <span className="font-medium">🔚 Kết thúc dành bàn:</span>{" "}
+                {new Date(selectedOrder.reservedEndTime).toLocaleString('vi-VN', {
+                  day: '2-digit',
+                  month: '2-digit',
+                  year: 'numeric',
+                  hour: '2-digit',
+                  minute: '2-digit'
+                })}
+              </p>
+            )}
+          </div>
+        </div>
+      )}
 
       {/* Nếu tất cả sẵn sàng, hiển thị thông báo */}
       {isAllItemsReady ? (

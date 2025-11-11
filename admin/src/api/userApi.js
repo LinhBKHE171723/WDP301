@@ -10,7 +10,11 @@ const userApi = {
         return res; // chứa user và token
     },
     ForgotPassword: (email) => Client.post("user/forgotPassword", { email }),
-    ResetPassword: (email, tempPassword, newPassword) => Client.post("user/resetPassword", { email, tempPassword, newPassword }),
+    VerifyResetToken: (token) => Client.get(`user/verifyResetToken?token=${token}`),
+    ResetPassword: (token, newPassword) => Client.post("user/resetPassword", { token, newPassword }),
+    getTodayShift: () => Client.get("user/today-shift"),
+    checkIn: () => Client.post("user/checkIn"),
+    checkOut: () => Client.post("user/checkOut"),
 };
 
 export default userApi;

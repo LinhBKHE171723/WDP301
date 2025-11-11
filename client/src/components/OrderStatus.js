@@ -551,6 +551,39 @@ const OrderStatus = React.memo(({ orderId, onBack }) => {
     setShowFeedbackModal(true);
   };
 
+  // Handle request payment
+  const handleRequestPayment = async () => {
+    if (!orderId) {
+      alert('Không tìm thấy ID đơn hàng');
+      return;
+    }
+
+    try {
+      setIsRefreshing(true);
+      const response = await fetch(API_ENDPOINTS.CUSTOMER.REQUEST_PAYMENT(orderId), {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        }
+      });
+
+      const data = await response.json();
+
+      if (data.success) {
+        alert('✅ ' + data.message);
+        // Refresh order status
+        fetchOrderStatus();
+      } else {
+        alert(`❌ ${data.message || 'Không thể gửi yêu cầu thanh toán'}`);
+      }
+    } catch (error) {
+      console.error('Error requesting payment:', error);
+      alert('Có lỗi xảy ra khi gửi yêu cầu thanh toán');
+    } finally {
+      setIsRefreshing(false);
+    }
+  };
+
   // Manual refresh function
   const handleManualRefresh = async () => {
     try {
@@ -1075,6 +1108,15 @@ const OrderStatus = React.memo(({ orderId, onBack }) => {
                   'Gửi lại đơn hàng cho waiter'
                 )}
             </button>
+            )}
+            {order && order.status === 'served' && (
+              <button 
+                onClick={handleRequestPayment} 
+                className="request-payment-btn"
+                disabled={isRefreshing}
+              >
+                💳 Yêu cầu thanh toán
+              </button>
             )}
             {order && order.status === 'paid' && (
               <button onClick={handleShowFeedback} className="feedback-btn">

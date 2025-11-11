@@ -4,6 +4,7 @@ import { useAuth } from '../context/AuthContext';
 import { getCookie, setCookie, eraseCookie, addOrderIdToCookie, getGuestOrderIds, validateAndCleanGuestOrderIds } from '../utils/cookie';
 import LoginModal from './LoginModal';
 import RegisterModal from './RegisterModal';
+import ForgotPasswordModal from './ForgotPasswordModal';
 import ItemDetail from './ItemDetail';
 import OrderStatus from './OrderStatus';
 import { filterMenusByPrice, filterItemsByPriceAndCategory, getUniqueCategories } from '../utils/priceFilters';
@@ -23,6 +24,7 @@ const MenuView = ({ table, onBack }) => {
   const [selectedItem, setSelectedItem] = useState(null);
   const [showLoginModal, setShowLoginModal] = useState(false);
   const [showRegisterModal, setShowRegisterModal] = useState(false);
+  const [showForgotPasswordModal, setShowForgotPasswordModal] = useState(false);
   const [showItemDetail, setShowItemDetail] = useState(false);
   const [priceFilter, setPriceFilter] = useState('all');
   const [itemPriceFilter, setItemPriceFilter] = useState('all');
@@ -215,6 +217,16 @@ const MenuView = ({ table, onBack }) => {
 
   const handleSwitchToLogin = () => {
     setShowRegisterModal(false);
+    setShowLoginModal(true);
+  };
+
+  const handleSwitchToForgotPassword = () => {
+    setShowLoginModal(false);
+    setShowForgotPasswordModal(true);
+  };
+
+  const handleSwitchFromForgotPasswordToLogin = () => {
+    setShowForgotPasswordModal(false);
     setShowLoginModal(true);
   };
 
@@ -585,6 +597,7 @@ const MenuView = ({ table, onBack }) => {
         onClose={() => setShowLoginModal(false)}
         onLogin={handleLogin}
         onSwitchToRegister={handleSwitchToRegister}
+        onSwitchToForgotPassword={handleSwitchToForgotPassword}
       />
 
       {/* Register Modal */}
@@ -593,6 +606,13 @@ const MenuView = ({ table, onBack }) => {
         onClose={() => setShowRegisterModal(false)}
         onRegister={handleRegister}
         onSwitchToLogin={handleSwitchToLogin}
+      />
+
+      {/* Forgot Password Modal */}
+      <ForgotPasswordModal 
+        isOpen={showForgotPasswordModal}
+        onClose={() => setShowForgotPasswordModal(false)}
+        onSwitchToLogin={handleSwitchFromForgotPasswordToLogin}
       />
     </div>
   );

@@ -9,6 +9,7 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "../ui/admin/dropdown-menu";
+import Client from "../../api/Client";
 import {
   Dialog,
   DialogContent,
@@ -28,7 +29,7 @@ const formatDate = (isoDate) => {
 
 export function AccountsTable() {
   const [filterStatus, setFilterStatus] = useState("all");
-  const [filterRole, setFilterRole] = useState("all"); // 🔹 thêm filter theo role
+  const [filterRole, setFilterRole] = useState("all"); 
   const [editData, setEditData] = useState(null);
   const [openEdit, setOpenEdit] = useState(false);
 
@@ -36,7 +37,7 @@ export function AccountsTable() {
   const [accounts, setAccounts] = useState([]);
   const [openRow, setOpenRow] = useState(null);
 
-  // 🔹 State phân trang
+  //  State phân trang
   const [page, setPage] = useState(1);
   const [limit] = useState(10);
   const [total, setTotal] = useState(0);
@@ -48,10 +49,11 @@ export function AccountsTable() {
   };
   const handleSaveEdit = async () => {
     try {
-      await axios.put(`http://localhost:5000/api/admin/users/${editData._id}`, {
-        role: editData.role,
-        accountStatus: editData.accountStatus,
-      });
+      await Client.put(`/admin/users/${editData._id}`, {
+  role: editData.role,
+  accountStatus: editData.accountStatus,
+});
+
       setAccounts((prev) =>
         prev.map((u) => (u._id === editData._id ? editData : u))
       );
@@ -73,18 +75,18 @@ export function AccountsTable() {
 
   // 🔹 Gọi API có phân trang + filter role + status
   useEffect(() => {
-    axios
-      .get("http://localhost:5000/api/admin/users", {
-        params: {
-          page,
-          limit,
-          q: search || undefined,
-          role: filterRole === "all" ? undefined : filterRole,
-          status: filterStatus === "all" ? undefined : filterStatus,
-        },
-      })
-      .then((res) => {
-        const data = res.data.data;
+  Client.get("/admin/users", {
+  params: {
+    page,
+    limit,
+    q: search || undefined,
+    role: filterRole === "all" ? undefined : filterRole,
+    status: filterStatus === "all" ? undefined : filterStatus,
+  },
+})
+.then((res) => {
+  const data = res.data;   
+
         setAccounts(Array.isArray(data.items) ? data.items : []);
         setTotal(data.total || 0);
       })
@@ -124,11 +126,9 @@ export function AccountsTable() {
 
     try {
       setSubmitting(true);
-      const res = await axios.post(
-        "http://localhost:5000/api/admin/users",
-        formData
-      );
-      setAccounts((prev) => [res.data.data, ...prev]);
+      const res = await Client.post("/admin/users", formData);
+setAccounts((prev) => [res.data, ...prev]);   
+
       setSuccessMessage("Tạo tài khoản thành công. Mật khẩu đã gửi email.");
 
       setTimeout(() => {

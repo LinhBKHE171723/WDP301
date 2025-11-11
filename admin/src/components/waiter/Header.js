@@ -37,11 +37,11 @@ export default function Header() {
                             Sơ đồ bàn
                         </Link>
                         <Link
-                            to="/waiter/checkin"
+                            to="/user/attendance"
                             className="btn btn-warning text-dark fw-semibold px-3 py-1"
                             style={{ fontSize: '14px' }}
                         >
-                            Check-in
+                            Điểm danh
                         </Link>
                         <Link
                             to="/waiter/orders/history"

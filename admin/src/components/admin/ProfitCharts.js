@@ -4,12 +4,14 @@ import {
   CartesianGrid, Tooltip, Legend,
   ResponsiveContainer, LineChart, Line
 } from 'recharts';
+import Client from "../../api/Client";
 
 const Card = ({ className, children }) => (
   <div className={`rounded-xl border border-gray-200 bg-white shadow-lg ${className}`}>
     {children}
   </div>
 );
+
 
 const Input = ({ type = 'text', value, onChange, className, placeholder }) => (
   <input
@@ -188,11 +190,12 @@ const fetchProfitData = async ({ range, customFrom, customTo }) => {
     fromDateString = dates.from;
     toDateString = dates.to;
   }
-  const API_URL = `http://localhost:5000/api/admin/revenue?from=${fromDateString}&to=${toDateString}&type=daily`;
+  //usse Client
+  // const API_URL = `http://localhost:5000/api/admin/revenue?from=${fromDateString}&to=${toDateString}&type=daily`;
   try {
-    const response = await fetch(API_URL);
-    if (!response.ok) throw new Error(`HTTP ${response.status}`);
-    return await response.json();
+    const response = Client.get(`/admin/revenue?from=${fromDateString}&to=${toDateString}&type=daily`);
+    
+    return response;
   } catch {
     return [];
   }

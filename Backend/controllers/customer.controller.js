@@ -391,7 +391,8 @@ exports.createOrder = async (req, res) => {
     // Populate để trả về thông tin đầy đủ
     const populatedOrder = await Order.findById(order._id)
       .populate("orderItems")
-      .populate("tableId")
+      .populate("tableId") // Backward compatibility
+      .populate("tableIds") // Nhiều bàn
       .populate("paymentId");
 
     // 🍪 Lưu orderId vào cookie
@@ -561,8 +562,8 @@ exports.createPreOrder = async (req, res) => {
       }
     }
 
-    // Tạo OrderItems từ cart data
-    const { createdOrderItems, totalAmount } = await createOrderItemsFromCart(orderItems);
+    // Tạo OrderItems từ cart data (skipDeductIngredients = true vì chưa approve, sẽ trừ khi admin approve)
+    const { createdOrderItems, totalAmount } = await createOrderItemsFromCart(orderItems, true);
 
     // Tạo Payment
     const payment = new Payment({
@@ -2173,6 +2174,87 @@ exports.startEditOrder = async (req, res) => {
       data: populatedOrder
     });
   } catch (error) {
+    res.status(500).json({ 
+      success: false, 
+      message: error.message 
+    });
+  }
+};
+
+// Customer yêu cầu thanh toán
+exports.requestPayment = async (req, res) => {
+  try {
+    const { orderId } = req.params;
+
+    // Kiểm tra order tồn tại
+    const order = await Order.findById(orderId)
+      .populate({
+        path: "orderItems",
+        populate: {
+          path: "servedBy",
+          select: "name username email _id"
+        }
+      })
+      .populate("tableId")
+      .populate("paymentId")
+      .populate("userId", "name email phone");
+
+    if (!order) {
+      return res.status(404).json({
+        success: false,
+        message: "Không tìm thấy đơn hàng"
+      });
+    }
+
+    // Kiểm tra order đã được phục vụ (served) chưa
+    if (order.status !== 'served') {
+      return res.status(400).json({
+        success: false,
+        message: "Chỉ có thể yêu cầu thanh toán khi đơn hàng đã được phục vụ"
+      });
+    }
+
+    // Kiểm tra order chưa được thanh toán
+    if (order.status === 'paid') {
+      return res.status(400).json({
+        success: false,
+        message: "Đơn hàng đã được thanh toán"
+      });
+    }
+
+    // Gửi WebSocket notification cho cashier
+    const webSocketService = req.app.get("webSocketService");
+    if (webSocketService) {
+      const notificationData = {
+        orderId: order._id,
+        order: order,
+        tableNumber: order.tableId?.tableNumber || null,
+        totalAmount: order.totalAmount,
+        requestedAt: new Date()
+      };
+
+      // Gửi thông báo yêu cầu thanh toán cho tất cả cashier
+      webSocketService.broadcastToAllCashiers("payment:requested", notificationData);
+      console.log(`💳 Payment request broadcasted to all cashiers for order ${order._id}`);
+
+      // Cũng broadcast cho order để customer biết yêu cầu đã được gửi
+      webSocketService.broadcastToOrder(order._id, "payment:request_sent", {
+        orderId: order._id,
+        requestedAt: new Date()
+      });
+    }
+
+    res.status(200).json({
+      success: true,
+      message: "Đã gửi yêu cầu thanh toán. Nhân viên sẽ đến bàn của bạn sớm nhất.",
+      data: {
+        orderId: order._id,
+        tableNumber: order.tableId?.tableNumber || null,
+        totalAmount: order.totalAmount
+      }
+    });
+  } catch (error) {
+    console.error("Error requesting payment:", error);
     res.status(500).json({ 
       success: false, 
       message: error.message 

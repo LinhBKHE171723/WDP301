@@ -11,11 +11,17 @@ const kitchenApi = {
   assignChefToItem: (orderItemId, chefId) =>
     Client.patch(`/kitchen/order-items/${orderItemId}/assign-chef`, { chefId }),
   assignChefToComboItem: (orderItemId, comboItemIndex, chefId) =>
-    Client.patch(`/kitchen/order-items/${orderItemId}/combo-items/${comboItemIndex}/assign-chef`, { chefId }),
+    Client.patch(
+      `/kitchen/order-items/${orderItemId}/combo-items/${comboItemIndex}/assign-chef`,
+      { chefId }
+    ),
   markItemReady: (orderItemId) =>
     Client.patch(`/kitchen/order-items/${orderItemId}/ready`),
   updateComboItemStatus: (orderItemId, comboItemIndex, status) =>
-    Client.patch(`/kitchen/order-items/${orderItemId}/combo-items/${comboItemIndex}/status`, { status }),
+    Client.patch(
+      `/kitchen/order-items/${orderItemId}/combo-items/${comboItemIndex}/status`,
+      { status }
+    ),
 
   /* =========================
     ITEM (Món ăn)
@@ -66,6 +72,16 @@ const kitchenApi = {
      CHEF (Đầu bếp)
   ========================== */
   getAllChefs: () => Client.get("/kitchen/chefs"),
+
+  /* =========================
+     CHEF ATTENDANCE (Điểm danh)
+  ========================== */
+  getTodayChefAttendance: () => Client.get("/kitchen/chefs/attendance/today"),
+  checkInChef: (chefId, workShiftId) =>
+    Client.post(`/kitchen/chefs/${chefId}/check-in`, { workShiftId }),
+  checkOutChef: (chefId) => Client.post(`/kitchen/chefs/${chefId}/check-out`),
+  getActiveChefs: () => Client.get("/kitchen/chefs/active"),
+  getWorkShifts: () => Client.get("/kitchen/work-shifts"),
 
   /* =========================
       CLOUDINARY
