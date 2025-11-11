@@ -6,12 +6,25 @@ import adminApi from "../../api/adminApi";
 import { toast } from "react-toastify";
 
 export default function SettingsPage() {
-  const [activeTab, setActiveTab] = useState("preorder"); // "preorder" | "workshift"
+  const [activeTab, setActiveTab] = useState("preorder"); // "preorder" | "workshift" | "loyalty"
   
   // Preorder settings state
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
   const [threshold, setThreshold] = useState(2000000);
+
+  // Loyalty settings state
+  const [loadingLoyalty, setLoadingLoyalty] = useState(false);
+  const [savingLoyalty, setSavingLoyalty] = useState(false);
+  const [pointRate, setPointRate] = useState(1);
+  const [pointRateInput, setPointRateInput] = useState("1"); // String để giữ nguyên giá trị khi nhập
+  const [ranks, setRanks] = useState([
+    { name: "bronze", minPoints: 0, discount: 0, label: "Đồng" },
+    { name: "silver", minPoints: 200, discount: 5, label: "Bạc" },
+    { name: "gold", minPoints: 500, discount: 10, label: "Vàng" },
+    { name: "platinum", minPoints: 1000, discount: 15, label: "Bạch Kim" },
+    { name: "diamond", minPoints: 2000, discount: 20, label: "Kim Cương" }
+  ]);
 
   // Work shift state
   const [workShifts, setWorkShifts] = useState([]);
@@ -34,6 +47,8 @@ export default function SettingsPage() {
     } else if (activeTab === "workshift") {
       loadWorkShifts();
       loadEmployees();
+    } else if (activeTab === "loyalty") {
+      loadLoyaltySettings();
     }
   }, [activeTab]);
 
@@ -207,6 +222,127 @@ export default function SettingsPage() {
     return daysOfWeek.map(day => dayNames[day]).join(", ");
   };
 
+  const loadLoyaltySettings = async () => {
+    try {
+      setLoadingLoyalty(true);
+      const [pointRateRes, ranksRes] = await Promise.all([
+        adminApi.getSetting("loyalty.pointRate"),
+        adminApi.getSetting("loyalty.ranks")
+      ]);
+      
+      // API trả về toàn bộ document, cần truy cập .value
+      if (pointRateRes?.data?.value !== undefined) {
+        const rate = typeof pointRateRes.data.value === "number" ? pointRateRes.data.value : Number(pointRateRes.data.value);
+        const validRate = !isNaN(rate) && rate > 0 ? rate : 1;
+        setPointRate(validRate);
+        setPointRateInput(String(validRate));
+      }
+      
+      if (ranksRes?.data?.value && Array.isArray(ranksRes.data.value)) {
+        // Sort ranks by minPoints
+        const sortedRanks = [...ranksRes.data.value].sort((a, b) => (a.minPoints || 0) - (b.minPoints || 0));
+        setRanks(sortedRanks);
+      }
+    } catch (error) {
+      console.error("Error loading loyalty settings:", error);
+      // Sử dụng giá trị mặc định nếu không load được
+    } finally {
+      setLoadingLoyalty(false);
+    }
+  };
+
+  const handleSaveLoyalty = async () => {
+    try {
+      // Validate pointRate
+      if (pointRate <= 0) {
+        toast.error("Tỷ lệ tích điểm phải lớn hơn 0");
+        return;
+      }
+
+      // Validate ranks
+      if (!ranks || ranks.length === 0) {
+        toast.error("Phải có ít nhất một hạng");
+        return;
+      }
+
+      for (const rank of ranks) {
+        if (!rank.name || typeof rank.name !== "string") {
+          toast.error("Mỗi hạng phải có tên (name)");
+          return;
+        }
+        if (typeof rank.minPoints !== "number" || rank.minPoints < 0) {
+          toast.error("Mỗi hạng phải có điểm tối thiểu (minPoints) >= 0");
+          return;
+        }
+        if (typeof rank.discount !== "number" || rank.discount < 0 || rank.discount > 100) {
+          toast.error("Mỗi hạng phải có giảm giá (discount) từ 0 đến 100%");
+          return;
+        }
+        if (!rank.label || typeof rank.label !== "string") {
+          toast.error("Mỗi hạng phải có nhãn (label)");
+          return;
+        }
+      }
+
+      // Sort ranks by minPoints
+      const sortedRanks = [...ranks].sort((a, b) => a.minPoints - b.minPoints);
+
+      setSavingLoyalty(true);
+      
+      await Promise.all([
+        adminApi.updateSetting(
+          "loyalty.pointRate",
+          pointRate,
+          "Tỷ lệ tích điểm (%): Số điểm tích được = (Tổng tiền đơn * pointRate) / 100",
+          "loyalty"
+        ),
+        adminApi.updateSetting(
+          "loyalty.ranks",
+          sortedRanks,
+          "Danh sách các hạng khách hàng với điểm tối thiểu và % giảm giá",
+          "loyalty"
+        )
+      ]);
+
+      toast.success("Đã lưu cài đặt phân hạng khách hàng thành công");
+      setTimeout(() => {
+        loadLoyaltySettings();
+      }, 500);
+    } catch (error) {
+      console.error("Error saving loyalty settings:", error);
+      toast.error(error.response?.data?.message || "Không thể lưu cài đặt");
+    } finally {
+      setSavingLoyalty(false);
+    }
+  };
+
+  const handleAddRank = () => {
+    setRanks([...ranks, {
+      name: `rank_${ranks.length + 1}`,
+      minPoints: ranks.length > 0 ? Math.max(...ranks.map(r => r.minPoints)) + 100 : 0,
+      discount: 0,
+      label: "Hạng mới"
+    }]);
+  };
+
+  const handleRemoveRank = (index) => {
+    if (ranks.length <= 1) {
+      toast.warning("Phải có ít nhất một hạng");
+      return;
+    }
+    setRanks(ranks.filter((_, i) => i !== index));
+  };
+
+  const handleUpdateRank = (index, field, value) => {
+    const newRanks = [...ranks];
+    if (field === "minPoints" || field === "discount") {
+      newRanks[index][field] = Number(value) || 0;
+    } else {
+      newRanks[index][field] = value;
+    }
+    setRanks(newRanks);
+  };
+
   const dayNames = [
     { value: 0, label: "Chủ nhật" },
     { value: 1, label: "Thứ 2" },
@@ -275,6 +411,16 @@ export default function SettingsPage() {
               }`}
             >
               Quản lý ca làm việc
+            </button>
+            <button
+              onClick={() => setActiveTab("loyalty")}
+              className={`px-4 py-2 font-medium ${
+                activeTab === "loyalty"
+                  ? "text-blue-600 border-b-2 border-blue-600"
+                  : "text-gray-600 hover:text-gray-900"
+              }`}
+            >
+              Phân hạng khách hàng
             </button>
           </div>
         </div>
@@ -538,6 +684,176 @@ export default function SettingsPage() {
                       {editingShift ? "Cập nhật" : "Tạo mới"}
                     </Button>
                   </div>
+                </div>
+              </div>
+            )}
+          </div>
+        </Card>
+      )}
+
+      {/* Loyalty Settings Tab */}
+      {activeTab === "loyalty" && (
+        <Card>
+          <div className="p-6">
+            <h2 className="text-2xl font-bold mb-6">Cài đặt phân hạng khách hàng</h2>
+
+            {loadingLoyalty ? (
+              <div className="text-center py-8">Đang tải...</div>
+            ) : (
+              <div className="space-y-6 max-w-4xl">
+                {/* Point Rate */}
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Tỷ lệ tích điểm (%)
+                  </label>
+                  <p className="text-xs text-gray-500 mb-3">
+                    Số điểm tích được = (Tổng tiền đơn * Tỷ lệ tích điểm) / 100
+                    <br />
+                    Ví dụ: Đơn 100.000₫ với tỷ lệ 1% = 1.000 điểm
+                  </p>
+                  <div className="flex items-center gap-3">
+                    <Input
+                      type="number"
+                      min="0.01"
+                      step="0.01"
+                      value={pointRateInput}
+                      onChange={(e) => {
+                        const val = e.target.value;
+                        // Lưu string để giữ nguyên giá trị khi nhập (ví dụ: "0.01")
+                        setPointRateInput(val);
+                        // Cập nhật number nếu hợp lệ
+                        const numVal = parseFloat(val);
+                        if (!isNaN(numVal) && numVal > 0) {
+                          setPointRate(numVal);
+                        }
+                      }}
+                      onBlur={(e) => {
+                        // Khi blur, đảm bảo giá trị hợp lệ
+                        const val = parseFloat(e.target.value);
+                        if (isNaN(val) || val <= 0) {
+                          setPointRate(1);
+                          setPointRateInput("1");
+                        } else {
+                          setPointRate(val);
+                          setPointRateInput(String(val));
+                        }
+                      }}
+                      className="flex-1 max-w-xs"
+                      placeholder="Nhập tỷ lệ..."
+                    />
+                    <span className="text-sm text-gray-600">%</span>
+                  </div>
+                </div>
+
+                {/* Ranks */}
+                <div>
+                  <div className="flex justify-between items-center mb-4">
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-2">
+                        Danh sách hạng khách hàng
+                      </label>
+                      <p className="text-xs text-gray-500">
+                        Cấu hình các hạng với điểm tối thiểu và % giảm giá. Hệ thống sẽ tự động áp dụng giảm giá dựa trên điểm tích lũy của khách hàng.
+                      </p>
+                    </div>
+                    <Button onClick={handleAddRank} variant="outline" size="sm">
+                      + Thêm hạng
+                    </Button>
+                  </div>
+
+                  <div className="space-y-3">
+                    {ranks.map((rank, index) => (
+                      <div key={index} className="border rounded-lg p-4 bg-gray-50">
+                        <div className="grid grid-cols-12 gap-3 items-end">
+                          <div className="col-span-3">
+                            <label className="block text-xs font-medium text-gray-700 mb-1">
+                              Tên hạng (name)
+                            </label>
+                            <Input
+                              value={rank.name}
+                              onChange={(e) => handleUpdateRank(index, "name", e.target.value)}
+                              placeholder="bronze"
+                              className="text-sm"
+                            />
+                          </div>
+                          <div className="col-span-2">
+                            <label className="block text-xs font-medium text-gray-700 mb-1">
+                              Nhãn (label)
+                            </label>
+                            <Input
+                              value={rank.label}
+                              onChange={(e) => handleUpdateRank(index, "label", e.target.value)}
+                              placeholder="Đồng"
+                              className="text-sm"
+                            />
+                          </div>
+                          <div className="col-span-3">
+                            <label className="block text-xs font-medium text-gray-700 mb-1">
+                              Điểm tối thiểu
+                            </label>
+                            <Input
+                              type="number"
+                              min="0"
+                              value={rank.minPoints}
+                              onChange={(e) => handleUpdateRank(index, "minPoints", e.target.value)}
+                              placeholder="0"
+                              className="text-sm"
+                            />
+                          </div>
+                          <div className="col-span-2">
+                            <label className="block text-xs font-medium text-gray-700 mb-1">
+                              Giảm giá (%)
+                            </label>
+                            <Input
+                              type="number"
+                              min="0"
+                              max="100"
+                              value={rank.discount}
+                              onChange={(e) => handleUpdateRank(index, "discount", e.target.value)}
+                              placeholder="0"
+                              className="text-sm"
+                            />
+                          </div>
+                          <div className="col-span-2 flex gap-2">
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => handleRemoveRank(index)}
+                              className="text-red-600 hover:text-red-700"
+                            >
+                              Xóa
+                            </Button>
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+                <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+                  <h3 className="text-sm font-semibold text-blue-900 mb-2">Lưu ý:</h3>
+                  <ul className="text-xs text-blue-800 space-y-1 list-disc list-inside">
+                    <li>Hệ thống sẽ tự động sắp xếp các hạng theo điểm tối thiểu (tăng dần)</li>
+                    <li>Khách hàng sẽ được xếp vào hạng cao nhất mà điểm tích lũy đạt được</li>
+                    <li>Giảm giá sẽ tự động áp dụng khi khách hàng đặt đơn (không cần nhập mã giảm giá)</li>
+                    <li>Điểm chỉ được tích khi đơn chuyển sang trạng thái "Đã thanh toán"</li>
+                  </ul>
+                </div>
+
+                <div className="flex justify-end gap-3 pt-4 border-t">
+                  <Button
+                    variant="outline"
+                    onClick={loadLoyaltySettings}
+                    disabled={savingLoyalty}
+                  >
+                    Hủy
+                  </Button>
+                  <Button
+                    onClick={handleSaveLoyalty}
+                    disabled={savingLoyalty}
+                  >
+                    {savingLoyalty ? "Đang lưu..." : "Lưu cài đặt"}
+                  </Button>
                 </div>
               </div>
             )}
