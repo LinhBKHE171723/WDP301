@@ -252,7 +252,7 @@ const GuestOrderHistory = ({ onBack }) => {
                       )}
                       <div className="order-detail-item">
                         <span className="detail-label">Tổng tiền:</span>
-                        <span className="detail-value">{order.totalAmount.toLocaleString('vi-VN')}đ</span>
+                        <span className="detail-value">{(order.totalAmount || 0).toLocaleString('vi-VN')}đ</span>
                       </div>
                       <div className="order-detail-item">
                         <span className="detail-label">Tình trạng:</span>

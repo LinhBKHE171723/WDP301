@@ -26,7 +26,8 @@ const {
   getLatestOrder,
   testUpdateOrderItemStatus,
   startEditOrder,
-  requestPayment
+  requestPayment,
+  getLoyaltyInfo
 } = require("../controllers/customer.controller");
 
 // Routes cho khách hàng (không cần authentication)
@@ -65,6 +66,9 @@ router.get("/orders/:orderId", getOrderById);
 
 // 7.2. Lấy danh sách đơn hàng của user đã đăng nhập (cần authentication)
 router.get("/user/orders", authRequired, getUserOrders);
+
+// 7.3. Lấy thông tin loyalty (điểm, rank, discount) của khách hàng (cần authentication)
+router.get("/loyalty-info", authRequired, getLoyaltyInfo);
 
 // 8. Thêm món mới vào order hiện có
 router.post("/orders/:orderId/items", addItemsToOrder);

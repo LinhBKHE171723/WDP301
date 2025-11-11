@@ -1,0 +1,217 @@
+.loyalty-info {
+  min-height: 100vh;
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  padding: 20px;
+}
+
+.loyalty-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 30px;
+  background: white;
+  padding: 20px;
+  border-radius: 12px;
+  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+}
+
+.loyalty-header h2 {
+  margin: 0;
+  color: #333;
+  font-size: 24px;
+}
+
+.back-btn {
+  background: #6c757d;
+  color: white;
+  border: none;
+  padding: 10px 20px;
+  border-radius: 8px;
+  cursor: pointer;
+  font-size: 14px;
+  transition: background 0.3s;
+}
+
+.back-btn:hover {
+  background: #5a6268;
+}
+
+.loyalty-content {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+  gap: 20px;
+  max-width: 1200px;
+  margin: 0 auto;
+}
+
+.loyalty-card {
+  background: white;
+  border-radius: 12px;
+  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+  overflow: hidden;
+  transition: transform 0.3s, box-shadow 0.3s;
+}
+
+.loyalty-card:hover {
+  transform: translateY(-5px);
+  box-shadow: 0 8px 12px rgba(0, 0, 0, 0.15);
+}
+
+.card-header {
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  color: white;
+  padding: 20px;
+}
+
+.card-header h3 {
+  margin: 0;
+  font-size: 20px;
+}
+
+.card-body {
+  padding: 20px;
+}
+
+.points-display {
+  text-align: center;
+  margin: 20px 0;
+}
+
+.points-value {
+  font-size: 48px;
+  font-weight: bold;
+  color: #667eea;
+  display: block;
+}
+
+.points-label {
+  font-size: 18px;
+  color: #6c757d;
+  display: block;
+  margin-top: 5px;
+}
+
+.points-description {
+  text-align: center;
+  color: #6c757d;
+  font-size: 14px;
+  margin-top: 15px;
+}
+
+.rank-badge {
+  text-align: center;
+  padding: 30px;
+  border-radius: 12px;
+  margin: 20px 0;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+.rank-label {
+  font-size: 32px;
+  font-weight: bold;
+  display: block;
+}
+
+.rank-info {
+  margin-top: 20px;
+}
+
+.rank-info p {
+  margin: 10px 0;
+  color: #333;
+  font-size: 14px;
+}
+
+.discount-info {
+  text-align: center;
+  margin: 20px 0;
+}
+
+.discount-percent {
+  font-size: 24px;
+  color: #28a745;
+  margin: 15px 0;
+}
+
+.discount-example {
+  font-size: 16px;
+  color: #6c757d;
+  margin: 15px 0;
+  padding: 15px;
+  background: #f8f9fa;
+  border-radius: 8px;
+}
+
+.discount-note {
+  margin-top: 20px;
+  padding: 15px;
+  background: #e7f3ff;
+  border-radius: 8px;
+  border-left: 4px solid #2196F3;
+}
+
+.discount-note p {
+  margin: 0;
+  color: #1976D2;
+  font-size: 14px;
+}
+
+.loading, .error, .no-access {
+  background: white;
+  padding: 40px;
+  border-radius: 12px;
+  text-align: center;
+  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+}
+
+.no-access-icon {
+  font-size: 64px;
+  margin-bottom: 20px;
+}
+
+.no-access h3 {
+  color: #333;
+  margin: 20px 0;
+}
+
+.no-access p {
+  color: #6c757d;
+  margin-bottom: 30px;
+}
+
+.back-to-menu-btn, .retry-btn {
+  background: #667eea;
+  color: white;
+  border: none;
+  padding: 12px 24px;
+  border-radius: 8px;
+  cursor: pointer;
+  font-size: 16px;
+  transition: background 0.3s;
+}
+
+.back-to-menu-btn:hover, .retry-btn:hover {
+  background: #5568d3;
+}
+
+.error p {
+  color: #dc3545;
+  margin-bottom: 20px;
+}
+
+@media (max-width: 768px) {
+  .loyalty-content {
+    grid-template-columns: 1fr;
+  }
+  
+  .loyalty-header {
+    flex-direction: column;
+    gap: 15px;
+    text-align: center;
+  }
+  
+  .points-value {
+    font-size: 36px;
+  }
+}
+

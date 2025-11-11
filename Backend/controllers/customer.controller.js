@@ -346,12 +346,27 @@ exports.createOrder = async (req, res) => {
     // Tạo OrderItems từ cart data (không cần order._id vì chưa có)
     const { createdOrderItems, totalAmount } = await createOrderItemsFromCart(orderItems);
 
+    // Tính discount tự động dựa trên rank của khách hàng
+    let autoDiscount = { discount: 0, discountAmount: 0, rank: null, rankLabel: null };
+    if (userId) {
+      try {
+        const { calculateAutoDiscount } = require("../utils/loyaltyHelpers");
+        autoDiscount = await calculateAutoDiscount(userId, totalAmount);
+      } catch (error) {
+        console.error("❌ Lỗi khi tính discount tự động:", error);
+        // Tiếp tục với discount = 0 nếu có lỗi
+      }
+    }
+
+    // Tính totalAmount sau discount
+    const finalTotalAmount = totalAmount - autoDiscount.discountAmount;
+
     // Tạo Payment
     const payment = new Payment({
       paymentMethod: "cash", // Mặc định thanh toán tiền mặt
       status: "unpaid",
       amountPaid: 0,
-      totalAmount: totalAmount
+      totalAmount: finalTotalAmount
     });
     await payment.save();
 
@@ -362,8 +377,8 @@ exports.createOrder = async (req, res) => {
       paymentId: payment._id, // Backward compatibility
       paymentIds: [payment._id], // Multiple payments support
       status: "pending",
-      totalAmount: totalAmount,
-      discount: 0,
+      totalAmount: finalTotalAmount,
+      discount: autoDiscount.discountAmount,
       userId: userId || null,
       waiterResponse: {
         status: "pending"
@@ -483,26 +498,85 @@ exports.createPreOrder = async (req, res) => {
   try {
     const { name, email, phone, orderItems, scheduledTime } = req.body;
 
-    // Validation
-    if (!name || !email || !phone) {
-      return res.status(400).json({
-        success: false,
-        message: "Tên, email và số điện thoại là bắt buộc"
-      });
-    }
+    // Kiểm tra nếu user đã đăng nhập, sử dụng thông tin từ req.user
+    let user = null;
+    if (req.user && req.user.id) {
+      // User đã đăng nhập - sử dụng thông tin từ token, không cập nhật từ form
+      user = await User.findById(req.user.id);
+      if (!user) {
+        return res.status(404).json({
+          success: false,
+          message: "Không tìm thấy tài khoản"
+        });
+      }
+      // Validate orderItems và scheduledTime
+      if (!orderItems || !Array.isArray(orderItems) || orderItems.length === 0) {
+        return res.status(400).json({
+          success: false,
+          message: "Vui lòng chọn ít nhất một món"
+        });
+      }
 
-    if (!orderItems || !Array.isArray(orderItems) || orderItems.length === 0) {
-      return res.status(400).json({
-        success: false,
-        message: "Vui lòng chọn ít nhất một món"
-      });
-    }
+      if (!scheduledTime) {
+        return res.status(400).json({
+          success: false,
+          message: "Vui lòng chọn thời gian đến ăn"
+        });
+      }
+    } else {
+      // User chưa đăng nhập (guest) - cần validation và tìm/tạo user
+      if (!name || !email || !phone) {
+        return res.status(400).json({
+          success: false,
+          message: "Tên, email và số điện thoại là bắt buộc"
+        });
+      }
 
-    if (!scheduledTime) {
-      return res.status(400).json({
-        success: false,
-        message: "Vui lòng chọn thời gian đến ăn"
+      if (!orderItems || !Array.isArray(orderItems) || orderItems.length === 0) {
+        return res.status(400).json({
+          success: false,
+          message: "Vui lòng chọn ít nhất một món"
+        });
+      }
+
+      if (!scheduledTime) {
+        return res.status(400).json({
+          success: false,
+          message: "Vui lòng chọn thời gian đến ăn"
+        });
+      }
+
+      // Tìm user theo email hoặc phone
+      user = await User.findOne({
+        $or: [
+          { email: email.trim().toLowerCase() },
+          { phone: phone.trim() }
+        ]
       });
+
+      // Nếu không tìm thấy, tạo tài khoản mới
+      if (!user) {
+        try {
+          user = await createCustomerAccount({ name, email: email.trim().toLowerCase(), phone: phone.trim() });
+        } catch (error) {
+          // Nếu email đã tồn tại (race condition), thử tìm lại
+          user = await User.findOne({
+            $or: [
+              { email: email.trim().toLowerCase() },
+              { phone: phone.trim() }
+            ]
+          });
+          
+          if (!user) {
+            return res.status(500).json({
+              success: false,
+              message: "Không thể tạo tài khoản: " + error.message
+            });
+          }
+        }
+      }
+      // Nếu tìm thấy user, sử dụng user đó KHÔNG cập nhật thông tin
+      // Order được tạo dựa trên user tìm được, không thay đổi thông tin user
     }
 
     // Validate scheduledTime is in the future
@@ -521,60 +595,39 @@ exports.createPreOrder = async (req, res) => {
       });
     }
 
-    // Tìm user theo email hoặc phone
-    let user = await User.findOne({
-      $or: [
-        { email: email.trim().toLowerCase() },
-        { phone: phone.trim() }
-      ]
-    });
+    // Tạo OrderItems từ cart data (skipDeductIngredients = true vì chưa approve, sẽ trừ khi admin approve)
+    const { createdOrderItems, totalAmount } = await createOrderItemsFromCart(orderItems, true);
 
-    // Nếu không tìm thấy, tạo tài khoản mới
-    if (!user) {
+    // Tính discount tự động dựa trên rank của khách hàng
+    let autoDiscount = { discount: 0, discountAmount: 0, rank: null, rankLabel: null };
+    if (user._id) {
       try {
-        user = await createCustomerAccount({ name, email: email.trim().toLowerCase(), phone: phone.trim() });
+        const { calculateAutoDiscount } = require("../utils/loyaltyHelpers");
+        autoDiscount = await calculateAutoDiscount(user._id, totalAmount);
       } catch (error) {
-        // Nếu email đã tồn tại (race condition), thử tìm lại
-        user = await User.findOne({
-          $or: [
-            { email: email.trim().toLowerCase() },
-            { phone: phone.trim() }
-          ]
-        });
-        
-        if (!user) {
-          return res.status(500).json({
-            success: false,
-            message: "Không thể tạo tài khoản: " + error.message
-          });
-        }
-      }
-    } else {
-      // Cập nhật thông tin nếu có thay đổi
-      const updateData = {};
-      if (user.name !== name) updateData.name = name;
-      if (user.email !== email.trim().toLowerCase()) updateData.email = email.trim().toLowerCase();
-      if (user.phone !== phone.trim()) updateData.phone = phone.trim();
-      
-      if (Object.keys(updateData).length > 0) {
-        await User.findByIdAndUpdate(user._id, updateData);
-        user = await User.findById(user._id);
+        console.error("❌ Lỗi khi tính discount tự động:", error);
+        // Tiếp tục với discount = 0 nếu có lỗi
       }
     }
 
-    // Tạo OrderItems từ cart data (skipDeductIngredients = true vì chưa approve, sẽ trừ khi admin approve)
-    const { createdOrderItems, totalAmount } = await createOrderItemsFromCart(orderItems, true);
+    // Tính totalAmount sau discount
+    const finalTotalAmount = totalAmount - autoDiscount.discountAmount;
 
     // Tạo Payment
     const payment = new Payment({
       paymentMethod: "cash", // Mặc định thanh toán tiền mặt
       status: "unpaid",
       amountPaid: 0,
-      totalAmount: totalAmount
+      totalAmount: finalTotalAmount
     });
     await payment.save();
 
     // Tạo Order với status "preorder"
+    // Lưu tên khách hàng lúc đặt (có thể khác với tên trong User)
+    const customerName = req.user && req.user.id 
+      ? user.name // Nếu user đã đăng nhập, dùng tên từ User
+      : (name || user.name); // Nếu guest, dùng tên từ form hoặc tên từ User nếu không có
+    
     const order = new Order({
       tableId: null, // Chưa có bàn khi đặt trước
       orderItems: createdOrderItems,
@@ -582,9 +635,10 @@ exports.createPreOrder = async (req, res) => {
       paymentIds: [payment._id], // Multiple payments support
       status: "preorder",
       scheduledTime: scheduledDate,
-      totalAmount: totalAmount,
-      discount: 0,
+      totalAmount: finalTotalAmount,
+      discount: autoDiscount.discountAmount,
       userId: user._id,
+      preorderName: customerName, // Lưu tên khách hàng lúc đặt
       waiterResponse: {
         status: "pending"
       },
@@ -696,6 +750,14 @@ exports.getUserOrders = async (req, res) => {
       await populateOrderItemDetails(order.orderItems);
       // Gộp các OrderItem đã bị tách lại thành 1 dòng khi hiển thị cho customer
       order.orderItems = groupSplitOrderItemsForCustomer(order.orderItems);
+      
+      // Đảm bảo discount và totalAmount luôn có giá trị (cho các đơn cũ)
+      if (order.discount === undefined || order.discount === null) {
+        order.discount = 0;
+      }
+      if (order.totalAmount === undefined || order.totalAmount === null) {
+        order.totalAmount = 0;
+      }
     }
 
     res.status(200).json({
@@ -723,7 +785,8 @@ exports.getOrderById = async (req, res) => {
           select: 'name username email'
         }
       })
-      .populate('paymentId');
+      .populate('paymentId')
+      .populate('paymentIds'); // Populate paymentIds để tính tiền cọc
 
     if (!order) {
       return res.status(404).json({
@@ -751,6 +814,46 @@ exports.getOrderById = async (req, res) => {
     
     // Gán plainOrderItems vào order (không phải Mongoose documents)
     order.orderItems = plainOrderItems;
+    
+    // Đảm bảo discount và totalAmount luôn có giá trị (cho các đơn cũ)
+    if (order.discount === undefined || order.discount === null) {
+      order.discount = 0;
+    }
+    if (order.totalAmount === undefined || order.totalAmount === null) {
+      order.totalAmount = 0;
+    }
+
+    // Tính tổng tiền cọc và số tiền còn lại từ paymentIds (nếu có)
+    let totalDeposit = 0;
+    let totalPaid = 0;
+    let remainingAmount = order.totalAmount || 0;
+    if (order.paymentIds && Array.isArray(order.paymentIds) && order.paymentIds.length > 0) {
+      // Filter và tính tổng: chỉ tính các payment có status = 'paid' và amountPaid > 0
+      const paidPayments = order.paymentIds.filter(p => {
+        return p && 
+               typeof p === 'object' && 
+               p.status === 'paid' && 
+               (p.amountPaid || 0) > 0;
+      });
+      
+      // Tính tổng tiền đã thanh toán (tất cả payments)
+      totalPaid = paidPayments.reduce((sum, p) => {
+        return sum + (Number(p.amountPaid) || 0);
+      }, 0);
+      
+      // Tính riêng tiền cọc (chỉ các payment có isDeposit = true)
+      // Lưu ý: payment cũ có thể không có field isDeposit, nên check cả undefined
+      const depositPayments = paidPayments.filter(p => {
+        // Nếu payment có isDeposit = true, hoặc không có isDeposit (backward compatibility: coi là cọc nếu order status là preorder)
+        return p.isDeposit === true || (p.isDeposit === undefined && (order.status === 'preorder' || order.status === 'confirmed'));
+      });
+      totalDeposit = depositPayments.reduce((sum, p) => {
+        return sum + (Number(p.amountPaid) || 0);
+      }, 0);
+      
+      // Tính số tiền còn lại phải trả
+      remainingAmount = Math.max(0, (order.totalAmount || 0) - totalPaid);
+    }
 
     // Debug: log để kiểm tra groupedOrderItems có đầy đủ field không
     if (plainOrderItems.length > 0) {
@@ -777,6 +880,11 @@ exports.getOrderById = async (req, res) => {
       // Đảm bảo orderItems là plainOrderItems
       orderToSend.orderItems = plainOrderItems;
     }
+    
+    // Thêm totalDeposit, totalPaid, và remainingAmount vào orderToSend
+    orderToSend.totalDeposit = totalDeposit;
+    orderToSend.totalPaid = totalPaid;
+    orderToSend.remainingAmount = remainingAmount;
     
     // Debug: Kiểm tra orderToSend.orderItems
     console.log(`📦 orderToSend.orderItems type:`, Array.isArray(orderToSend.orderItems) ? 'array' : typeof orderToSend.orderItems);
@@ -923,7 +1031,28 @@ exports.addItemsToOrder = async (req, res) => {
 
     // Cập nhật order với orderItems mới và totalAmount
     order.orderItems.push(...createdOrderItems);
-    order.totalAmount += additionalAmount;
+    
+    // Tính lại totalAmount gốc (trước discount) bằng cách cộng thêm additionalAmount vào totalAmount hiện tại
+    // Nhưng cần cộng lại discount cũ để có totalAmount gốc
+    const currentTotalBeforeDiscount = order.totalAmount + (order.discount || 0);
+    const newTotalBeforeDiscount = currentTotalBeforeDiscount + additionalAmount;
+    
+    // Tính lại discount tự động dựa trên rank của khách hàng với totalAmount mới
+    let autoDiscount = { discount: 0, discountAmount: 0, rank: null, rankLabel: null };
+    if (order.userId) {
+      try {
+        const { calculateAutoDiscount } = require("../utils/loyaltyHelpers");
+        autoDiscount = await calculateAutoDiscount(order.userId, newTotalBeforeDiscount);
+      } catch (error) {
+        console.error("❌ Lỗi khi tính lại discount tự động:", error);
+        // Giữ discount cũ nếu có lỗi
+        autoDiscount.discountAmount = order.discount || 0;
+      }
+    }
+    
+    // Cập nhật totalAmount sau discount
+    order.totalAmount = newTotalBeforeDiscount - autoDiscount.discountAmount;
+    order.discount = autoDiscount.discountAmount;
     
     // Reset confirmation flow khi order được modify
     order.waiterResponse.status = 'pending';
@@ -1210,6 +1339,24 @@ exports.updateOrderStatus = async (req, res) => {
       } catch (error) {
         console.error(`❌ Lỗi khi hoàn nguyên liệu cho order ${orderId} khi thanh toán:`, error);
         // Không throw error để không làm gián đoạn quá trình thanh toán
+      }
+      
+      // Tích điểm cho khách hàng khi đơn chuyển sang paid
+      if (order.userId) {
+        try {
+          const { addPointsToCustomer } = require("../utils/loyaltyHelpers");
+          const { pointsEarned, newTotalPoints } = await addPointsToCustomer(
+            order.userId,
+            order.totalAmount
+          );
+          
+          if (pointsEarned > 0) {
+            console.log(`✅ Tích ${pointsEarned} điểm cho khách hàng ${order.userId}. Tổng điểm: ${newTotalPoints}`);
+          }
+        } catch (error) {
+          console.error("❌ Lỗi khi tích điểm cho khách hàng:", error);
+          // Không throw error để không làm gián đoạn quá trình thanh toán
+        }
       }
     } else if (status === 'cancelled') {
       // Khi hủy đơn: hoàn nguyên liệu cho tất cả món chưa phục vụ
@@ -2255,6 +2402,59 @@ exports.requestPayment = async (req, res) => {
     });
   } catch (error) {
     console.error("Error requesting payment:", error);
+    res.status(500).json({ 
+      success: false, 
+      message: error.message 
+    });
+  }
+};
+
+// Lấy thông tin loyalty (điểm, rank, discount) của khách hàng
+exports.getLoyaltyInfo = async (req, res) => {
+  try {
+    const userId = req.user?.id;
+    
+    if (!userId) {
+      return res.status(401).json({
+        success: false,
+        message: "Vui lòng đăng nhập để xem thông tin loyalty"
+      });
+    }
+
+    const user = await User.findById(userId);
+    if (!user || user.role !== "customer") {
+      return res.status(403).json({
+        success: false,
+        message: "Chỉ khách hàng mới có thể xem thông tin loyalty"
+      });
+    }
+
+    const { getCustomerRank, calculateAutoDiscount } = require("../utils/loyaltyHelpers");
+    const points = user.point || 0;
+    const rank = await getCustomerRank(points);
+    
+    // Tính discount mẫu cho đơn 100,000đ để hiển thị
+    const sampleDiscount = await calculateAutoDiscount(userId, 100000);
+
+    res.status(200).json({
+      success: true,
+      data: {
+        points,
+        rank: {
+          name: rank.name,
+          label: rank.label,
+          minPoints: rank.minPoints,
+          discount: rank.discount
+        },
+        sampleDiscount: {
+          discountPercent: sampleDiscount.discount,
+          discountAmount: sampleDiscount.discountAmount,
+          example: `Với đơn 100,000đ, bạn được giảm ${sampleDiscount.discountAmount.toLocaleString('vi-VN')}đ (${sampleDiscount.discount}%)`
+        }
+      }
+    });
+  } catch (error) {
+    console.error("Error getting loyalty info:", error);
     res.status(500).json({ 
       success: false, 
       message: error.message 

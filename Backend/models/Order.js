@@ -26,6 +26,7 @@ const orderSchema = new Schema(
     discount: Number,
     servedAt: Date,
     scheduledTime: Date, // Thời gian khách muốn đến ăn (cho đặt trước)
+    preorderName: String, // Tên khách hàng lúc đặt preorder (có thể khác với tên trong User)
     preparationStartTime: Date, // Thời gian bắt đầu chuẩn bị (admin nhập khi approve)
     reservedEndTime: Date, // Thời gian kết thúc dành bàn (admin nhập khi approve)
     waiterResponse: {

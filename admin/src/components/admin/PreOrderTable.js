@@ -352,7 +352,7 @@ export function PreOrderTable() {
     // Admin chỉ nhận đơn lớn, Cashier chỉ nhận đơn nhỏ (backend đã filter)
     if (messageType === 'preorder:new') {
         // Show toast notification
-        const customerName = orderData.userId?.name || "Khách hàng";
+        const customerName = orderData.preorderName || orderData.userId?.name || "Khách hàng";
         const orderTotal = formatCurrency(orderData.totalAmount || 0);
         toast.info(`🆕 Đơn đặt trước mới từ ${customerName} - ${orderTotal}`, {
           position: "top-right",
@@ -381,7 +381,7 @@ export function PreOrderTable() {
     // Handle cancelled preorder - remove from list (vì status đã thành "cancelled", không còn là "preorder")
     else if (messageType === 'preorder:cancelled') {
       // Show toast notification
-      const customerName = orderData.userId?.name || "Khách hàng";
+      const customerName = orderData.preorderName || orderData.userId?.name || "Khách hàng";
       toast.warning(`❌ Đơn đặt trước từ ${customerName} đã bị hủy`, {
         position: "top-right",
         autoClose: 3000,
@@ -399,7 +399,7 @@ export function PreOrderTable() {
     }
     // Handle preorder:approved - Khi approve, order sẽ chuyển sang "confirmed" nên cần remove ngay
     else if (messageType === 'preorder:approved') {
-      const customerName = orderData.userId?.name || "Khách hàng";
+      const customerName = orderData.preorderName || orderData.userId?.name || "Khách hàng";
       toast.success(`✅ Đơn đặt trước từ ${customerName} đã được duyệt`, {
         position: "top-right",
         autoClose: 3000,
@@ -433,7 +433,7 @@ export function PreOrderTable() {
       messageType === 'preorder:items_modified'
     ) {
       // Show toast notifications for important events
-      const customerName = orderData.userId?.name || "Khách hàng";
+      const customerName = orderData.preorderName || orderData.userId?.name || "Khách hàng";
       if (messageType === 'preorder:deposit_recorded') {
         const depositAmount = formatCurrency(orderData.totalDeposit || orderData.totalPaid || 0);
         toast.success(`💰 Đã ghi nhận tiền cọc ${depositAmount} từ ${customerName}`, {
@@ -523,7 +523,7 @@ export function PreOrderTable() {
     if (!search.trim()) return preorders;
     const searchLower = search.toLowerCase();
     return preorders.filter((order) => {
-      const customerName = order?.userId?.name || "";
+      const customerName = order?.preorderName || order?.userId?.name || "";
       const customerEmail = order?.userId?.email || "";
       const customerPhone = order?.userId?.phone || "";
       const orderId = order?._id || "";
@@ -733,7 +733,8 @@ export function PreOrderTable() {
                 const orderId = order?._id || "";
                 const orderShort = orderId ? `${String(orderId).slice(-8)}...` : "-";
                 const customer = order?.userId || {};
-                const customerName = customer?.name || "Khách ẩn danh";
+                // Ưu tiên dùng preorderName (tên lúc đặt) nếu có, nếu không thì dùng tên từ User
+                const customerName = order?.preorderName || customer?.name || "Khách ẩn danh";
                 const customerEmail = customer?.email || "-";
                 const customerPhone = customer?.phone || "-";
                 const scheduledTime = order?.scheduledTime;
@@ -870,9 +871,15 @@ export function PreOrderTable() {
                                 </h4>
                                 <div className="grid grid-cols-1 gap-2 text-sm">
                                   <div>
-                                    <span className="text-gray-500">Tên:</span>{" "}
-                                    <span className="font-medium">{customerName}</span>
+                                    <span className="text-gray-500">Tên người dùng:</span>{" "}
+                                    <span className="font-medium">{customer?.name || "Khách ẩn danh"}</span>
                                   </div>
+                                  {order?.preorderName && order.preorderName !== customer?.name && (
+                                    <div>
+                                      <span className="text-gray-500">Tên liên hệ:</span>{" "}
+                                      <span className="font-medium text-blue-600">{order.preorderName}</span>
+                                    </div>
+                                  )}
                                   <div>
                                     <span className="text-gray-500">Email:</span>{" "}
                                     <span className="font-medium">{customerEmail}</span>
@@ -954,7 +961,13 @@ export function PreOrderTable() {
                                           <td colSpan={4} className="p-2 text-right">
                                             Tổng tiền:
                                           </td>
-                                          <td className="p-2">{formatCurrency(totalAmount)}</td>
+                                          <td className="p-2">
+                                            {formatCurrency(
+                                              orderItems.reduce((sum, item) => {
+                                                return sum + ((item?.price || 0) * (item?.quantity || 0));
+                                              }, 0)
+                                            )}
+                                          </td>
                                         </tr>
                                       </tfoot>
                                     </table>
@@ -974,12 +987,48 @@ export function PreOrderTable() {
                                   Thông tin thanh toán
                                 </h4>
                                 <div className="space-y-3">
-                                  <div className="flex justify-between">
-                                    <span className="text-gray-600">Tổng tiền đơn:</span>
-                                    <span className="font-semibold text-gray-900">
-                                      {formatCurrency(totalAmount)}
-                                    </span>
-                                  </div>
+                                  {/* Tính tổng tiền gốc từ orderItems */}
+                                  {(() => {
+                                    const subtotal = orderItems.reduce((sum, item) => {
+                                      return sum + ((item?.price || 0) * (item?.quantity || 0));
+                                    }, 0);
+                                    const discount = order?.discount || 0;
+                                    const finalTotal = totalAmount;
+                                    
+                                    if (discount > 0) {
+                                      return (
+                                        <>
+                                          <div className="flex justify-between">
+                                            <span className="text-gray-600">Tổng tiền gốc:</span>
+                                            <span className="font-semibold text-gray-900">
+                                              {formatCurrency(subtotal)}
+                                            </span>
+                                          </div>
+                                          <div className="flex justify-between" style={{ color: '#28a745', fontWeight: 'bold' }}>
+                                            <span className="text-gray-600">Giảm giá (khách hàng thân thiết):</span>
+                                            <span className="font-semibold">
+                                              -{formatCurrency(discount)}
+                                            </span>
+                                          </div>
+                                          <div className="flex justify-between border-t pt-2">
+                                            <span className="text-gray-600 font-semibold">Tổng tiền đơn:</span>
+                                            <span className="font-semibold text-gray-900">
+                                              {formatCurrency(finalTotal)}
+                                            </span>
+                                          </div>
+                                        </>
+                                      );
+                                    } else {
+                                      return (
+                                        <div className="flex justify-between">
+                                          <span className="text-gray-600">Tổng tiền đơn:</span>
+                                          <span className="font-semibold text-gray-900">
+                                            {formatCurrency(finalTotal)}
+                                          </span>
+                                        </div>
+                                      );
+                                    }
+                                  })()}
                                   
                                   {/* Danh sách tất cả payments */}
                                   {order?.paymentIds && Array.isArray(order.paymentIds) && order.paymentIds.length > 0 ? (
@@ -1263,6 +1312,9 @@ export function PreOrderTable() {
                                                 Mã đơn
                                               </th>
                                               <th className="text-left p-3 font-semibold text-gray-700 text-xs uppercase tracking-wider border-b border-gray-200">
+                                                Tên lúc đặt
+                                              </th>
+                                              <th className="text-left p-3 font-semibold text-gray-700 text-xs uppercase tracking-wider border-b border-gray-200">
                                                 Trạng thái
                                               </th>
                                               <th className="text-left p-3 font-semibold text-gray-700 text-xs uppercase tracking-wider border-b border-gray-200">
@@ -1339,6 +1391,11 @@ export function PreOrderTable() {
                                                   {String(order._id).slice(-6)}
                                                     </span>
                                                 </td>
+                                                  <td className="p-3">
+                                                    <span className="text-sm text-gray-700">
+                                                      {order.preorderName || customerInfo.user?.name || customer?.name || "-"}
+                                                    </span>
+                                                  </td>
                                                   <td className="p-3">
                                                   <span
                                                       className={`inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium ${

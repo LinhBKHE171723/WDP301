@@ -224,6 +224,24 @@ exports.completeOrderPayment = async (req, res) => {
     if (totalPaid >= order.totalAmount) {
       order.status = "paid";
       await order.save();
+      
+      // Tích điểm cho khách hàng khi đơn chuyển sang paid
+      if (order.userId) {
+        try {
+          const { addPointsToCustomer } = require("../utils/loyaltyHelpers");
+          const { pointsEarned, newTotalPoints } = await addPointsToCustomer(
+            order.userId,
+            order.totalAmount
+          );
+          
+          if (pointsEarned > 0) {
+            console.log(`✅ Tích ${pointsEarned} điểm cho khách hàng ${order.userId}. Tổng điểm: ${newTotalPoints}`);
+          }
+        } catch (error) {
+          console.error("❌ Lỗi khi tích điểm cho khách hàng:", error);
+          // Không throw error để không làm gián đoạn quá trình thanh toán
+        }
+      }
     }
 
     const populatedOrder = await Order.findById(orderId)

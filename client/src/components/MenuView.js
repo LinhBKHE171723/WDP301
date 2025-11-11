@@ -7,6 +7,7 @@ import RegisterModal from './RegisterModal';
 import ForgotPasswordModal from './ForgotPasswordModal';
 import ItemDetail from './ItemDetail';
 import OrderStatus from './OrderStatus';
+import UserDropdown from './UserDropdown';
 import { filterMenusByPrice, filterItemsByPriceAndCategory, getUniqueCategories } from '../utils/priceFilters';
 import { API_ENDPOINTS } from '../utils/apiConfig';
 import './MenuView.css';
@@ -270,30 +271,11 @@ const MenuView = ({ table, onBack }) => {
           <h1>Thực đơn nhà hàng</h1>
         </div>
         <div className="header-actions">
-          <button onClick={() => navigate('/preorder')} className="preorder-btn" style={{
-            background: '#4CAF50',
-            color: 'white',
-            border: 'none',
-            padding: '10px 20px',
-            borderRadius: '8px',
-            cursor: 'pointer',
-            fontWeight: '600',
-            fontSize: '14px',
-            transition: 'all 0.3s ease',
-            marginRight: '10px'
-          }}>
+          <button onClick={() => navigate('/preorder')} className="preorder-btn">
             🍽️ Đặt bàn trước
           </button>
           {isLoggedIn ? (
-            <div className="user-info">
-              <span className="welcome-text">Xin chào, {user?.name || user?.username || 'Khách hàng'}!</span>
-              <button onClick={() => navigate('/order-history')} className="order-history-btn">
-                📋 Lịch sử đơn hàng
-              </button>
-              <button onClick={handleLogout} className="logout-btn">
-                Đăng xuất
-              </button>
-            </div>
+            <UserDropdown onLogout={handleLogout} />
           ) : (
             <div className="guest-actions">
               <button onClick={() => setShowLoginModal(true)} className="login-btn">

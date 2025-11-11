@@ -47,6 +47,7 @@ export const groupOrderItems = (orderItems) => {
 export const getStatusText = (status) => {
   const statusMap = {
     'pending': 'Chờ xử lý',
+    'preorder': 'Đặt trước',
     'waiting_confirm': 'Chờ xác nhận',
     'confirmed': 'Đã xác nhận',
     'preparing': 'Đang chuẩn bị',
@@ -66,6 +67,7 @@ export const getStatusText = (status) => {
 export const getStatusClass = (status) => {
   const classMap = {
     'pending': 'status-pending',
+    'preorder': 'status-preorder',
     'waiting_confirm': 'status-waiting',
     'confirmed': 'status-confirmed',
     'preparing': 'status-preparing',
