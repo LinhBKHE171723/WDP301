@@ -332,7 +332,21 @@ export function PreOrderTable() {
       
     if (!orderData || !orderData._id) return;
 
-    const orderId = String(orderData._id);
+    const orderId = String(orderData._id || orderData.id || '');
+    
+    if (!orderId) {
+      console.warn('⚠️ WebSocket event missing orderId:', messageType, orderData);
+      return;
+    }
+    
+    // Debug log để kiểm tra WebSocket events
+    console.log(`📨 PreOrderTable received WebSocket event: ${messageType}`, {
+      orderId,
+      status: orderData.status,
+      waiterResponseStatus: orderData.waiterResponse?.status,
+      hasOrderId: !!orderData._id,
+      orderDataKeys: Object.keys(orderData || {})
+    });
 
     // Handle new preorder event
     // Admin chỉ nhận đơn lớn, Cashier chỉ nhận đơn nhỏ (backend đã filter)
@@ -383,21 +397,44 @@ export function PreOrderTable() {
         return filtered;
       });
     }
-    // Handle updated preorder (approved, modified, deposit recorded, etc.)
+    // Handle preorder:approved - Khi approve, order sẽ chuyển sang "confirmed" nên cần remove ngay
+    else if (messageType === 'preorder:approved') {
+      const customerName = orderData.userId?.name || "Khách hàng";
+      toast.success(`✅ Đơn đặt trước từ ${customerName} đã được duyệt`, {
+        position: "top-right",
+        autoClose: 3000,
+      });
+      
+      // Khi approve preorder, order sẽ chuyển sang "confirmed" → remove khỏi danh sách "Đơn đặt trước"
+      setPreorders((prevPreorders) => {
+        const filtered = prevPreorders.filter(
+          (order) => {
+            const currentOrderId = String(order._id || order);
+            return currentOrderId !== orderId;
+          }
+        );
+        if (filtered.length !== prevPreorders.length) {
+          console.log(`✅ Preorder approved - removed from list:`, orderId, `(status: ${orderData.status})`);
+        } else {
+          console.log(`⚠️ Preorder ${orderId} not found in list to remove`);
+        }
+        return filtered;
+      });
+      
+      // Đóng modal nếu đang mở cho order này
+      if (openRow === orderId) {
+        setOpenRow(null);
+      }
+    }
+    // Handle updated preorder (modified, deposit recorded, etc.) - KHÔNG bao gồm approved
     else if (
-      messageType === 'preorder:approved' ||
       messageType === 'preorder:updated' ||
       messageType === 'preorder:deposit_recorded' ||
       messageType === 'preorder:items_modified'
     ) {
       // Show toast notifications for important events
       const customerName = orderData.userId?.name || "Khách hàng";
-      if (messageType === 'preorder:approved') {
-        toast.success(`✅ Đơn đặt trước từ ${customerName} đã được duyệt`, {
-          position: "top-right",
-          autoClose: 3000,
-        });
-      } else if (messageType === 'preorder:deposit_recorded') {
+      if (messageType === 'preorder:deposit_recorded') {
         const depositAmount = formatCurrency(orderData.totalDeposit || orderData.totalPaid || 0);
         toast.success(`💰 Đã ghi nhận tiền cọc ${depositAmount} từ ${customerName}`, {
           position: "top-right",
@@ -407,13 +444,19 @@ export function PreOrderTable() {
       
       setPreorders((prevPreorders) => {
         const exists = prevPreorders.some(
-          (order) => String(order._id) === orderId
+          (order) => {
+            const currentOrderId = String(order._id || order);
+            return currentOrderId === orderId;
+          }
         );
         
         // Nếu order không còn là "preorder" (đã chuyển sang confirmed, cancelled, etc.), remove khỏi list
-        if (orderData.status !== 'preorder') {
+        if (orderData.status && orderData.status !== 'preorder') {
           const filtered = prevPreorders.filter(
-            (order) => String(order._id) !== orderId
+            (order) => {
+              const currentOrderId = String(order._id || order);
+              return currentOrderId !== orderId;
+            }
           );
           if (filtered.length !== prevPreorders.length) {
             console.log(`✅ Preorder ${messageType} - removed from list (status changed to ${orderData.status}):`, orderId);
@@ -423,9 +466,10 @@ export function PreOrderTable() {
         
         if (exists) {
           // Update existing preorder (vẫn là preorder)
-          return prevPreorders.map((order) =>
-            String(order._id) === orderId ? orderData : order
-          );
+          return prevPreorders.map((order) => {
+            const currentOrderId = String(order._id || order);
+            return currentOrderId === orderId ? orderData : order;
+          });
         }
         // Nếu không tồn tại và order vẫn là "preorder", thêm vào list
         else {
@@ -445,19 +489,34 @@ export function PreOrderTable() {
       }
     }
     // Handle order:confirmed (khi approve với autoConfirm)
+    // Lưu ý: Backend emit cả preorder:approved và order:confirmed khi approve
+    // Cả hai events đều cần remove order khỏi danh sách "Đơn đặt trước"
+    // Nhưng để tránh duplicate, chỉ xử lý nếu chưa bị remove bởi preorder:approved
     else if (messageType === 'order:confirmed') {
+      console.log(`📨 Handling order:confirmed event for order ${orderId}, status: ${orderData.status}`);
+      
       setPreorders((prevPreorders) => {
         // Remove khỏi list vì đã chuyển sang confirmed
         const filtered = prevPreorders.filter(
-          (order) => String(order._id) !== orderId
+          (order) => {
+            const currentOrderId = String(order._id || order);
+            return currentOrderId !== orderId;
+          }
         );
         if (filtered.length !== prevPreorders.length) {
           console.log('✅ Order confirmed, removed from preorder list:', orderId);
+        } else {
+          console.log(`⚠️ Order ${orderId} not found in preorder list (may have been removed by preorder:approved event)`);
         }
         return filtered;
       });
+      
+      // Đóng modal nếu đang mở cho order này
+      if (openRow === orderId) {
+        setOpenRow(null);
+      }
     }
-  }, [lastMessage]);
+  }, [lastMessage, openRow]);
 
   // Filter preorders based on search
   const filtered = useMemo(() => {

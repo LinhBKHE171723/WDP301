@@ -141,6 +141,25 @@ export default function OrderCard({
     try {
       const key = `${orderItemId}-${comboItemIndex}`;
       setMarkingServed(prev => ({ ...prev, [key]: true }));
+      
+      // Cập nhật state ngay lập tức để tránh bấm lại
+      const updatedOrder = { ...order };
+      if (updatedOrder.orderItems) {
+        updatedOrder.orderItems = updatedOrder.orderItems.map(oi => {
+          if (oi._id === orderItemId && oi.comboItems && oi.comboItems[comboItemIndex]) {
+            return {
+              ...oi,
+              comboItems: oi.comboItems.map((ci, idx) => 
+                idx === comboItemIndex ? { ...ci, status: 'served' } : ci
+              )
+            };
+          }
+          return oi;
+        });
+      }
+      // Cập nhật state tạm thời (sẽ được cập nhật lại từ server)
+      // Note: Không thể cập nhật order trực tiếp vì order là prop, cần callback
+      
       await waiterApi.markComboItemServed(orderItemId, comboItemIndex);
       toast.success("Đã đánh dấu món trong combo đã phục vụ!");
       
@@ -236,12 +255,12 @@ export default function OrderCard({
                               {comboItem.status || 'pending'}
                             </Badge>
                           </div>
-                          {!isPending && canMarkComboItemServed(comboItem) && comboItem.status === 'ready' && (
+                          {!isPending && canMarkComboItemServed(comboItem) && comboItem.status === 'ready' && comboItem.status !== 'served' && (
                             <Button
                               size="sm"
                               variant="success"
                               onClick={() => handleMarkComboItemServed(item._id, idx)}
-                              disabled={markingServed[`${item._id}-${idx}`]}
+                              disabled={markingServed[`${item._id}-${idx}`] || comboItem.status === 'served'}
                               className="ms-2"
                             >
                               {markingServed[`${item._id}-${idx}`] ? "..." : "✓ Đã phục vụ"}

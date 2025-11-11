@@ -235,12 +235,12 @@ export default function TableDetail() {
                                       {comboItem.servedBy && user && (
                                         ((comboItem.servedBy._id && comboItem.servedBy._id.toString() === user.id?.toString()) ||
                                         (typeof comboItem.servedBy === 'string' && comboItem.servedBy === user.id?.toString()))
-                                      ) && comboItem.status === 'ready' && (
+                                      ) && comboItem.status === 'ready' && comboItem.status !== 'served' && (
                                         <Button
                                           size="sm"
                                           variant="success"
                                           onClick={() => handleMarkComboItemServed(oi._id, idx)}
-                                          disabled={markingServed[`${oi._id}-${idx}`]}
+                                          disabled={markingServed[`${oi._id}-${idx}`] || comboItem.status === 'served'}
                                           className="ms-auto"
                                         >
                                           {markingServed[`${oi._id}-${idx}`] ? "..." : "✓ Đã phục vụ"}
