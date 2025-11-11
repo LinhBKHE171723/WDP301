@@ -237,9 +237,21 @@ export default function CashierDashboard({
     }
   }, [preorderMessage, fetchPreordersCounts])
 
+  // Handle payment request notification
+  const handlePaymentRequested = useCallback((data) => {
+    console.log('💳 Payment requested:', data);
+    const tableNumber = data.tableNumber || 'N/A';
+    const totalAmount = data.totalAmount?.toLocaleString('vi-VN') || '0';
+    toast.warning(`💳 Khách hàng tại bàn ${tableNumber} yêu cầu thanh toán! Tổng tiền: ${totalAmount}đ`, {
+      autoClose: 8000,
+      position: "top-right"
+    });
+  }, []);
+
   useCashierSocket({
     onOrderPreparing: handleRealtimePreparing,
     onOrderPaid: handleRealtimePaid,
+    onPaymentRequested: handlePaymentRequested,
   })
 
  const cashRevenue = paymentHistory.filter((p) => p.method === "Tiền mặt").reduce((s, p) => s + p.amount, 0)

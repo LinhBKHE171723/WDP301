@@ -269,43 +269,6 @@ WaiterDashboard có một useEffect lắng nghe lastMessage → xử lý cập n
                     fetchOrders();
                     break;
 
-                case 'payment:requested':
-                    // Khách hàng yêu cầu thanh toán
-                    console.log('💳 Payment requested:', lastMessage.data);
-                    const paymentData = lastMessage.data;
-                    const orderIdForPayment = paymentData.orderId;
-                    const paymentNow = Date.now();
-                    
-                    // Kiểm tra xem đã hiển thị toast cho yêu cầu thanh toán này trong 3 giây qua chưa (tránh duplicate)
-                    const lastPaymentShown = shownNotificationsRef.current.get(`payment_${orderIdForPayment}`);
-                    if (lastPaymentShown && (paymentNow - lastPaymentShown) < 3000) {
-                        console.log('⏭️ Skipping duplicate payment notification for order:', orderIdForPayment);
-                        break;
-                    }
-
-                    // Đánh dấu đã hiển thị toast cho yêu cầu thanh toán này
-                    shownNotificationsRef.current.set(`payment_${orderIdForPayment}`, paymentNow);
-
-                    // Xóa các thông báo đã hiển thị quá 10 giây để tránh memory leak
-                    shownNotificationsRef.current.forEach((timestamp, id) => {
-                        if (paymentNow - timestamp > 10000) {
-                            shownNotificationsRef.current.delete(id);
-                        }
-                    });
-
-                    // Hiển thị thông báo với thông tin bàn và tổng tiền
-                    const tableNumber = paymentData.tableNumber || 'N/A';
-                    const totalAmount = paymentData.totalAmount?.toLocaleString('vi-VN') || '0';
-                    toast.warning(`💳 Khách hàng tại bàn ${tableNumber} yêu cầu thanh toán! Tổng tiền: ${totalAmount}đ`, {
-                        autoClose: 8000,
-                        position: "top-right"
-                    });
-
-                    // Refresh orders để cập nhật trạng thái
-                    fetchOrders();
-                    fetchPendingOrders();
-                    break;
-
                 default:
                     console.log('📨 Unknown message type:', lastMessage.type);
             }

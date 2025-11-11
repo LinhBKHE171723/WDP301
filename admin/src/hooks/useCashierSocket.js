@@ -29,9 +29,9 @@ function resolveWebSocketUrl() {
 
 const RECONNECT_DELAY = 3000
 
-export default function useCashierSocket({ onOrderPreparing, onOrderPaid } = {}) {
-  const callbacksRef = useRef({ onOrderPreparing, onOrderPaid })
-  callbacksRef.current = { onOrderPreparing, onOrderPaid }
+export default function useCashierSocket({ onOrderPreparing, onOrderPaid, onPaymentRequested } = {}) {
+  const callbacksRef = useRef({ onOrderPreparing, onOrderPaid, onPaymentRequested })
+  callbacksRef.current = { onOrderPreparing, onOrderPaid, onPaymentRequested }
 
   useEffect(() => {
     const wsUrl = resolveWebSocketUrl()
@@ -93,7 +93,7 @@ export default function useCashierSocket({ onOrderPreparing, onOrderPaid } = {})
       socket.onmessage = (event) => {
         try {
           const message = JSON.parse(event.data)
-          const { onOrderPreparing, onOrderPaid } = callbacksRef.current
+          const { onOrderPreparing, onOrderPaid, onPaymentRequested } = callbacksRef.current
 
           switch (message.type) {
             case "cashier.orders.preparing":
@@ -101,6 +101,9 @@ export default function useCashierSocket({ onOrderPreparing, onOrderPaid } = {})
               break
             case "cashier.orders.paid":
               onOrderPaid?.(message.data)
+              break
+            case "payment:requested":
+              onPaymentRequested?.(message.data)
               break
             default:
               break

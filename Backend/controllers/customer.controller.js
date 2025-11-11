@@ -2222,36 +2222,7 @@ exports.requestPayment = async (req, res) => {
       });
     }
 
-    // Lấy waiterId từ orderItems (waiter đã phục vụ)
-    // Tìm waiter từ orderItems đã served
-    let waiterId = null;
-    if (order.orderItems && order.orderItems.length > 0) {
-      for (const item of order.orderItems) {
-        // Kiểm tra servedBy trong orderItem chính
-        if (item.servedBy) {
-          // servedBy có thể là ObjectId hoặc đã được populate
-          waiterId = typeof item.servedBy === 'object' && item.servedBy._id 
-            ? item.servedBy._id 
-            : item.servedBy;
-          break; // Lấy waiter đầu tiên tìm thấy
-        }
-        // Kiểm tra trong comboItems
-        if (item.comboItems && item.comboItems.length > 0) {
-          for (const comboItem of item.comboItems) {
-            if (comboItem.servedBy) {
-              // comboItem.servedBy có thể là ObjectId string hoặc ObjectId
-              waiterId = typeof comboItem.servedBy === 'object' && comboItem.servedBy._id
-                ? comboItem.servedBy._id
-                : comboItem.servedBy;
-              break;
-            }
-          }
-          if (waiterId) break;
-        }
-      }
-    }
-
-    // Gửi WebSocket notification cho waiter
+    // Gửi WebSocket notification cho cashier
     const webSocketService = req.app.get("webSocketService");
     if (webSocketService) {
       const notificationData = {
@@ -2262,15 +2233,9 @@ exports.requestPayment = async (req, res) => {
         requestedAt: new Date()
       };
 
-      // Nếu có waiterId cụ thể, gửi cho waiter đó
-      if (waiterId) {
-        webSocketService.broadcastToWaiter(waiterId, "payment:requested", notificationData);
-        console.log(`💳 Payment request sent to waiter ${waiterId} for order ${order._id}`);
-      } else {
-        // Nếu không có waiterId, gửi cho tất cả waiter
-        webSocketService.broadcastToAllWaiters("payment:requested", notificationData);
-        console.log(`💳 Payment request broadcasted to all waiters for order ${order._id}`);
-      }
+      // Gửi thông báo yêu cầu thanh toán cho tất cả cashier
+      webSocketService.broadcastToAllCashiers("payment:requested", notificationData);
+      console.log(`💳 Payment request broadcasted to all cashiers for order ${order._id}`);
 
       // Cũng broadcast cho order để customer biết yêu cầu đã được gửi
       webSocketService.broadcastToOrder(order._id, "payment:request_sent", {
