@@ -19,6 +19,7 @@ export const API_ENDPOINTS = {
     CANCEL_ORDER_ITEM: (orderId, itemId) => `${API_BASE_URL}/customer/orders/${orderId}/items/${itemId}`,
     CONFIRM_ORDER: (id) => `${API_BASE_URL}/customer/orders/${id}/confirm`,
     START_EDIT_ORDER: (id) => `${API_BASE_URL}/customer/orders/${id}/start-edit`,
+    REQUEST_PAYMENT: (id) => `${API_BASE_URL}/customer/orders/${id}/request-payment`,
     ORDER_CAN_FEEDBACK: (id) => `${API_BASE_URL}/customer/orders/${id}/can-feedback`,
     ORDER_FEEDBACK: (id) => `${API_BASE_URL}/customer/orders/${id}/feedback`,
     PREORDERS: `${API_BASE_URL}/customer/preorders`
