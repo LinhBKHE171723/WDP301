@@ -16,9 +16,25 @@ const formatDate = (iso) => {
 // Kiểm tra overlap giữa 2 preorders (cùng bàn, thời gian trùng lấn)
 // Sử dụng preparationStartTime và reservedEndTime nếu có, nếu không thì dùng scheduledTime
 const checkOverlap = (order1, order2) => {
+  // Lấy danh sách bàn của cả 2 đơn (ưu tiên tableIds, fallback về tableId)
+  const getTableIds = (order) => {
+    if (order.tableIds && Array.isArray(order.tableIds) && order.tableIds.length > 0) {
+      return order.tableIds.map(t => t._id?.toString() || t.toString());
+    } else if (order.tableId) {
+      return [order.tableId._id?.toString() || order.tableId.toString()];
+    }
+    return [];
+  };
+  
+  const tableIds1 = getTableIds(order1);
+  const tableIds2 = getTableIds(order2);
+  
   // Chỉ kiểm tra nếu cả 2 đều đã được gán bàn
-  if (!order1.tableId || !order2.tableId) return false;
-  if (order1.tableId._id?.toString() !== order2.tableId._id?.toString()) return false;
+  if (tableIds1.length === 0 || tableIds2.length === 0) return false;
+  
+  // Kiểm tra xem có bàn nào trùng không
+  const commonTables = tableIds1.filter(tid => tableIds2.includes(tid));
+  if (commonTables.length === 0) return false;
   
   // Nếu có reservedEndTime thì dùng để kiểm tra overlap chính xác
   if (order1.reservedEndTime && order2.reservedEndTime) {
@@ -110,23 +126,52 @@ export default function PreOrderCalendar({ preorders, onSelectEvent }) {
           minute: '2-digit' 
         });
         
+        // Lấy danh sách số bàn để hiển thị (ưu tiên tableIds, fallback về tableId)
+        const getTableNumbers = (order) => {
+          if (order.tableIds && Array.isArray(order.tableIds) && order.tableIds.length > 0) {
+            const tableNumbers = order.tableIds
+              .map(t => t?.tableNumber || t)
+              .filter(Boolean);
+            return tableNumbers.length > 0 ? tableNumbers.join(", ") : 'Chưa gán';
+          } else if (order.tableId) {
+            const tableNumber = order.tableId?.tableNumber || order.tableId;
+            return tableNumber ? String(tableNumber) : 'Chưa gán';
+          }
+          return 'Chưa gán';
+        };
+        
+        const tableNumbersStr = getTableNumbers(order);
+        const customerName = order.userId?.name || 'Khách vãng lai';
+        
+        // Chỉ hiển thị số bàn, bỏ tên khách hàng
+        const shortTitle = tableNumbersStr !== 'Chưa gán' 
+          ? `Bàn ${tableNumbersStr}`
+          : `Chưa gán`;
+        
         return {
           id: order._id,
-          title: `${timeStr} - Bàn ${order.tableId?.tableNumber || 'Chưa gán'} - ${order.userId?.name || 'Khách vãng lai'}`,
+          title: shortTitle,
           start: startTime,
           end: endTime,
           resource: {
             order,
             hasOverlap,
-            overlappingOrders
+            overlappingOrders,
+            fullTitle: `${timeStr} - Bàn ${tableNumbersStr} - ${customerName}` // Lưu title đầy đủ để hiển thị trong tooltip
           },
           style: {
             backgroundColor,
             color: 'white',
             border: hasOverlap ? '3px solid #dc2626' : '1px solid rgba(0,0,0,0.1)',
             borderRadius: '4px',
-            padding: '2px 4px',
-            fontSize: '12px'
+            padding: '4px 6px',
+            fontSize: '11px',
+            fontWeight: '500',
+            minHeight: '20px', // Đảm bảo có đủ chiều cao để hiển thị text
+            overflow: 'visible', // Cho phép text hiển thị đầy đủ
+            whiteSpace: 'nowrap', // Không xuống dòng
+            textOverflow: 'ellipsis', // Hiển thị ... nếu quá dài
+            zIndex: hasOverlap ? 10 : 1 // Events overlap có z-index cao hơn
           }
         };
       })
@@ -135,8 +180,35 @@ export default function PreOrderCalendar({ preorders, onSelectEvent }) {
 
   const eventStyleGetter = (event) => {
     return {
-      style: event.style
+      style: {
+        ...event.style,
+        // Đảm bảo events có thể hiển thị đầy đủ
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'flex-start',
+        width: '100%',
+        maxWidth: '100%'
+      },
+      className: 'rbc-event-content' // Thêm class để có thể style thêm
     };
+  };
+  
+  // Custom event component để hiển thị tooltip với thông tin đầy đủ
+  const EventComponent = ({ event }) => {
+    const fullTitle = event.resource?.fullTitle || event.title;
+    return (
+      <div 
+        title={fullTitle} 
+        style={{ 
+          width: '100%', 
+          overflow: 'hidden',
+          textOverflow: 'ellipsis',
+          whiteSpace: 'nowrap'
+        }}
+      >
+        {event.title}
+      </div>
+    );
   };
 
   const handleSelectEvent = (event) => {
@@ -160,6 +232,9 @@ export default function PreOrderCalendar({ preorders, onSelectEvent }) {
         onNavigate={setDate}
         eventPropGetter={eventStyleGetter}
         onSelectEvent={handleSelectEvent}
+        components={{
+          event: EventComponent
+        }}
         messages={{
           next: 'Sau',
           previous: 'Trước',
@@ -175,6 +250,8 @@ export default function PreOrderCalendar({ preorders, onSelectEvent }) {
         }}
         popup
         showMultiDayTimes
+        step={15} // Hiển thị theo 15 phút để chính xác hơn
+        timeslots={4} // 4 timeslots mỗi giờ (15 phút)
       />
       
       {/* Legend */}
@@ -231,7 +308,21 @@ export default function PreOrderCalendar({ preorders, onSelectEvent }) {
                   <div>
                     <span className="text-gray-500">Bàn:</span>{' '}
                     <span className="font-medium">
-                      {selectedOrder.tableId ? `Bàn ${selectedOrder.tableId.tableNumber}` : 'Chưa gán'}
+                      {(() => {
+                        // Ưu tiên tableIds (nhiều bàn), fallback về tableId (1 bàn)
+                        if (selectedOrder?.tableIds && Array.isArray(selectedOrder.tableIds) && selectedOrder.tableIds.length > 0) {
+                          const tableNumbers = selectedOrder.tableIds
+                            .map(t => t?.tableNumber || t)
+                            .filter(Boolean);
+                          return tableNumbers.length > 0 
+                            ? `Bàn ${tableNumbers.join(", ")}`
+                            : "Chưa gán";
+                        } else if (selectedOrder?.tableId) {
+                          const tableNumber = selectedOrder.tableId?.tableNumber || selectedOrder.tableId;
+                          return tableNumber ? `Bàn ${tableNumber}` : "Chưa gán";
+                        }
+                        return "Chưa gán";
+                      })()}
                     </span>
                   </div>
                   <div>
