@@ -1190,7 +1190,7 @@ export function PreOrderTable() {
                 required
               >
                 <option value="">-- Chọn bàn --</option>
-                {availableTables.map((table) => (
+                {allTables.map((table) => (
                   <option key={table._id} value={table._id}>
                     Bàn {table.tableNumber}
                   </option>
@@ -1789,7 +1789,7 @@ export function PreOrderTable() {
                 <option value="">-- Chưa gán bàn --</option>
                 {allTables.map((table) => (
                   <option key={table._id} value={table._id}>
-                    Bàn {table.tableNumber} {table.status === "occupied" ? "(Đang sử dụng)" : ""}
+                    Bàn {table.tableNumber}
                   </option>
                 ))}
               </select>

@@ -1,6 +1,8 @@
 import Client from "./Client";
 
 const adminApi = {
+  // Lấy lịch sử tất cả orders (với filters)
+  getOrdersHistory: (params = {}) => Client.get("/admin/orders", { params }),
   // Lấy danh sách đơn đặt trước (với filters)
   getPreOrders: (params = {}) => Client.get("/admin/preorders", { params }),
   // Lấy thông tin chi tiết khách hàng và lịch sử đơn hàng

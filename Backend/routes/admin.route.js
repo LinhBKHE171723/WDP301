@@ -5,6 +5,7 @@ const { authRequired, roleRequired } = require("../middlewares/auth.middleware")
 const userCtrl = require("../controllers/admin/user.controller");
 const feedbackController = require("../controllers/admin/feedback.controller");
 const preorderController = require("../controllers/admin/preorder.controller");
+const orderController = require("../controllers/admin/order.controller");
 const statsCtrl = require("../controllers/admin/adminStats.controller");
 const performanceController = require("../controllers/admin/performance.controller");
 const itemCtrl = require("../controllers/admin/item.controller");
@@ -42,6 +43,9 @@ router.get("/work-shifts/:id", authRequired, roleRequired("admin"), workShiftCon
 router.post("/work-shifts", authRequired, roleRequired("admin"), workShiftController.createWorkShift);
 router.put("/work-shifts/:id", authRequired, roleRequired("admin"), workShiftController.updateWorkShift);
 router.delete("/work-shifts/:id", authRequired, roleRequired("admin"), workShiftController.deleteWorkShift);
+
+// --- ORDER HISTORY ROUTES (/api/admin/orders) ---
+router.get("/orders", authRequired, roleRequired("admin"), orderController.getOrdersHistory);
 
 // --- PREORDER ROUTES (/api/admin/preorders) ---
 router.get("/preorders", authRequired, roleRequired("admin", "cashier"), preorderController.getPreOrders);

@@ -25,6 +25,7 @@ import CustomerReportPage from "../pages/admin/CustomerReportPage";
 import PerformancePage from "../pages/admin/PerformancePage";
 import PerformanceDetailPage from "../pages/admin/PerformancePageDetail";
 import PreOrderPage from "../pages/admin/PreOrderPage";
+import OrderHistoryPage from "../pages/admin/OrderHistoryPage";
 import AdminPreOrderNotification from "../components/admin/AdminPreOrderNotification";
 import CashierShiftManager from "../components/cashier/CashierShiftManager";
 import CashierDashboard from "../components/cashier/CashierDashboard";
@@ -221,6 +222,7 @@ export default function AppRouter() {
                       <Routes>
                         
                         <Route path="/preorders" element={<PreOrderPage />} />
+                        <Route path="/orders" element={<OrderHistoryPage />} />
                         <Route path="/analytics" element={<AnalyticsPage />} />
                         <Route path="/item-report" element={<ItemReportPage />} />
                         <Route path="item-analytics/:itemId" element={<AnalyticsPage2 />} />
