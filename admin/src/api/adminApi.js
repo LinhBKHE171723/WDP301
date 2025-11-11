@@ -5,13 +5,23 @@ const adminApi = {
   getOrdersHistory: (params = {}) => Client.get("/admin/orders", { params }),
   // Lấy danh sách đơn đặt trước (với filters)
   getPreOrders: (params = {}) => Client.get("/admin/preorders", { params }),
+  // Lấy thông tin nguyên liệu cần thiết cho pre-order
+  getPreOrderIngredients: (orderId) => Client.get(`/admin/preorders/${orderId}/ingredients`),
   // Lấy thông tin chi tiết khách hàng và lịch sử đơn hàng
   getCustomerInfo: (userId) => Client.get(`/admin/customers/${userId}/info`),
   // Lấy thống kê thất thoát nguyên liệu hết hạn
   getIngredientWasteStats: () => Client.get("/admin/stats/ingredient-waste"),
   // Approve đơn đặt trước
-  approvePreOrder: (orderId, tableId, adminNotes) => 
-    Client.patch(`/admin/preorders/${orderId}/approve`, { tableId, adminNotes }),
+  // Hỗ trợ cả tableId (backward compatibility) và tableIds[] (mới)
+  approvePreOrder: (orderId, tableIds, adminNotes, preparationStartTime, reservedEndTime, forceApprove = false) => 
+    Client.patch(`/admin/preorders/${orderId}/approve`, { 
+      tableIds: Array.isArray(tableIds) ? tableIds : (tableIds ? [tableIds] : []), // Luôn gửi array
+      tableId: Array.isArray(tableIds) && tableIds.length > 0 ? tableIds[0] : (tableIds || null), // Backward compatibility
+      adminNotes,
+      preparationStartTime,
+      reservedEndTime,
+      forceApprove
+    }),
   // Hủy đơn đặt trước
   cancelPreOrder: (orderId, adminNotes) => 
     Client.patch(`/admin/preorders/${orderId}/cancel`, { adminNotes }),
@@ -22,8 +32,16 @@ const adminApi = {
   modifyPreOrderItems: (orderId, itemsToAdd, itemsToRemove, itemsToUpdate) => 
     Client.patch(`/admin/preorders/${orderId}/items`, { itemsToAdd, itemsToRemove, itemsToUpdate }),
   // Cập nhật thông tin đơn (gán bàn, sửa thời gian)
-  updatePreOrder: (orderId, tableId, scheduledTime, adminNotes) => 
-    Client.patch(`/admin/preorders/${orderId}`, { tableId, scheduledTime, adminNotes }),
+  // Hỗ trợ cả tableId (backward compatibility) và tableIds[] (mới)
+  // Hỗ trợ forceUpdate để bỏ qua conflict warning
+  updatePreOrder: (orderId, tableIds, scheduledTime, adminNotes, forceUpdate = false) => 
+    Client.patch(`/admin/preorders/${orderId}`, { 
+      tableIds: Array.isArray(tableIds) ? tableIds : (tableIds ? [tableIds] : []), // Luôn gửi array
+      tableId: Array.isArray(tableIds) && tableIds.length > 0 ? tableIds[0] : (tableIds || null), // Backward compatibility
+      scheduledTime, 
+      adminNotes,
+      forceUpdate // Thêm forceUpdate để bỏ qua conflict
+    }),
   // Quản lý ghi chú admin
   addAdminNote: (orderId, note) => Client.post(`/admin/preorders/${orderId}/notes`, { note }),
   deleteAdminNote: (orderId, noteId) => Client.delete(`/admin/preorders/${orderId}/notes/${noteId}`),

@@ -24,14 +24,42 @@ export default function OrderQueue({ orders, selectedOrder, onSelectOrder }) {
               onClick={() => onSelectOrder(order)}
             >
               <div className="flex justify-between items-center">
-                <span className="font-bold text-gray-900">
-                  Order #{order._id.slice(-4)}
-                </span>
+                <div className="flex items-center gap-2">
+                  <span className="font-bold text-gray-900">
+                    Order #{order._id.slice(-4)}
+                  </span>
+                  {order.isPreOrder && (
+                    <span className="px-2 py-0.5 bg-blue-100 text-blue-700 text-xs font-medium rounded">
+                      📅 Đặt trước
+                    </span>
+                  )}
+                </div>
                 <span className="text-sm text-gray-600">
                   ⏱ {Math.floor((order.waitTime || 0) / 60)}:
                   {String((order.waitTime || 0) % 60).padStart(2, "0")}
                 </span>
               </div>
+              {order.isPreOrder && order.scheduledTime && (
+                <p className="text-xs text-blue-600 mt-1 font-medium">
+                  🕐 Đến ăn: {new Date(order.scheduledTime).toLocaleString('vi-VN', {
+                    day: '2-digit',
+                    month: '2-digit',
+                    year: 'numeric',
+                    hour: '2-digit',
+                    minute: '2-digit'
+                  })}
+                </p>
+              )}
+              {order.isPreOrder && order.preparationStartTime && (
+                <p className="text-xs text-purple-600 mt-0.5">
+                  ⏰ Bắt đầu chuẩn bị: {new Date(order.preparationStartTime).toLocaleString('vi-VN', {
+                    day: '2-digit',
+                    month: '2-digit',
+                    hour: '2-digit',
+                    minute: '2-digit'
+                  })}
+                </p>
+              )}
               <p className="text-gray-500 text-sm mt-1">
                 Trạng thái:{" "}
                 <span className="font-medium text-orange-600">

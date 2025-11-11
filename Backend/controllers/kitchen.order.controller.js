@@ -105,10 +105,33 @@ exports.formatOrderForKitchen = (order) => {
 exports.getConfirmedOrders = async (req, res) => {
   try {
     // 1. Chỉ lấy các order có trạng thái là 'confirmed'
-    // 2. Populate các thông tin cần thiết cho KDS:
-    //    - orderItems: để biết có những món nào và trạng thái từng món
-    //    - tableId: để biết order này của bàn nào
-    const orders = await Order.find({ status: "confirmed" })
+    // 2. Filter pre-orders: chỉ hiển thị những đơn đã đến thời gian chuẩn bị
+    //    - Nếu có preparationStartTime: chỉ lấy khi preparationStartTime <= now
+    //    - Nếu không có preparationStartTime nhưng có scheduledTime: chỉ lấy khi scheduledTime <= now
+    //    - Nếu không phải pre-order (không có scheduledTime): lấy luôn
+    const now = new Date();
+    
+    const orders = await Order.find({ 
+      status: "confirmed",
+      $or: [
+        // Đơn thường (không có scheduledTime)
+        { scheduledTime: { $exists: false } },
+        { scheduledTime: null },
+        // Pre-order đã đến thời gian chuẩn bị (có preparationStartTime)
+        { 
+          scheduledTime: { $exists: true, $ne: null },
+          preparationStartTime: { $exists: true, $ne: null, $lte: now }
+        },
+        // Pre-order không có preparationStartTime nhưng đã đến scheduledTime
+        { 
+          scheduledTime: { $exists: true, $ne: null, $lte: now },
+          $or: [
+            { preparationStartTime: { $exists: false } },
+            { preparationStartTime: null }
+          ]
+        }
+      ]
+    })
       .populate({
         path: "orderItems",
         // Populate chi tiết Item (tên món ăn)
@@ -141,6 +164,11 @@ exports.getConfirmedOrders = async (req, res) => {
         status: order.status, // Trạng thái của Order (confirmed)
         totalItems: order.orderItems.length,
         itemsRemaining: pendingItems, // Số món còn phải làm
+        // Thông tin pre-order (nếu có)
+        isPreOrder: order.scheduledTime ? true : false,
+        scheduledTime: order.scheduledTime || null, // Thời gian khách muốn đến ăn
+        preparationStartTime: order.preparationStartTime || null, // Thời gian bắt đầu chuẩn bị
+        reservedEndTime: order.reservedEndTime || null, // Thời gian kết thúc dành bàn
         items: order.orderItems.map((orderItem) => ({
           orderItemId: orderItem._id,
           itemName: orderItem.itemName || (orderItem.itemId ? orderItem.itemId.name : "Món đã xóa"),

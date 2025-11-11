@@ -49,6 +49,7 @@ router.get("/orders", authRequired, roleRequired("admin"), orderController.getOr
 
 // --- PREORDER ROUTES (/api/admin/preorders) ---
 router.get("/preorders", authRequired, roleRequired("admin", "cashier"), preorderController.getPreOrders);
+router.get("/preorders/:orderId/ingredients", authRequired, roleRequired("admin", "cashier"), preorderController.getPreOrderIngredients);
 router.get("/customers/:userId/info", authRequired, roleRequired("admin", "cashier"), preorderController.getCustomerInfo);
 router.patch("/preorders/:orderId/approve", authRequired, roleRequired("admin", "cashier"), checkPreOrderPermission, preorderController.approvePreOrder);
 router.patch("/preorders/:orderId/cancel", authRequired, roleRequired("admin", "cashier"), checkPreOrderPermission, preorderController.cancelPreOrder);

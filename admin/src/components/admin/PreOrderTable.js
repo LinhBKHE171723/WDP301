@@ -2,6 +2,8 @@ import { useEffect, useMemo, useState } from "react";
 import { useSearchParams } from "react-router-dom";
 import { Card } from "../ui/admin/card";
 import { Input } from "../ui/admin/input";
+import DatePicker from "react-datepicker";
+import "react-datepicker/dist/react-datepicker.css";
 import {
   Dialog,
   DialogContent,
@@ -17,9 +19,10 @@ import waiterApi from "../../api/waiterApi";
 import useAdminWebSocket from "../../hooks/useAdminWebSocket";
 import { useAuth } from "../../context/AuthContext";
 import { toast } from "react-toastify";
+import PreOrderCalendar from "./PreOrderCalendar";
 import "./PreOrderTable.css";
 
-const formatDate = (iso) => {
+export const formatDate = (iso) => {
   if (!iso) return "-";
   const d = new Date(iso);
   return d.toLocaleString("vi-VN", {
@@ -31,7 +34,7 @@ const formatDate = (iso) => {
   });
 };
 
-const formatCurrency = (amount) => {
+export const formatCurrency = (amount) => {
   if (!amount) return "0 ₫";
   return new Intl.NumberFormat("vi-VN", {
     style: "currency",
@@ -53,6 +56,8 @@ export function PreOrderTable() {
   const [loading, setLoading] = useState(true);
   const [openRow, setOpenRow] = useState(null);
   const [customerInfo, setCustomerInfo] = useState(null);
+  const [ingredientsInfo, setIngredientsInfo] = useState(null);
+  const [loadingIngredients, setLoadingIngredients] = useState(false);
   const [loadingCustomerInfo, setLoadingCustomerInfo] = useState(false);
   
   // Advanced filters - initialize from URL params
@@ -84,7 +89,12 @@ export function PreOrderTable() {
   const [cancelModalOpen, setCancelModalOpen] = useState(false);
   const [selectedOrderForAction, setSelectedOrderForAction] = useState(null);
   const [availableTables, setAvailableTables] = useState([]);
-  const [approveForm, setApproveForm] = useState({ tableId: "", adminNotes: "" });
+  const [approveForm, setApproveForm] = useState({ 
+    tableIds: [], // Mảng các bàn đã chọn
+    adminNotes: "",
+    preparationStartTime: "",
+    reservedEndTime: ""
+  });
   const [cancelForm, setCancelForm] = useState({ adminNotes: "" });
   const [depositModalOpen, setDepositModalOpen] = useState(false);
   const [depositForm, setDepositForm] = useState({ amount: "", paymentMethod: "cash", adminNotes: "" });
@@ -94,12 +104,135 @@ export function PreOrderTable() {
   const [availableMenus, setAvailableMenus] = useState([]);
   const [newItemForm, setNewItemForm] = useState({ type: "item", itemId: "", quantity: 1 });
   const [updateModalOpen, setUpdateModalOpen] = useState(false);
-  const [updateForm, setUpdateForm] = useState({ tableId: "", scheduledTime: "", adminNotes: "" });
+  const [updateForm, setUpdateForm] = useState({ tableIds: [], scheduledTime: "", adminNotes: "" });
+  const [updateOverlapWarning, setUpdateOverlapWarning] = useState(null); // { overlappingOrders: [], showConfirm: false }
   const [allTables, setAllTables] = useState([]);
   const [actionLoading, setActionLoading] = useState(false);
+  const [viewMode, setViewMode] = useState("table"); // "table" or "calendar"
+  const [overlapWarning, setOverlapWarning] = useState(null); // { overlappingOrders: [], showConfirm: false }
 
   // WebSocket connection for real-time preorder updates
   const { lastMessage } = useAdminWebSocket();
+
+  // Hàm xử lý approve preorder
+  const handleApprovePreOrder = async (forceApprove = false) => {
+    try {
+      setActionLoading(true);
+      await adminApi.approvePreOrder(
+        selectedOrderForAction._id,
+        approveForm.tableIds, // Gửi mảng tableIds
+        approveForm.adminNotes,
+        approveForm.preparationStartTime,
+        approveForm.reservedEndTime,
+        forceApprove
+      );
+      toast.success(`Đã approve và xác nhận đơn thành công (${approveForm.tableIds.length} bàn)`);
+      setApproveModalOpen(false);
+      setSelectedOrderForAction(null);
+      setOverlapWarning(null);
+      setApproveForm({ 
+        tableIds: [], 
+        adminNotes: "",
+        preparationStartTime: "",
+        reservedEndTime: ""
+      });
+      
+      // Refresh list (silently, không hiển thị toast nếu lỗi)
+      try {
+        const response = await adminApi.getPreOrders({
+          waiterResponseStatus,
+          fromDate,
+          toDate,
+          minAmount,
+          maxAmount,
+          sortBy,
+          sortOrder
+        });
+        setPreorders(Array.isArray(response?.data) ? response.data : []);
+      } catch (refreshErr) {
+        console.error("Lỗi khi refresh danh sách sau khi approve đơn:", refreshErr);
+      }
+    } catch (err) {
+      console.error("Lỗi khi approve đơn:", err);
+      // Client.js đã reject với err.response?.data, nên cần truy cập err.message hoặc err.data?.message
+      const errorMessage = err?.message || err?.data?.message || err?.response?.data?.message || "Lỗi khi approve đơn";
+      toast.error(errorMessage, {
+        position: "top-right",
+        autoClose: 5000,
+        hideProgressBar: false,
+        closeOnClick: true,
+        pauseOnHover: true,
+        draggable: true,
+      });
+    } finally {
+      setActionLoading(false);
+    }
+  };
+
+  // Hàm xử lý update preorder
+  const handleUpdatePreOrder = async (forceUpdate = false) => {
+    try {
+      setActionLoading(true);
+      await adminApi.updatePreOrder(
+        selectedOrderForAction._id,
+        updateForm.tableIds.length > 0 ? updateForm.tableIds : undefined, // Gửi tableIds nếu có
+        updateForm.scheduledTime || undefined,
+        updateForm.adminNotes,
+        forceUpdate // Gửi forceUpdate
+      );
+      toast.success("Đã cập nhật đơn đặt trước thành công");
+      setUpdateModalOpen(false);
+      setSelectedOrderForAction(null);
+      setUpdateForm({ tableIds: [], scheduledTime: "", adminNotes: "" });
+      setUpdateOverlapWarning(null);
+      
+      // Refresh list (silently, không hiển thị toast nếu lỗi)
+      try {
+        const response = await adminApi.getPreOrders({
+          waiterResponseStatus,
+          fromDate,
+          toDate,
+          minAmount,
+          maxAmount,
+          sortBy,
+          sortOrder
+        });
+        setPreorders(Array.isArray(response?.data) ? response.data : []);
+      } catch (refreshErr) {
+        console.error("Lỗi khi refresh danh sách sau khi cập nhật đơn:", refreshErr);
+      }
+    } catch (err) {
+      console.error("Lỗi khi cập nhật đơn:", err);
+      console.log("🔍 Full err object:", JSON.stringify(err, null, 2));
+      // Kiểm tra xem có conflicts trong response không
+      // Client.js interceptor đã extract err.response.data thành err, nên check err.conflicts trực tiếp
+      const conflicts = err?.conflicts || err?.response?.data?.conflicts || err?.data?.conflicts;
+      console.log("🔍 Debug conflicts:", conflicts, "type:", typeof conflicts, "isArray:", Array.isArray(conflicts));
+      if (conflicts && Array.isArray(conflicts) && conflicts.length > 0 && !forceUpdate) {
+        console.log("✅ Có conflicts, sẽ hiển thị modal thay vì toast");
+        // Parse conflicts thành format giống approve
+        const overlappingOrders = conflicts.map(c => ({
+          _id: c.orderId,
+          userId: { name: c.customerName },
+          tableIds: c.tableIds ? c.tableIds.map(tid => ({ _id: tid })) : (c.otherTableIds ? c.otherTableIds.map(tid => ({ _id: tid })) : []),
+          scheduledTime: c.scheduledTime,
+          preparationStartTime: c.preparationStartTime,
+          reservedEndTime: c.reservedEndTime
+        }));
+        console.log("🔍 Debug overlappingOrders:", overlappingOrders);
+        setUpdateOverlapWarning({
+          overlappingOrders,
+          showConfirm: false
+        });
+        setActionLoading(false);
+        return; // Không hiển thị toast, hiển thị modal cảnh báo
+      }
+      const errorMessage = err?.message || err?.data?.message || err?.response?.data?.message || "Lỗi khi cập nhật đơn";
+      toast.error(errorMessage);
+    } finally {
+      setActionLoading(false);
+    }
+  };
 
   // Fetch available tables
   useEffect(() => {
@@ -372,8 +505,36 @@ export function PreOrderTable() {
       </div>
 
       <Card className="preorder-card">
-        {/* Search */}
-        <div className="preorder-search-container">
+        {/* View Mode Switcher */}
+        <div className="flex gap-2 mb-4 border-b">
+          <Button
+            variant={viewMode === "table" ? "default" : "outline"}
+            onClick={() => setViewMode("table")}
+            className="rounded-b-none"
+          >
+            Danh sách
+          </Button>
+          <Button
+            variant={viewMode === "calendar" ? "default" : "outline"}
+            onClick={() => setViewMode("calendar")}
+            className="rounded-b-none"
+          >
+            Lịch
+          </Button>
+        </div>
+
+        {/* Calendar View */}
+        {viewMode === "calendar" && (
+          <div className="p-4">
+            <PreOrderCalendar preorders={preorders} />
+          </div>
+        )}
+
+        {/* Table View */}
+        {viewMode === "table" && (
+          <>
+            {/* Search */}
+            <div className="preorder-search-container">
           <Input
             placeholder="Tìm theo tên, email, SĐT, mã đơn..."
             value={search}
@@ -573,6 +734,7 @@ export function PreOrderTable() {
                           setOpenRow(v ? orderId : null);
                           if (!v) {
                             setCustomerInfo(null);
+                            setIngredientsInfo(null);
                           }
                         }}
                       >
@@ -605,6 +767,22 @@ export function PreOrderTable() {
                               } else {
                                 console.warn("Không có userId để fetch thông tin khách hàng. Order userId:", order?.userId, "Customer:", customer);
                                 setCustomerInfo(null);
+                              }
+                              
+                              // Load thông tin nguyên liệu
+                              try {
+                                setLoadingIngredients(true);
+                                const ingredientsResponse = await adminApi.getPreOrderIngredients(orderId);
+                                if (ingredientsResponse?.data) {
+                                  setIngredientsInfo(ingredientsResponse.data);
+                                } else {
+                                  setIngredientsInfo(null);
+                                }
+                              } catch (err) {
+                                console.error("Lỗi khi load thông tin nguyên liệu:", err);
+                                setIngredientsInfo(null);
+                              } finally {
+                                setLoadingIngredients(false);
                               }
                             }}
                           >
@@ -648,6 +826,26 @@ export function PreOrderTable() {
                                     <span className="text-gray-500">Thời gian đặt:</span>{" "}
                                     <span className="font-medium">
                                       {scheduledTime ? formatDate(scheduledTime) : "-"}
+                                    </span>
+                                  </div>
+                                  <div>
+                                    <span className="text-gray-500">Bàn:</span>{" "}
+                                    <span className="font-medium">
+                                      {(() => {
+                                        // Ưu tiên tableIds (nhiều bàn), fallback về tableId (1 bàn)
+                                        if (order?.tableIds && Array.isArray(order.tableIds) && order.tableIds.length > 0) {
+                                          const tableNumbers = order.tableIds
+                                            .map(t => t?.tableNumber || t)
+                                            .filter(Boolean);
+                                          return tableNumbers.length > 0 
+                                            ? `Bàn ${tableNumbers.join(", ")}`
+                                            : "Chưa gán bàn";
+                                        } else if (order?.tableId) {
+                                          const tableNumber = order.tableId?.tableNumber || order.tableId;
+                                          return tableNumber ? `Bàn ${tableNumber}` : "Chưa gán bàn";
+                                        }
+                                        return "Chưa gán bàn";
+                                      })()}
                                     </span>
                                   </div>
                                 </div>
@@ -842,8 +1040,96 @@ export function PreOrderTable() {
                               </div>
                             </div>
 
-                            {/* Cột phải: Chi tiết khách hàng */}
+                            {/* Cột phải: Nguyên liệu và Chi tiết khách hàng */}
                             <div className="space-y-4 border-l pl-8">
+                              {/* Thông tin nguyên liệu */}
+                              <div>
+                                <h3 className="font-semibold text-lg text-gray-800 border-b pb-2 mb-3">
+                                  Nguyên liệu cần thiết
+                                </h3>
+                                {loadingIngredients ? (
+                                  <div className="text-center text-gray-500 py-4">
+                                    Đang tải thông tin nguyên liệu...
+                                  </div>
+                                ) : ingredientsInfo ? (
+                                  <div className="space-y-3">
+                                    {ingredientsInfo.hasInsufficient && (
+                                      <div className="bg-red-50 border-2 border-red-500 rounded-lg p-3 mb-3">
+                                        <p className="text-red-700 font-semibold text-sm">
+                                          ⚠️ Cảnh báo: Thiếu nguyên liệu!
+                                        </p>
+                                        <p className="text-red-600 text-xs mt-1">
+                                          Một số nguyên liệu không đủ để thực hiện đơn này. Vui lòng nhập thêm trước khi xác nhận.
+                                        </p>
+                                      </div>
+                                    )}
+                                    <div className="max-h-96 overflow-y-auto border rounded-lg">
+                                      <table className="w-full text-sm border-collapse">
+                                        <thead className="bg-gray-50 sticky top-0">
+                                          <tr>
+                                            <th className="text-left p-2 border-b">Nguyên liệu</th>
+                                            <th className="text-right p-2 border-b">Cần</th>
+                                            <th className="text-right p-2 border-b">Có</th>
+                                            <th className="text-right p-2 border-b">Thiếu</th>
+                                            <th className="text-center p-2 border-b">Trạng thái</th>
+                                          </tr>
+                                        </thead>
+                                        <tbody>
+                                          {ingredientsInfo.ingredients.map((ing, idx) => (
+                                            <tr 
+                                              key={ing.ingredientId || idx} 
+                                              className={`border-b hover:bg-gray-50 ${
+                                                !ing.isSufficient ? 'bg-red-50' : ''
+                                              }`}
+                                            >
+                                              <td className="p-2 font-medium">
+                                                {ing.ingredientName}
+                                                {ing.unit && <span className="text-gray-500 text-xs ml-1">({ing.unit})</span>}
+                                              </td>
+                                              <td className="p-2 text-right">
+                                                {ing.requiredQuantity.toLocaleString('vi-VN')}
+                                              </td>
+                                              <td className="p-2 text-right">
+                                                {ing.availableQuantity.toLocaleString('vi-VN')}
+                                              </td>
+                                              <td className="p-2 text-right">
+                                                {ing.shortage > 0 ? (
+                                                  <span className="text-red-600 font-semibold">
+                                                    {ing.shortage.toLocaleString('vi-VN')}
+                                                  </span>
+                                                ) : (
+                                                  <span className="text-gray-400">-</span>
+                                                )}
+                                              </td>
+                                              <td className="p-2 text-center">
+                                                {ing.isSufficient ? (
+                                                  <span className="inline-flex items-center px-2 py-1 rounded text-xs font-medium bg-green-100 text-green-700">
+                                                    ✅ Đủ
+                                                  </span>
+                                                ) : (
+                                                  <span className="inline-flex items-center px-2 py-1 rounded text-xs font-medium bg-red-100 text-red-700">
+                                                    ❌ Thiếu
+                                                  </span>
+                                                )}
+                                              </td>
+                                            </tr>
+                                          ))}
+                                        </tbody>
+                                      </table>
+                                    </div>
+                                    {ingredientsInfo.ingredients.length === 0 && (
+                                      <div className="text-sm text-gray-500 text-center py-4">
+                                        Không có nguyên liệu nào cần thiết cho đơn này.
+                                      </div>
+                                    )}
+                                  </div>
+                                ) : (
+                                  <div className="text-sm text-gray-500 text-center py-4">
+                                    Không thể tải thông tin nguyên liệu.
+                                  </div>
+                                )}
+                              </div>
+                              
                               <h3 className="font-semibold text-lg text-gray-800 border-b pb-2">
                                 Chi tiết khách hàng
                               </h3>
@@ -1065,20 +1351,24 @@ export function PreOrderTable() {
                           </div>
 
                           <DialogFooter className="flex gap-2 flex-wrap">
-                            {/* Chỉ hiển thị các button action khi đơn ở trạng thái phù hợp */}
+                            {/* Hiển thị button Approve chỉ khi đơn ở trạng thái pending */}
                             {waiterResponseStatus === "pending" && (
+                              <Button
+                                variant="outline"
+                                onClick={() => {
+                                  setSelectedOrderForAction(order);
+                                  setApproveForm({ tableIds: [], adminNotes: "", preparationStartTime: "", reservedEndTime: "" });
+                                  setApproveModalOpen(true);
+                                }}
+                                className="bg-green-50 text-green-700 hover:bg-green-100"
+                              >
+                                Approve
+                              </Button>
+                            )}
+                            
+                            {/* Hiển thị button Sửa món và Hủy đơn cho cả đơn pending và đã approved */}
+                            {(waiterResponseStatus === "pending" || waiterResponseStatus === "approved") && (
                               <>
-                                <Button
-                                  variant="outline"
-                                  onClick={() => {
-                                    setSelectedOrderForAction(order);
-                                    setApproveForm({ tableId: "", adminNotes: "" });
-                                    setApproveModalOpen(true);
-                                  }}
-                                  className="bg-green-50 text-green-700 hover:bg-green-100"
-                                >
-                                  Approve
-                                </Button>
                                 <Button
                                   variant="outline"
                                   onClick={() => {
@@ -1118,8 +1408,13 @@ export function PreOrderTable() {
                                   const minutes = String(d.getMinutes()).padStart(2, "0");
                                   scheduledTimeFormatted = `${year}-${month}-${day}T${hours}:${minutes}`;
                                 }
+                                // Lấy bàn hiện tại của order
+                                const currentTableIds = order?.tableIds && Array.isArray(order.tableIds) && order.tableIds.length > 0
+                                  ? order.tableIds.map(t => t._id?.toString() || t.toString())
+                                  : (order?.tableId ? [order.tableId._id?.toString() || order.tableId.toString()] : []);
+                                
                                 setUpdateForm({ 
-                                  tableId: order.tableId ? String(order.tableId._id || order.tableId) : "", 
+                                  tableIds: currentTableIds,
                                   scheduledTime: scheduledTimeFormatted,
                                   adminNotes: ""
                                 });
@@ -1127,7 +1422,7 @@ export function PreOrderTable() {
                               }}
                               className="bg-purple-50 text-purple-700 hover:bg-purple-100"
                             >
-                              Gán bàn / Sửa thời gian
+                              Sửa thời gian
                             </Button>
                             <Button
                               variant="outline"
@@ -1167,7 +1462,8 @@ export function PreOrderTable() {
             Tổng số: {filtered.length} đơn đặt trước
           </div>
         )}
-      </Card>
+          </>
+        )}
 
       {/* Approve Modal */}
       <Dialog open={approveModalOpen} onOpenChange={setApproveModalOpen}>
@@ -1181,22 +1477,143 @@ export function PreOrderTable() {
           <div className="space-y-4">
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">
-                Chọn bàn *
+                Chọn bàn (có thể chọn nhiều bàn) *
               </label>
+              
+              {/* Hiển thị các bàn đã chọn dưới dạng Badge */}
+              {approveForm.tableIds.length > 0 && (
+                <div className="mb-3 p-2 bg-gray-50 rounded-md border border-gray-200">
+                  <div className="text-xs text-gray-600 mb-2">✅ Đã chọn {approveForm.tableIds.length} bàn:</div>
+                  <div className="flex flex-wrap gap-2">
+                    {approveForm.tableIds.map((tableIdStr) => {
+                      const table = allTables.find(t => t._id === tableIdStr);
+                      if (!table) return null;
+                      return (
+                        <span
+                          key={tableIdStr}
+                          className="inline-flex items-center gap-1 px-3 py-1 bg-green-100 text-green-800 rounded-full text-sm"
+                        >
+                          <span>Bàn {table.tableNumber}</span>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setApproveForm({ 
+                                ...approveForm, 
+                                tableIds: approveForm.tableIds.filter(id => id !== tableIdStr) 
+                              });
+                              setOverlapWarning(null);
+                            }}
+                            className="ml-1 text-green-700 hover:text-green-900 font-bold text-lg leading-none"
+                          >
+                            ×
+                          </button>
+                        </span>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
+
+              {/* Dropdown để thêm bàn mới */}
               <select
-                value={approveForm.tableId}
-                onChange={(e) => setApproveForm({ ...approveForm, tableId: e.target.value })}
+                value=""
+                onChange={(e) => {
+                  const newTableId = e.target.value;
+                  if (newTableId && !approveForm.tableIds.includes(newTableId)) {
+                    setApproveForm({ 
+                      ...approveForm, 
+                      tableIds: [...approveForm.tableIds, newTableId] 
+                    });
+                    setOverlapWarning(null);
+                  }
+                  e.target.value = ""; // Reset dropdown
+                }}
                 className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm"
-                required
               >
-                <option value="">-- Chọn bàn --</option>
-                {allTables.map((table) => (
-                  <option key={table._id} value={table._id}>
-                    Bàn {table.tableNumber}
-                  </option>
-                ))}
+                <option value="">+ Thêm bàn phục vụ</option>
+                {allTables
+                  .filter(table => !approveForm.tableIds.includes(table._id))
+                  .map((table) => (
+                    <option key={table._id} value={table._id}>
+                      Bàn {table.tableNumber}
+                    </option>
+                  ))}
               </select>
-    </div>
+              
+              {approveForm.tableIds.length === 0 && (
+                <p className="text-xs text-amber-600 mt-1">
+                  ⚠️ Vui lòng chọn ít nhất 1 bàn trước khi xác nhận
+                </p>
+              )}
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Thời gian bắt đầu chuẩn bị *
+              </label>
+              <DatePicker
+                selected={approveForm.preparationStartTime ? new Date(approveForm.preparationStartTime) : null}
+                onChange={(date) => {
+                  if (date) {
+                    // Format to datetime-local format (YYYY-MM-DDTHH:mm)
+                    const year = date.getFullYear();
+                    const month = String(date.getMonth() + 1).padStart(2, "0");
+                    const day = String(date.getDate()).padStart(2, "0");
+                    const hours = String(date.getHours()).padStart(2, "0");
+                    const minutes = String(date.getMinutes()).padStart(2, "0");
+                    const formatted = `${year}-${month}-${day}T${hours}:${minutes}`;
+                    setApproveForm({ ...approveForm, preparationStartTime: formatted });
+                    setOverlapWarning(null); // Clear cảnh báo khi thay đổi
+                  } else {
+                    setApproveForm({ ...approveForm, preparationStartTime: "" });
+                    setOverlapWarning(null);
+                  }
+                }}
+                showTimeSelect
+                timeFormat="HH:mm"
+                timeIntervals={15}
+                dateFormat="dd/MM/yyyy HH:mm"
+                className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm"
+                placeholderText="Chọn ngày và giờ"
+                required
+              />
+              <p className="text-xs text-gray-500 mt-1">
+                Thời gian bắt đầu chuẩn bị món cho đơn này (định dạng 24 giờ)
+              </p>
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Thời gian kết thúc dành bàn *
+              </label>
+              <DatePicker
+                selected={approveForm.reservedEndTime ? new Date(approveForm.reservedEndTime) : null}
+                onChange={(date) => {
+                  if (date) {
+                    // Format to datetime-local format (YYYY-MM-DDTHH:mm)
+                    const year = date.getFullYear();
+                    const month = String(date.getMonth() + 1).padStart(2, "0");
+                    const day = String(date.getDate()).padStart(2, "0");
+                    const hours = String(date.getHours()).padStart(2, "0");
+                    const minutes = String(date.getMinutes()).padStart(2, "0");
+                    const formatted = `${year}-${month}-${day}T${hours}:${minutes}`;
+                    setApproveForm({ ...approveForm, reservedEndTime: formatted });
+                    setOverlapWarning(null); // Clear cảnh báo khi thay đổi
+                  } else {
+                    setApproveForm({ ...approveForm, reservedEndTime: "" });
+                    setOverlapWarning(null);
+                  }
+                }}
+                showTimeSelect
+                timeFormat="HH:mm"
+                timeIntervals={15}
+                dateFormat="dd/MM/yyyy HH:mm"
+                className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm"
+                placeholderText="Chọn ngày và giờ"
+                required
+              />
+              <p className="text-xs text-gray-500 mt-1">
+                Thời gian kết thúc dành bàn (để tránh order khác trùng vào khoảng thời gian này) (định dạng 24 giờ)
+              </p>
+            </div>
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">
                 Ghi chú (tùy chọn)
@@ -1208,6 +1625,73 @@ export function PreOrderTable() {
                 onChange={(e) => setApproveForm({ ...approveForm, adminNotes: e.target.value })}
               />
             </div>
+            
+            {/* Cảnh báo overlap */}
+            {overlapWarning && overlapWarning.overlappingOrders.length > 0 && !overlapWarning.showConfirm && (
+              <div className="bg-red-50 border-2 border-red-500 rounded-lg p-4">
+                <h4 className="font-semibold text-red-700 mb-2">⚠️ Cảnh báo: Bị trùng lấn thời gian</h4>
+                <p className="text-sm text-red-600 mb-3">
+                  Khoảng thời gian bạn chọn bị trùng với {overlapWarning.overlappingOrders.length} đơn khác ở các bàn đã chọn:
+                </p>
+                <div className="space-y-2 mb-3 max-h-40 overflow-y-auto">
+                  {overlapWarning.overlappingOrders.map((order, idx) => {
+                    // Lấy danh sách bàn trùng
+                    const otherTableIds = [];
+                    if (order.tableIds && order.tableIds.length > 0) {
+                      otherTableIds.push(...order.tableIds.map(t => t._id?.toString() || t.toString()));
+                    } else if (order.tableId) {
+                      otherTableIds.push(order.tableId._id?.toString() || order.tableId.toString());
+                    }
+                    const commonTables = approveForm.tableIds.filter(tid => otherTableIds.includes(tid));
+                    const commonTableNumbers = commonTables.map(tid => {
+                      const table = allTables.find(t => t._id === tid);
+                      return table ? `Bàn ${table.tableNumber}` : tid;
+                    }).join(", ");
+                    
+                    return (
+                      <div key={idx} className="text-sm bg-white p-2 rounded border border-red-200">
+                        <div className="font-medium">Mã đơn: {String(order._id).slice(-8)}</div>
+                        <div className="text-gray-600">
+                          Khách: {order.userId?.name || 'Khách vãng lai'}
+                        </div>
+                        <div className="text-red-600 font-medium">
+                          Bàn trùng: {commonTableNumbers || 'N/A'}
+                        </div>
+                        {order.preparationStartTime && order.reservedEndTime ? (
+                          <div className="text-gray-600">
+                            Thời gian: {new Date(order.preparationStartTime).toLocaleString('vi-VN')} - {new Date(order.reservedEndTime).toLocaleString('vi-VN')}
+                          </div>
+                        ) : order.scheduledTime ? (
+                          <div className="text-gray-600">
+                            Thời gian đặt: {new Date(order.scheduledTime).toLocaleString('vi-VN')}
+                          </div>
+                        ) : null}
+                      </div>
+                    );
+                  })}
+                </div>
+                <div className="flex gap-2">
+                  <Button
+                    variant="outline"
+                    onClick={() => {
+                      setOverlapWarning(null);
+                    }}
+                    className="flex-1"
+                  >
+                    Quay lại để sửa
+                  </Button>
+                  <Button
+                    onClick={async () => {
+                      // Gọi approve với forceApprove = true
+                      await handleApprovePreOrder(true);
+                    }}
+                    className="flex-1 bg-yellow-600 text-white hover:bg-yellow-700"
+                  >
+                    Tiếp tục (vẫn approve)
+                  </Button>
+                </div>
+              </div>
+            )}
           </div>
           <DialogFooter>
             <Button
@@ -1215,52 +1699,93 @@ export function PreOrderTable() {
               onClick={() => {
                 setApproveModalOpen(false);
                 setSelectedOrderForAction(null);
-                setApproveForm({ tableId: "", adminNotes: "" });
+                setOverlapWarning(null);
+                setApproveForm({ 
+                  tableIds: [], 
+                  adminNotes: "",
+                  preparationStartTime: "",
+                  reservedEndTime: ""
+                });
               }}
             >
               Hủy
             </Button>
             <Button
+              data-approve-button
               onClick={async () => {
-                if (!approveForm.tableId) {
-                  toast.error("Vui lòng chọn bàn");
+                if (approveForm.tableIds.length === 0) {
+                  toast.error("Vui lòng chọn ít nhất 1 bàn");
                   return;
                 }
-                try {
-                  setActionLoading(true);
-                  await adminApi.approvePreOrder(
-                    selectedOrderForAction._id,
-                    approveForm.tableId,
-                    approveForm.adminNotes
-                  );
-                  toast.success("Đã approve và xác nhận đơn thành công");
-                  setApproveModalOpen(false);
-                  setSelectedOrderForAction(null);
-                  setApproveForm({ tableId: "", adminNotes: "" });
-                  
-                  // Refresh list (silently, không hiển thị toast nếu lỗi)
-                  try {
-                    const response = await adminApi.getPreOrders({
-                      waiterResponseStatus,
-                      fromDate,
-                      toDate,
-                      minAmount,
-                      maxAmount,
-                      sortBy,
-                      sortOrder
-                    });
-                    setPreorders(Array.isArray(response?.data) ? response.data : []);
-                  } catch (refreshErr) {
-                    console.error("Lỗi khi refresh danh sách sau khi approve đơn:", refreshErr);
-                  }
-                } catch (err) {
-                  console.error("Lỗi khi approve đơn:", err);
-                  toast.error(err.response?.data?.message || "Lỗi khi approve đơn");
-                } finally {
-                  setActionLoading(false);
+                if (!approveForm.preparationStartTime) {
+                  toast.error("Vui lòng nhập thời gian bắt đầu chuẩn bị");
+                  return;
                 }
+                if (!approveForm.reservedEndTime) {
+                  toast.error("Vui lòng nhập thời gian kết thúc dành bàn");
+                  return;
+                }
+                
+                // Kiểm tra overlap trước khi approve - check tất cả các bàn đã chọn
+                const prepStart = new Date(approveForm.preparationStartTime);
+                const reservedEnd = new Date(approveForm.reservedEndTime);
+                const overlappingOrders = preorders.filter(order => {
+                  // Bỏ qua đơn hiện tại
+                  if (order._id.toString() === selectedOrderForAction._id.toString()) {
+                    return false;
+                  }
+                  
+                  // Lấy danh sách bàn của đơn khác
+                  const otherTableIds = [];
+                  if (order.tableIds && order.tableIds.length > 0) {
+                    otherTableIds.push(...order.tableIds.map(t => t._id?.toString() || t.toString()));
+                  } else if (order.tableId) {
+                    otherTableIds.push(order.tableId._id?.toString() || order.tableId.toString());
+                  }
+                  
+                  // Kiểm tra xem có bàn nào trùng không
+                  const hasCommonTable = approveForm.tableIds.some(tid => otherTableIds.includes(tid));
+                  if (!hasCommonTable) {
+                    return false; // Không có bàn trùng
+                  }
+                  
+                  // Kiểm tra overlap với đơn đã có reservedEndTime
+                  if (order.reservedEndTime) {
+                    const orderStart = order.preparationStartTime 
+                      ? new Date(order.preparationStartTime) 
+                      : new Date(order.scheduledTime);
+                    const orderEnd = new Date(order.reservedEndTime);
+                    
+                    // Overlap: prepStart < orderEnd && orderStart < reservedEnd
+                    if (prepStart < orderEnd && orderStart < reservedEnd) {
+                      return true;
+                    }
+                  } else if (order.scheduledTime) {
+                    // Nếu đơn chưa có reservedEndTime, kiểm tra scheduledTime trong vòng 2 giờ
+                    const orderTime = new Date(order.scheduledTime);
+                    const timeDiff = Math.abs(prepStart.getTime() - orderTime.getTime());
+                    const twoHours = 2 * 60 * 60 * 1000;
+                    if (timeDiff < twoHours) {
+                      return true;
+                    }
+                  }
+                  
+                  return false;
+                });
+                
+                // Nếu có overlap và chưa confirm, hiển thị cảnh báo
+                if (overlappingOrders.length > 0 && !overlapWarning?.showConfirm) {
+                  setOverlapWarning({
+                    overlappingOrders,
+                    showConfirm: false
+                  });
+                  return;
+                }
+                
+                // Nếu đã confirm hoặc không có overlap, tiếp tục approve
+                await handleApprovePreOrder();
               }}
-              disabled={actionLoading || !approveForm.tableId}
+              disabled={actionLoading || approveForm.tableIds.length === 0 || !approveForm.preparationStartTime || !approveForm.reservedEndTime}
               className="bg-green-600 text-white hover:bg-green-700"
             >
               {actionLoading ? "Đang xử lý..." : "Xác nhận"}
@@ -1335,7 +1860,8 @@ export function PreOrderTable() {
                   }
                 } catch (err) {
                   console.error("Lỗi khi hủy đơn:", err);
-                  toast.error(err.response?.data?.message || "Lỗi khi hủy đơn");
+                  const errorMessage = err?.message || err?.data?.message || err?.response?.data?.message || "Lỗi khi hủy đơn";
+                  toast.error(errorMessage);
                 } finally {
                   setActionLoading(false);
                 }
@@ -1452,7 +1978,8 @@ export function PreOrderTable() {
                   }
                 } catch (err) {
                   console.error("Lỗi khi ghi nhận tiền cọc:", err);
-                  toast.error(err.response?.data?.message || "Lỗi khi ghi nhận tiền cọc");
+                  const errorMessage = err?.message || err?.data?.message || err?.response?.data?.message || "Lỗi khi ghi nhận tiền cọc";
+                  toast.error(errorMessage);
                 } finally {
                   setActionLoading(false);
                 }
@@ -1753,7 +2280,8 @@ export function PreOrderTable() {
                   }
                 } catch (err) {
                   console.error("Lỗi khi chỉnh sửa món:", err);
-                  toast.error(err.response?.data?.message || "Lỗi khi chỉnh sửa món");
+                  const errorMessage = err?.message || err?.data?.message || err?.response?.data?.message || "Lỗi khi chỉnh sửa món";
+                  toast.error(errorMessage);
                 } finally {
                   setActionLoading(false);
                 }
@@ -1767,11 +2295,11 @@ export function PreOrderTable() {
         </DialogContent>
       </Dialog>
 
-      {/* Update PreOrder Modal (Gán bàn / Sửa thời gian) */}
+      {/* Update PreOrder Modal (Sửa thời gian đặt trước và bàn) */}
       <Dialog open={updateModalOpen} onOpenChange={setUpdateModalOpen}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>Gán bàn / Sửa thời gian đặt trước</DialogTitle>
+            <DialogTitle>Cập nhật đơn đặt trước</DialogTitle>
             <DialogDescription>
               Mã đơn: {selectedOrderForAction?._id ? String(selectedOrderForAction._id).slice(-8) : "-"}
             </DialogDescription>
@@ -1779,34 +2307,171 @@ export function PreOrderTable() {
           <div className="space-y-4">
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">
-                Chọn bàn
+                Chọn bàn (tùy chọn)
               </label>
+              
+              {/* Hiển thị các bàn đã chọn dưới dạng Badge */}
+              {updateForm.tableIds.length > 0 && (
+                <div className="mb-3 p-2 bg-gray-50 rounded-md border border-gray-200">
+                  <div className="text-xs text-gray-600 mb-2">✅ Đã chọn {updateForm.tableIds.length} bàn:</div>
+                  <div className="flex flex-wrap gap-2">
+                    {updateForm.tableIds.map((tableIdStr) => {
+                      const table = allTables.find(t => t._id === tableIdStr);
+                      if (!table) return null;
+                      return (
+                        <span
+                          key={tableIdStr}
+                          className="inline-flex items-center gap-1 px-3 py-1 bg-blue-100 text-blue-800 rounded-full text-sm"
+                        >
+                          <span>Bàn {table.tableNumber}</span>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setUpdateForm({ 
+                                ...updateForm, 
+                                tableIds: updateForm.tableIds.filter(id => id !== tableIdStr) 
+                              });
+                              setUpdateOverlapWarning(null); // Clear cảnh báo khi thay đổi
+                            }}
+                            className="ml-1 text-blue-700 hover:text-blue-900 font-bold text-lg leading-none"
+                          >
+                            ×
+                          </button>
+                        </span>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
+              
               <select
-                value={updateForm.tableId}
-                onChange={(e) => setUpdateForm({ ...updateForm, tableId: e.target.value })}
                 className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm"
+                onChange={(e) => {
+                  const newTableId = e.target.value;
+                  if (newTableId && !updateForm.tableIds.includes(newTableId)) {
+                    setUpdateForm({ 
+                      ...updateForm, 
+                      tableIds: [...updateForm.tableIds, newTableId] 
+                    });
+                    setUpdateOverlapWarning(null); // Clear cảnh báo khi thay đổi
+                  }
+                  e.target.value = ""; // Reset dropdown
+                }}
               >
-                <option value="">-- Chưa gán bàn --</option>
-                {allTables.map((table) => (
-                  <option key={table._id} value={table._id}>
-                    Bàn {table.tableNumber}
-                  </option>
-                ))}
+                <option value="">+ Thêm bàn</option>
+                {allTables
+                  .filter(table => !updateForm.tableIds.includes(table._id))
+                  .map((table) => (
+                    <option key={table._id} value={table._id}>
+                      Bàn {table.tableNumber}
+                    </option>
+                  ))}
               </select>
               <p className="text-xs text-gray-500 mt-1">
-                Để trống để xóa bàn đã gán
+                Có thể chọn nhiều bàn cho đơn này
               </p>
             </div>
+            
+            {/* Hiển thị cảnh báo overlap cho update */}
+            {updateOverlapWarning && updateOverlapWarning.overlappingOrders.length > 0 && !updateOverlapWarning.showConfirm && (
+              <div className="bg-red-50 border-2 border-red-500 rounded-lg p-4">
+                <h4 className="font-semibold text-red-700 mb-2">⚠️ Cảnh báo: Bị trùng lấn thời gian</h4>
+                <p className="text-sm text-red-600 mb-3">
+                  Khoảng thời gian bạn chọn bị trùng với {updateOverlapWarning.overlappingOrders.length} đơn khác ở các bàn đã chọn:
+                </p>
+                <div className="space-y-2 mb-3 max-h-40 overflow-y-auto">
+                  {updateOverlapWarning.overlappingOrders.map((order, idx) => {
+                    // Lấy danh sách bàn trùng
+                    const otherTableIds = [];
+                    if (order.tableIds && order.tableIds.length > 0) {
+                      otherTableIds.push(...order.tableIds.map(t => t._id?.toString() || t.toString()));
+                    } else if (order.tableId) {
+                      otherTableIds.push(order.tableId._id?.toString() || order.tableId.toString());
+                    }
+                    const commonTables = updateForm.tableIds.filter(tid => otherTableIds.includes(tid));
+                    const commonTableNumbers = commonTables.map(tid => {
+                      const table = allTables.find(t => t._id === tid);
+                      return table ? `Bàn ${table.tableNumber}` : tid;
+                    }).join(", ");
+                    
+                    return (
+                      <div key={idx} className="text-sm bg-white p-2 rounded border border-red-200">
+                        <div className="font-medium">Mã đơn: {String(order._id).slice(-8)}</div>
+                        <div className="text-gray-600">
+                          Khách: {order.userId?.name || 'Khách vãng lai'}
+                        </div>
+                        <div className="text-red-600 font-medium">
+                          Bàn trùng: {commonTableNumbers || 'N/A'}
+                        </div>
+                        {order.preparationStartTime && order.reservedEndTime ? (
+                          <div className="text-gray-600">
+                            Thời gian: {new Date(order.preparationStartTime).toLocaleString('vi-VN')} - {new Date(order.reservedEndTime).toLocaleString('vi-VN')}
+                          </div>
+                        ) : order.scheduledTime ? (
+                          <div className="text-gray-600">
+                            Thời gian đặt: {new Date(order.scheduledTime).toLocaleString('vi-VN')}
+                          </div>
+                        ) : null}
+                      </div>
+                    );
+                  })}
+                </div>
+                <div className="flex gap-2">
+                  <Button
+                    variant="outline"
+                    onClick={() => {
+                      setUpdateOverlapWarning(null);
+                    }}
+                    className="flex-1"
+                  >
+                    Quay lại để sửa
+                  </Button>
+                  <Button
+                    onClick={() => {
+                      // Gọi update với forceUpdate = true
+                      handleUpdatePreOrder(true);
+                    }}
+                    className="flex-1 bg-yellow-600 text-white hover:bg-yellow-700"
+                  >
+                    Vẫn tiếp tục
+                  </Button>
+                </div>
+              </div>
+            )}
+            
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">
-                Thời gian đến ăn
+                Thời gian đến ăn *
               </label>
-              <Input
-                type="datetime-local"
-                value={updateForm.scheduledTime}
-                onChange={(e) => setUpdateForm({ ...updateForm, scheduledTime: e.target.value })}
-                className="w-full"
+              <DatePicker
+                selected={updateForm.scheduledTime ? new Date(updateForm.scheduledTime) : null}
+                onChange={(date) => {
+                  if (date) {
+                    // Format to datetime-local format (YYYY-MM-DDTHH:mm)
+                    const year = date.getFullYear();
+                    const month = String(date.getMonth() + 1).padStart(2, "0");
+                    const day = String(date.getDate()).padStart(2, "0");
+                    const hours = String(date.getHours()).padStart(2, "0");
+                    const minutes = String(date.getMinutes()).padStart(2, "0");
+                    const formatted = `${year}-${month}-${day}T${hours}:${minutes}`;
+                    setUpdateForm({ ...updateForm, scheduledTime: formatted });
+                    setUpdateOverlapWarning(null); // Clear cảnh báo khi thay đổi
+                  } else {
+                    setUpdateForm({ ...updateForm, scheduledTime: "" });
+                    setUpdateOverlapWarning(null);
+                  }
+                }}
+                showTimeSelect
+                timeFormat="HH:mm"
+                timeIntervals={15}
+                dateFormat="dd/MM/yyyy HH:mm"
+                className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm"
+                placeholderText="Chọn ngày và giờ"
+                required
               />
+              <p className="text-xs text-gray-500 mt-1">
+                Thời gian khách hàng muốn đến ăn (định dạng 24 giờ)
+              </p>
             </div>
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">
@@ -1826,48 +2491,14 @@ export function PreOrderTable() {
               onClick={() => {
                 setUpdateModalOpen(false);
                 setSelectedOrderForAction(null);
-                setUpdateForm({ tableId: "", scheduledTime: "", adminNotes: "" });
+                setUpdateForm({ tableIds: [], scheduledTime: "", adminNotes: "" });
+                setUpdateOverlapWarning(null);
               }}
             >
               Hủy
             </Button>
             <Button
-              onClick={async () => {
-                try {
-                  setActionLoading(true);
-                  await adminApi.updatePreOrder(
-                    selectedOrderForAction._id,
-                    updateForm.tableId || null,
-                    updateForm.scheduledTime || undefined,
-                    updateForm.adminNotes
-                  );
-                  toast.success("Đã cập nhật đơn đặt trước thành công");
-                  setUpdateModalOpen(false);
-                  setSelectedOrderForAction(null);
-                  setUpdateForm({ tableId: "", scheduledTime: "", adminNotes: "" });
-                  
-                  // Refresh list (silently, không hiển thị toast nếu lỗi)
-                  try {
-                    const response = await adminApi.getPreOrders({
-                      waiterResponseStatus,
-                      fromDate,
-                      toDate,
-                      minAmount,
-                      maxAmount,
-                      sortBy,
-                      sortOrder
-                    });
-                    setPreorders(Array.isArray(response?.data) ? response.data : []);
-                  } catch (refreshErr) {
-                    console.error("Lỗi khi refresh danh sách sau khi cập nhật đơn:", refreshErr);
-                  }
-                } catch (err) {
-                  console.error("Lỗi khi cập nhật đơn:", err);
-                  toast.error(err.response?.data?.message || "Lỗi khi cập nhật đơn");
-                } finally {
-                  setActionLoading(false);
-                }
-              }}
+              onClick={() => handleUpdatePreOrder(updateOverlapWarning?.showConfirm || false)}
               disabled={actionLoading}
               className="bg-purple-600 text-white hover:bg-purple-700"
             >
@@ -1876,6 +2507,7 @@ export function PreOrderTable() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+      </Card>
     </div>
   );
 }

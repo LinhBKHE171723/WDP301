@@ -71,7 +71,8 @@ exports.getPendingOrders = async (req, res) => {
       status: "pending",
       "waiterResponse.status": "pending"
     })
-      .populate('tableId', 'tableNumber')
+      .populate('tableId', 'tableNumber') // Backward compatibility
+      .populate('tableIds', 'tableNumber') // Nhiều bàn
       .populate({
         path: 'orderItems',
         populate: {
@@ -109,7 +110,7 @@ exports.getPendingOrders = async (req, res) => {
 exports.respondToOrder = async (req, res) => {
   try {
     const { orderId } = req.params;
-    const { approved, reason, selectedTable } = req.body;
+    const { approved, reason, selectedTable, selectedTables } = req.body; // Hỗ trợ cả selectedTable (backward) và selectedTables (mới)
     const waiterId = req.user.id; // lấy từ middleware auth
 
     // Validate input
@@ -123,9 +124,30 @@ exports.respondToOrder = async (req, res) => {
     const order = await Order.findById(orderId);
     if (!order) return res.status(404).json({ success: false, message: "Không tìm thấy đơn hàng" });
 
+    // Xử lý selectedTables: ưu tiên selectedTables[], fallback về selectedTable (backward compatibility)
+    console.log(`🔍 Debug: selectedTables =`, selectedTables, `(type: ${typeof selectedTables}, isArray: ${Array.isArray(selectedTables)})`);
+    console.log(`🔍 Debug: selectedTable =`, selectedTable);
+    
+    let finalTableIds = [];
+    if (selectedTables && Array.isArray(selectedTables) && selectedTables.length > 0) {
+      finalTableIds = selectedTables;
+      console.log(`✅ Sử dụng selectedTables: ${finalTableIds.length} bàn`);
+    } else if (selectedTable) {
+      finalTableIds = [selectedTable]; // Convert single table thành array
+      console.log(`✅ Sử dụng selectedTable (single): ${finalTableIds.length} bàn`);
+    } else if (order.tableIds && order.tableIds.length > 0) {
+      finalTableIds = order.tableIds.map(id => id.toString()); // Sử dụng bàn hiện có
+      console.log(`✅ Sử dụng order.tableIds hiện có: ${finalTableIds.length} bàn`);
+    } else if (order.tableId) {
+      finalTableIds = [order.tableId.toString()]; // Fallback về tableId cũ
+      console.log(`✅ Sử dụng order.tableId (fallback): ${finalTableIds.length} bàn`);
+    }
+    
+    console.log(`🔍 Debug: finalTableIds =`, finalTableIds);
+
     // Validate table selection for approval
-    if (approved && !selectedTable && !order.tableId) {
-      return res.status(400).json({ success: false, message: "Cần chọn bàn khi xác nhận" });
+    if (approved && finalTableIds.length === 0) {
+      return res.status(400).json({ success: false, message: "Cần chọn ít nhất 1 bàn khi xác nhận" });
     }
 
     if (order.waiterResponse.status !== 'pending') {
@@ -134,64 +156,48 @@ exports.respondToOrder = async (req, res) => {
 
     // nếu waiter xác nhận
     if (approved) {
-      let table;
-      let finalTableId;
-
-      // 🎯 Ưu tiên bàn mà waiter chọn (nếu có)
-      if (selectedTable) {
-        table = await Table.findById(selectedTable);
-        if (!table) {
-          return res.status(404).json({
-            success: false,
-            message: "Bàn không tồn tại"
-          });
-        }
-
-        // ✅ Cho phép nhiều order trên cùng một bàn
-        // Chỉ kiểm tra nếu bàn không tồn tại, không kiểm tra status occupied
-        finalTableId = selectedTable;
-        console.log(`✅ Waiter chọn bàn: ${table.tableNumber}`);
-
-      } else if (order.tableId) {
-        // 🔄 Fallback: Sử dụng bàn auto-assigned
-        table = await Table.findById(order.tableId);
-        if (!table) {
-          return res.status(404).json({
-            success: false,
-            message: "Bàn auto-assigned không tồn tại"
-          });
-        }
-
-        finalTableId = order.tableId;
-        console.log(`✅ Sử dụng bàn auto-assigned: ${table.tableNumber}`);
-
-      } else {
-        // ❌ Không có bàn nào được chọn
-        return res.status(400).json({
+      // Validate tất cả các bàn tồn tại
+      const tables = await Table.find({ _id: { $in: finalTableIds } });
+      if (tables.length !== finalTableIds.length) {
+        return res.status(404).json({
           success: false,
-          message: "Cần chọn bàn khi xác nhận đơn hàng"
+          message: "Một hoặc nhiều bàn không tồn tại"
         });
       }
 
-      // 🔄 Cập nhật tableId cho order (nếu khác với bàn hiện tại)
-      let oldTableId = null;
-      if (order.tableId?.toString() !== finalTableId.toString()) {
-        oldTableId = order.tableId;
-        order.tableId = new mongoose.Types.ObjectId(finalTableId);
-        console.log(`🔄 Order ${order._id} được cập nhật tableId: ${order.tableId}`);
+      // Lưu oldTableIds để cleanup sau
+      const oldTableIds = order.tableIds && order.tableIds.length > 0 
+        ? order.tableIds.map(id => id.toString())
+        : (order.tableId ? [order.tableId.toString()] : []);
 
-        // 🧹 Xử lý bàn cũ (nếu có)
-        if (oldTableId) {
-          const oldTable = await Table.findById(oldTableId);
-          if (oldTable && oldTable.orderNow) {
-            oldTable.orderNow = oldTable.orderNow.filter(oid => oid.toString() !== order._id.toString());
-            if (oldTable.orderNow.length === 0) {
-              oldTable.status = "available";
-            }
-            await oldTable.save();
-            console.log(`🧹 Đã xóa order khỏi bàn cũ: ${oldTable.tableNumber}`);
+      // Cập nhật tableIds cho order
+      order.tableIds = finalTableIds.map(id => new mongoose.Types.ObjectId(id));
+      // tableId sẽ được tự động sync = tableIds[0] bởi middleware
+      
+      console.log(`✅ Waiter chọn ${finalTableIds.length} bàn: ${tables.map(t => t.tableNumber).join(', ')}`);
+
+      // 🧹 Xử lý bàn cũ: xóa order khỏi các bàn không còn được sử dụng
+      const tablesToRemove = oldTableIds.filter(oldId => !finalTableIds.includes(oldId));
+      for (const oldTableId of tablesToRemove) {
+        const oldTable = await Table.findById(oldTableId);
+        if (oldTable && oldTable.orderNow) {
+          oldTable.orderNow = oldTable.orderNow.filter(oid => oid.toString() !== order._id.toString());
+          if (oldTable.orderNow.length === 0) {
+            oldTable.status = "available";
           }
+          await oldTable.save();
+          console.log(`🧹 Đã xóa order khỏi bàn cũ: ${oldTable.tableNumber}`);
         }
+      }
+
+      // ✅ Thêm order vào các bàn mới
+      for (const table of tables) {
+        table.status = 'occupied';
+        if (!table.orderNow.some(oid => oid.toString() === order._id.toString())) {
+          table.orderNow.push(order._id);
+        }
+        await table.save();
+        console.log(`✅ Đã thêm order vào bàn: ${table.tableNumber}`);
       }
 
       // Tìm người phục vụ (để validate)
@@ -207,13 +213,6 @@ exports.respondToOrder = async (req, res) => {
       order.waiterResponse.status = 'approved';
       order.waiterResponse.reason = null;
       order.waiterResponse.respondedAt = new Date();
-
-      // Table chuyển sang occupied và thêm order vào mảng
-      table.status = 'occupied';
-      if (!table.orderNow.includes(order._id)) {
-        table.orderNow.push(order._id);
-      }
-      await table.save();
     } else {
       // ❌ Từ chối
       order.waiterResponse.status = 'rejected';
@@ -233,7 +232,7 @@ exports.respondToOrder = async (req, res) => {
 
     await order.save();
 
-    console.log(`💾 Order ${order._id} đã được save với tableId: ${order.tableId}`);
+    console.log(`💾 Order ${order._id} đã được save với tableIds: ${order.tableIds?.map(id => id.toString()).join(', ') || 'none'}`);
 
     // Populate để trả về cho UI bên phía khách hàng
     const populatedOrder = await Order.findById(order._id)
@@ -255,7 +254,8 @@ exports.respondToOrder = async (req, res) => {
           }
         ]
       })
-      .populate("tableId", "tableNumber status")
+      .populate("tableId", "tableNumber status") // Backward compatibility
+      .populate("tableIds", "tableNumber status") // Nhiều bàn
       .populate("paymentId")
       .populate("userId", "name email phone");
 

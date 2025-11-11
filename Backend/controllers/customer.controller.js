@@ -391,7 +391,8 @@ exports.createOrder = async (req, res) => {
     // Populate để trả về thông tin đầy đủ
     const populatedOrder = await Order.findById(order._id)
       .populate("orderItems")
-      .populate("tableId")
+      .populate("tableId") // Backward compatibility
+      .populate("tableIds") // Nhiều bàn
       .populate("paymentId");
 
     // 🍪 Lưu orderId vào cookie
@@ -561,8 +562,8 @@ exports.createPreOrder = async (req, res) => {
       }
     }
 
-    // Tạo OrderItems từ cart data
-    const { createdOrderItems, totalAmount } = await createOrderItemsFromCart(orderItems);
+    // Tạo OrderItems từ cart data (skipDeductIngredients = true vì chưa approve, sẽ trừ khi admin approve)
+    const { createdOrderItems, totalAmount } = await createOrderItemsFromCart(orderItems, true);
 
     // Tạo Payment
     const payment = new Payment({

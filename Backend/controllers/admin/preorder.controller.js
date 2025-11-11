@@ -59,21 +59,26 @@ exports.getPreOrders = async (req, res) => {
     // Build query filter
     const filter = {};
     
-    // Nếu filter "Đơn đặt trước hôm nay" (approved + scheduledTime) → bao gồm cả đơn đã chuyển status
-    // Ngược lại → chỉ lấy đơn có status = "preorder"
-    if (waiterResponseStatus === "approved" && filterBy === "scheduledTime") {
-      // Đơn đã approved, scheduledTime hôm nay → có thể đã chuyển sang confirmed/preparing/served
-      // Với đơn đã chuyển status, vẫn có waiterResponse.status = "approved" từ khi approve
-      filter.status = { $in: ["preorder", "confirmed", "preparing", "served"] };
-      filter["waiterResponse.status"] = "approved";
-    } else {
-      // Đơn đang chờ (pending) hoặc các filter khác → chỉ lấy status = "preorder"
-      filter.status = "preorder";
-      // Filter theo waiterResponseStatus
-      if (waiterResponseStatus) {
+    // Preorder được nhận diện bởi scheduledTime (không phụ thuộc status)
+    // Vì sau khi approve, status chuyển thành "confirmed" nhưng vẫn là preorder
+    // Nên luôn filter theo scheduledTime tồn tại
+    filter.scheduledTime = { $exists: true, $ne: null };
+    
+    // Filter theo waiterResponseStatus
+    if (waiterResponseStatus) {
+      if (waiterResponseStatus === "approved") {
+        // Đơn đã approved → có thể đã chuyển sang confirmed/preparing/served
+        // Với đơn đã chuyển status, vẫn có waiterResponse.status = "approved" từ khi approve
+        filter["waiterResponse.status"] = "approved";
+        // Không filter status vì có thể là preorder, confirmed, preparing, hoặc served
+      } else {
+        // Đơn pending hoặc rejected → chỉ lấy status = "preorder"
+        filter.status = "preorder";
         filter["waiterResponse.status"] = waiterResponseStatus;
       }
     }
+    // Không filter waiterResponseStatus → lấy tất cả preorders
+    // Chỉ cần có scheduledTime là đủ để xác định là preorder
 
     // Filter theo khoảng thời gian
     // Nếu filterBy=scheduledTime → filter theo scheduledTime (ngày khách đến)
@@ -94,39 +99,56 @@ exports.getPreOrders = async (req, res) => {
     }
 
     // Filter theo khoảng giá trị
-    if (minAmount !== undefined || maxAmount !== undefined) {
-      filter.totalAmount = {};
-      if (minAmount !== undefined) {
-        filter.totalAmount.$gte = parseFloat(minAmount);
-      }
-      if (maxAmount !== undefined) {
-        filter.totalAmount.$lte = parseFloat(maxAmount);
-      }
+    if (minAmount !== undefined && minAmount !== null && minAmount !== "") {
+      if (!filter.totalAmount) filter.totalAmount = {};
+      filter.totalAmount.$gte = parseFloat(minAmount);
+    }
+    if (maxAmount !== undefined && maxAmount !== null && maxAmount !== "") {
+      if (!filter.totalAmount) filter.totalAmount = {};
+      filter.totalAmount.$lte = parseFloat(maxAmount);
     }
 
     // Filter theo role để tránh trùng lặp
     // Admin chỉ thấy đơn lớn, Cashier chỉ thấy đơn nhỏ
     const { role } = req.user;
-    const threshold = await getLargeOrderThreshold();
+    let threshold;
+    try {
+      threshold = await getLargeOrderThreshold();
+    } catch (thresholdError) {
+      console.error("❌ Error getting threshold:", thresholdError);
+      threshold = 2000000; // Default threshold
+    }
+    
+    console.log(`👤 User role: ${role}, Threshold: ${threshold}`);
     
     if (role === "admin") {
       // Admin chỉ thấy đơn lớn (> threshold)
-      if (filter.totalAmount) {
+      if (filter.totalAmount && Object.keys(filter.totalAmount).length > 0) {
         // Nếu đã có filter, merge logic
         const existingGte = filter.totalAmount.$gte;
+        const existingLte = filter.totalAmount.$lte;
+        
+        // Xóa các filter cũ
+        delete filter.totalAmount.$gte;
+        delete filter.totalAmount.$lte;
+        delete filter.totalAmount.$gt;
+        
         // Đảm bảo đơn lớn hơn threshold
         filter.totalAmount.$gt = threshold;
+        
         // Nếu có minAmount từ query và lớn hơn threshold, giữ giá trị đó
-        if (existingGte !== undefined && existingGte > threshold) {
+        if (existingGte !== undefined && !isNaN(existingGte) && existingGte > threshold) {
           filter.totalAmount.$gte = existingGte;
         }
-        // Xóa $lte nếu có vì admin chỉ xem đơn lớn
-        if (filter.totalAmount.$lte !== undefined) {
-          delete filter.totalAmount.$lte;
+        
+        // Nếu có maxAmount từ query, chỉ giữ nếu lớn hơn threshold
+        if (existingLte !== undefined && !isNaN(existingLte) && existingLte > threshold) {
+          filter.totalAmount.$lte = existingLte;
         }
       } else {
         filter.totalAmount = { $gt: threshold };
       }
+      console.log(`🔍 Admin filter - totalAmount > ${threshold}`, JSON.stringify(filter.totalAmount));
     } else if (role === "cashier") {
       // Cashier chỉ thấy đơn nhỏ (<= threshold)
       if (filter.totalAmount) {
@@ -149,6 +171,7 @@ exports.getPreOrders = async (req, res) => {
       } else {
         filter.totalAmount = { $lte: threshold };
       }
+      console.log(`🔍 Cashier filter - totalAmount <= ${threshold}`);
     }
 
     // Build sort options
@@ -175,11 +198,27 @@ exports.getPreOrders = async (req, res) => {
       console.log("🔍 PreOrder filter (raw):", filter);
     }
     
+    // Debug: Kiểm tra có bao nhiêu đơn có scheduledTime (không filter)
+    const allPreOrdersCount = await Order.countDocuments({ scheduledTime: { $exists: true, $ne: null } });
+    console.log(`📊 Total preorders (with scheduledTime): ${allPreOrdersCount}`);
+    
+    // Debug: Kiểm tra có bao nhiêu đơn match filter (trước khi populate)
+    const countBeforePopulate = await Order.countDocuments(filter);
+    console.log(`📊 Orders matching filter (before populate): ${countBeforePopulate}`);
+    
     const orders = await Order.find(filter)
       .populate({
         path: "userId",
         select: "name email phone",
       })
+      .populate({
+        path: "tableId",
+        select: "tableNumber",
+      }) // Backward compatibility
+      .populate({
+        path: "tableIds",
+        select: "tableNumber",
+      }) // Nhiều bàn
       .populate({
         path: "orderItems",
         select: "itemName itemType quantity price itemId",
@@ -233,6 +272,27 @@ exports.getPreOrders = async (req, res) => {
 
     return success(res, orders);
   } catch (err) {
+    console.error("❌ Error in getPreOrders:", err);
+    console.error("❌ Error stack:", err.stack);
+    return error(res, err.message || "Lỗi khi lấy danh sách đơn đặt trước");
+  }
+};
+
+// Lấy thông tin nguyên liệu cần thiết cho pre-order
+exports.getPreOrderIngredients = async (req, res) => {
+  try {
+    const { orderId } = req.params;
+
+    if (!orderId) {
+      return error(res, "orderId là bắt buộc", 400);
+    }
+
+    const { calculatePreOrderIngredients } = require("../../utils/preorderHelpers");
+    const result = await calculatePreOrderIngredients(orderId);
+
+    return success(res, result, "Lấy thông tin nguyên liệu thành công");
+  } catch (err) {
+    console.error("Error in getPreOrderIngredients:", err);
     return error(res, err.message);
   }
 };
@@ -327,11 +387,23 @@ exports.getCustomerInfo = async (req, res) => {
 exports.approvePreOrder = async (req, res) => {
   try {
     const { orderId } = req.params;
-    const { tableId, adminNotes } = req.body;
+    const { tableId, tableIds, adminNotes, preparationStartTime, reservedEndTime, forceApprove } = req.body; // Hỗ trợ cả tableId (backward) và tableIds (mới)
+    
+    // Validate thời gian
+    if (preparationStartTime && reservedEndTime) {
+      const prepStart = new Date(preparationStartTime);
+      const reservedEnd = new Date(reservedEndTime);
+      if (isNaN(prepStart.getTime()) || isNaN(reservedEnd.getTime())) {
+        return error(res, "Thời gian không hợp lệ", 400);
+      }
+      if (reservedEnd <= prepStart) {
+        return error(res, "Thời gian kết thúc phải sau thời gian bắt đầu chuẩn bị", 400);
+      }
+    }
     const adminId = req.user.id; // Lấy từ middleware auth
 
-    // Tìm order
-    const order = await Order.findById(orderId);
+    // Tìm order (dùng let để có thể reload sau khi splitLargeOrderItems)
+    let order = await Order.findById(orderId);
     if (!order) {
       return error(res, "Không tìm thấy đơn hàng", 404);
     }
@@ -346,54 +418,254 @@ exports.approvePreOrder = async (req, res) => {
       return error(res, "Đơn hàng đã được phản hồi trước đó", 400);
     }
 
+    // Xử lý tableIds: ưu tiên tableIds[], fallback về tableId (backward compatibility)
+    console.log(`🔍 Debug approvePreOrder: orderId=${orderId}, tableIds=`, tableIds, `(type: ${typeof tableIds}, isArray: ${Array.isArray(tableIds)}), tableId=`, tableId);
+    
+    let finalTableIds = [];
+    if (tableIds) {
+      // Xử lý cả trường hợp tableIds là string (comma-separated) hoặc array
+      if (typeof tableIds === 'string') {
+        // Nếu là string, split bằng dấu phẩy
+        finalTableIds = tableIds.split(',').map(id => id.trim()).filter(id => id.length > 0);
+        console.log(`🔍 Debug: tableIds is string, split by comma =`, finalTableIds);
+      } else if (Array.isArray(tableIds) && tableIds.length > 0) {
+        // Filter out null, undefined, empty string, và convert tất cả thành string
+        finalTableIds = tableIds
+          .filter(id => id != null && id !== "" && id !== undefined)
+          .map(id => {
+            // Nếu là ObjectId, convert thành string; nếu đã là string, giữ nguyên
+            if (id && typeof id === 'object' && id.toString) {
+              return id.toString();
+            }
+            return String(id).trim();
+          })
+          .filter(id => id.length > 0);
+        console.log(`🔍 Debug: tableIds from request (array) =`, tableIds, `→ filtered =`, finalTableIds);
+      }
+    }
+    
+    // Fallback về tableId nếu finalTableIds vẫn rỗng
+    if (finalTableIds.length === 0 && tableId) {
+      // Xử lý cả trường hợp tableId là array hoặc string
+      if (Array.isArray(tableId)) {
+        // Nếu là array, xử lý tương tự như tableIds
+        finalTableIds = tableId
+          .filter(id => id != null && id !== "" && id !== undefined)
+          .map(id => {
+            if (id && typeof id === 'object' && id.toString) {
+              return id.toString();
+            }
+            return String(id).trim();
+          })
+          .filter(id => id.length > 0);
+        console.log(`🔍 Debug: using tableId (array) =`, finalTableIds);
+      } else if (typeof tableId === 'string') {
+        // Nếu là string, có thể là comma-separated hoặc single ID
+        const splitIds = tableId.split(',').map(id => id.trim()).filter(id => id.length > 0);
+        finalTableIds = splitIds;
+        console.log(`🔍 Debug: using tableId (string, split by comma) =`, finalTableIds);
+      } else {
+        // Single value (ObjectId hoặc string)
+        finalTableIds = [String(tableId).trim()];
+        console.log(`🔍 Debug: using tableId (single) =`, finalTableIds);
+      }
+    } else if (finalTableIds.length === 0 && order.tableIds && order.tableIds.length > 0) {
+      finalTableIds = order.tableIds.map(id => id.toString()).filter(id => id != null && id !== ""); // Sử dụng bàn hiện có
+      console.log(`🔍 Debug: using order.tableIds =`, finalTableIds);
+    } else if (finalTableIds.length === 0 && order.tableId) {
+      finalTableIds = [order.tableId.toString()]; // Fallback về tableId cũ
+      console.log(`🔍 Debug: using order.tableId (fallback) =`, finalTableIds);
+    }
+
     // Validate table selection
-    if (!tableId && !order.tableId) {
-      return error(res, "Cần chọn bàn khi xác nhận", 400);
+    if (finalTableIds.length === 0) {
+      return error(res, "Cần chọn ít nhất 1 bàn khi xác nhận", 400);
     }
 
-    let table;
-    let finalTableId;
+    console.log(`🔍 Debug: finalTableIds (before conversion) =`, finalTableIds, `(types:`, finalTableIds.map(id => typeof id).join(", "), `)`);
 
-    // Ưu tiên bàn mà admin chọn
-    if (tableId) {
-      table = await Table.findById(tableId);
-      if (!table) {
-        return error(res, "Bàn không tồn tại", 404);
+    // Convert finalTableIds thành ObjectId để query MongoDB
+    const finalTableIdsObjectIds = [];
+    const invalidIds = [];
+    for (const id of finalTableIds) {
+      if (!id || id === "" || id === null || id === undefined) {
+        invalidIds.push(`"${id}" (empty/null)`);
+        continue;
       }
-      finalTableId = tableId;
-    } else if (order.tableId) {
-      table = await Table.findById(order.tableId);
-      if (!table) {
-        return error(res, "Bàn auto-assigned không tồn tại", 404);
+      try {
+        // Ensure it's a string before converting
+        const idString = String(id).trim();
+        if (idString.length === 0) {
+          invalidIds.push(`"${id}" (empty after trim)`);
+          continue;
+        }
+        // Check if it's a valid ObjectId format
+        if (!mongoose.Types.ObjectId.isValid(idString)) {
+          invalidIds.push(`"${idString}" (invalid ObjectId format)`);
+          continue;
+        }
+        const objectId = new mongoose.Types.ObjectId(idString);
+        finalTableIdsObjectIds.push(objectId);
+      } catch (err) {
+        console.error(`❌ Invalid tableId format: ${id} (type: ${typeof id})`, err);
+        invalidIds.push(`"${id}" (${err.message})`);
       }
-      finalTableId = order.tableId;
     }
 
-    // Cập nhật tableId cho order (nếu khác với bàn hiện tại)
-    let oldTableId = null;
-    if (order.tableId?.toString() !== finalTableId.toString()) {
-      oldTableId = order.tableId;
-      order.tableId = new mongoose.Types.ObjectId(finalTableId);
+    if (invalidIds.length > 0) {
+      console.error(`❌ Invalid table IDs:`, invalidIds);
+      return error(res, `Một hoặc nhiều bàn có ID không hợp lệ: ${invalidIds.join(", ")}`, 400);
+    }
 
-      // Xử lý bàn cũ (nếu có)
-      if (oldTableId) {
-        const oldTable = await Table.findById(oldTableId);
-        if (oldTable && oldTable.orderNow) {
-          oldTable.orderNow = oldTable.orderNow.filter(oid => oid.toString() !== orderId);
-          if (oldTable.orderNow.length === 0) {
-            oldTable.status = "available";
+    if (finalTableIdsObjectIds.length === 0) {
+      return error(res, "Không có bàn hợp lệ nào được chọn", 400);
+    }
+
+    console.log(`✅ Debug: finalTableIdsObjectIds (after conversion) =`, finalTableIdsObjectIds.map(id => id.toString()));
+
+    // Validate tất cả các bàn tồn tại
+    const tables = await Table.find({ _id: { $in: finalTableIdsObjectIds } });
+    if (tables.length !== finalTableIdsObjectIds.length) {
+      return error(res, "Một hoặc nhiều bàn không tồn tại", 404);
+    }
+
+    // Lưu oldTableIds để cleanup sau
+    const oldTableIds = order.tableIds && order.tableIds.length > 0 
+      ? order.tableIds.map(id => id.toString())
+      : (order.tableId ? [order.tableId.toString()] : []);
+
+    // Kiểm tra trùng bàn trước khi approve (chỉ khi có thời gian chuẩn bị và kết thúc)
+    if (preparationStartTime && reservedEndTime) {
+      const prepStart = new Date(preparationStartTime);
+      const reservedEnd = new Date(reservedEndTime);
+      
+      // Tìm các preorder khác đã được gán cùng bàn (trong tableIds) và có thời gian trùng lấn
+      // Check cả tableId và tableIds
+      const overlappingOrders = await Order.find({
+        _id: { $ne: orderId }, // Bỏ qua đơn hiện tại
+        scheduledTime: { $exists: true, $ne: null }, // Chỉ kiểm tra preorders
+        $and: [
+          {
+            $or: [
+              { status: "preorder" },
+              { "waiterResponse.status": "approved" } // Bao gồm cả đơn đã approve
+            ]
+          },
+          {
+            $or: [
+              { tableId: { $in: finalTableIdsObjectIds } }, // Check tableId
+              { tableIds: { $in: finalTableIdsObjectIds } } // Check tableIds
+            ]
           }
-          await oldTable.save();
+        ]
+      }).populate("tableId", "tableNumber").populate("tableIds", "tableNumber").populate("userId", "name email phone");
+      
+      // Kiểm tra overlap với từng đơn và từng bàn
+      const conflicts = [];
+      for (const otherOrder of overlappingOrders) {
+        // Lấy danh sách bàn của đơn khác
+        const otherTableIds = [];
+        if (otherOrder.tableIds && otherOrder.tableIds.length > 0) {
+          otherTableIds.push(...otherOrder.tableIds.map(t => t._id?.toString() || t.toString()));
+        } else if (otherOrder.tableId) {
+          otherTableIds.push(otherOrder.tableId._id?.toString() || otherOrder.tableId.toString());
+        }
+        
+        // Kiểm tra xem có bàn nào trùng không
+        const commonTables = finalTableIds.filter(tid => otherTableIds.includes(tid));
+        if (commonTables.length === 0) continue; // Không có bàn trùng, bỏ qua
+        
+        let hasConflict = false;
+        
+        if (otherOrder.reservedEndTime) {
+          // Đơn đã có reservedEndTime → kiểm tra overlap chính xác
+          const otherStart = otherOrder.preparationStartTime 
+            ? new Date(otherOrder.preparationStartTime) 
+            : new Date(otherOrder.scheduledTime);
+          const otherEnd = new Date(otherOrder.reservedEndTime);
+          
+          // Overlap: prepStart < otherEnd && otherStart < reservedEnd
+          if (prepStart < otherEnd && otherStart < reservedEnd) {
+            hasConflict = true;
+          }
+        } else if (otherOrder.scheduledTime) {
+          // Đơn chưa có reservedEndTime → kiểm tra scheduledTime trong vòng 2 giờ
+          const otherTime = new Date(otherOrder.scheduledTime);
+          const timeDiff = Math.abs(prepStart.getTime() - otherTime.getTime());
+          const twoHours = 2 * 60 * 60 * 1000;
+          if (timeDiff < twoHours) {
+            hasConflict = true;
+          }
+        }
+        
+        if (hasConflict) {
+          // Lấy tên các bàn trùng
+          const commonTableNumbers = commonTables.map(tid => {
+            const table = tables.find(t => t._id.toString() === tid);
+            return table ? `Bàn ${table.tableNumber}` : tid;
+          }).join(", ");
+          
+          conflicts.push({
+            orderId: otherOrder._id,
+            customerName: otherOrder.userId?.name || "Khách vãng lai",
+            tableNumbers: commonTableNumbers,
+            scheduledTime: otherOrder.scheduledTime,
+            preparationStartTime: otherOrder.preparationStartTime,
+            reservedEndTime: otherOrder.reservedEndTime
+          });
         }
       }
+      
+      // Nếu có conflict và admin chưa force approve, trả về cảnh báo
+      if (conflicts.length > 0 && !forceApprove) {
+        const conflictDetails = conflicts.map(c => 
+          `Mã đơn: ${String(c.orderId).slice(-8)}, Khách: ${c.customerName}, Bàn trùng: ${c.tableNumbers}`
+        ).join("; ");
+        return error(res, `Các bàn đã được đặt trước trong khoảng thời gian này. Các đơn trùng: ${conflictDetails}`, 400);
+      }
+      
+      // Nếu có conflict nhưng admin force approve, log cảnh báo nhưng vẫn tiếp tục
+      if (conflicts.length > 0 && forceApprove) {
+        console.warn(`⚠️ Admin force approve preorder ${orderId} despite conflicts:`, conflicts);
+      }
     }
 
-    // Admin approve → tự động confirm luôn (không cần chờ customer)
-    order.waiterResponse.status = "approved";
-    order.waiterResponse.reason = null;
-    order.waiterResponse.respondedAt = new Date();
-    order.status = "confirmed";
-    order.customerConfirmed = true;
+    // Cập nhật tableIds cho order (sử dụng finalTableIdsObjectIds đã convert)
+    order.tableIds = finalTableIdsObjectIds;
+    // tableId sẽ được tự động sync = tableIds[0] bởi middleware
+
+    // 🧹 Xử lý bàn cũ: xóa order khỏi các bàn không còn được sử dụng
+    const tablesToRemove = oldTableIds.filter(oldId => !finalTableIds.includes(oldId));
+    for (const oldTableId of tablesToRemove) {
+      const oldTable = await Table.findById(oldTableId);
+      if (oldTable && oldTable.orderNow) {
+        oldTable.orderNow = oldTable.orderNow.filter(oid => oid.toString() !== orderId);
+        if (oldTable.orderNow.length === 0) {
+          oldTable.status = "available";
+        }
+        await oldTable.save();
+        console.log(`🧹 Đã xóa order khỏi bàn cũ: ${oldTable.tableNumber}`);
+      }
+    }
+
+    // Lưu các thay đổi cần apply vào order (trước khi splitLargeOrderItems)
+    const orderUpdates = {
+      waiterResponse: {
+        status: "approved",
+        reason: null,
+        respondedAt: new Date()
+      },
+      status: "confirmed",
+      customerConfirmed: true
+    };
+    
+    // Lưu thời gian chuẩn bị và kết thúc dành bàn
+    if (preparationStartTime) {
+      orderUpdates.preparationStartTime = new Date(preparationStartTime);
+    }
+    if (reservedEndTime) {
+      orderUpdates.reservedEndTime = new Date(reservedEndTime);
+    }
 
     // Gọi splitLargeOrderItems để chia OrderItem lớn thành nhiều OrderItem nhỏ hơn
     const { splitLargeOrderItems } = require("../../utils/customerHelpers");
@@ -402,15 +674,91 @@ exports.approvePreOrder = async (req, res) => {
       console.log(`✅ Đã chia ${splitCount} OrderItem lớn thành nhiều OrderItem nhỏ hơn sau khi admin approve`);
     }
 
+    // ⚠️ QUAN TRỌNG: Reload order sau khi splitLargeOrderItems vì nó đã save order (tăng version)
+    // Nếu không reload, sẽ bị VersionError khi save lại
+    order = await Order.findById(orderId);
+    if (!order) {
+      return error(res, "Không tìm thấy đơn hàng sau khi chia OrderItem", 404);
+    }
+
+    // Apply lại các thay đổi đã lưu
+    order.tableIds = finalTableIdsObjectIds; // Cập nhật lại tableIds
+    order.waiterResponse.status = orderUpdates.waiterResponse.status;
+    order.waiterResponse.reason = orderUpdates.waiterResponse.reason;
+    order.waiterResponse.respondedAt = orderUpdates.waiterResponse.respondedAt;
+    order.status = orderUpdates.status;
+    order.customerConfirmed = orderUpdates.customerConfirmed;
+    if (orderUpdates.preparationStartTime) {
+      order.preparationStartTime = orderUpdates.preparationStartTime;
+    }
+    if (orderUpdates.reservedEndTime) {
+      order.reservedEndTime = orderUpdates.reservedEndTime;
+    }
+
     // Reload order sau khi chia để có OrderItem mới
     await order.populate("orderItems");
 
-    // Cập nhật table status
-    table.status = "occupied";
-    if (!table.orderNow.includes(order._id)) {
-      table.orderNow.push(order._id);
+    // Trừ nguyên liệu từ kho khi approve pre-order
+    const { deductIngredientsFromStock } = require("../../utils/customerHelpers");
+    const OrderItem = require("../../models/OrderItem");
+    const Item = require("../../models/Item");
+    const Menu = require("../../models/Menu");
+    
+    try {
+      // Populate orderItems với itemId để lấy thông tin món
+      const populatedOrderItems = await OrderItem.find({ _id: { $in: order.orderItems } })
+        .populate("itemId");
+      
+      for (const orderItem of populatedOrderItems) {
+        try {
+          let item;
+          
+          // Lấy item hoặc menu tùy theo itemType
+          if (orderItem.itemType === 'item') {
+            item = await Item.findById(orderItem.itemId).populate('ingredients.ingredient');
+          } else if (orderItem.itemType === 'menu') {
+            item = await Menu.findById(orderItem.itemId).populate('items');
+          }
+          
+          if (item) {
+            // Trừ nguyên liệu cho món đơn
+            if (orderItem.itemType === 'item') {
+              await deductIngredientsFromStock(item, orderItem.quantity);
+            } 
+            // Trừ nguyên liệu cho combo
+            else if (orderItem.itemType === 'menu' && item.type === 'combo' && item.items && item.items.length > 0) {
+              for (const comboItemId of item.items) {
+                const comboItem = await Item.findById(comboItemId).populate('ingredients.ingredient');
+                if (comboItem) {
+                  await deductIngredientsFromStock(comboItem, orderItem.quantity);
+                }
+              }
+            }
+          }
+        } catch (error) {
+          console.error(`❌ Lỗi khi trừ nguyên liệu cho OrderItem ${orderItem._id} khi approve pre-order:`, error);
+          // Không throw error để không làm gián đoạn quá trình approve
+        }
+      }
+      
+      console.log(`✅ Đã trừ nguyên liệu từ kho cho pre-order ${orderId} sau khi admin approve`);
+    } catch (error) {
+      console.error(`❌ Lỗi khi trừ nguyên liệu cho pre-order ${orderId}:`, error);
+      // Không throw error để không làm gián đoạn quá trình approve
+      // Admin có thể kiểm tra lại sau
     }
-    await table.save();
+
+    // ✅ Thêm order vào các bàn mới
+    const tableNumbers = [];
+    for (const table of tables) {
+      table.status = "occupied";
+      if (!table.orderNow.some(oid => oid.toString() === order._id.toString())) {
+        table.orderNow.push(order._id);
+      }
+      await table.save();
+      tableNumbers.push(table.tableNumber);
+      console.log(`✅ Đã thêm order vào bàn: ${table.tableNumber}`);
+    }
 
     // Lưu lịch sử
     if (!order.confirmationHistory) {
@@ -419,7 +767,7 @@ exports.approvePreOrder = async (req, res) => {
     order.confirmationHistory.push({
       action: "admin_approved",
       timestamp: new Date(),
-      details: `Admin ${adminId} approve và confirm đơn (bàn ${table.tableNumber})`
+      details: `Admin ${adminId} approve và confirm đơn (${tableNumbers.length} bàn: ${tableNumbers.join(", ")})`
     });
 
     if (adminNotes) {
@@ -438,7 +786,8 @@ exports.approvePreOrder = async (req, res) => {
         path: "orderItems",
         select: "itemName itemType quantity price itemId",
       })
-      .populate("tableId", "tableNumber status")
+      .populate("tableId", "tableNumber status") // Backward compatibility
+      .populate("tableIds", "tableNumber status") // Nhiều bàn
       .populate("userId", "name email phone");
 
     // Tự động fill itemName từ itemId nếu thiếu
@@ -468,18 +817,23 @@ exports.cancelPreOrder = async (req, res) => {
     const { adminNotes } = req.body;
     const adminId = req.user.id; // Lấy từ middleware auth
 
-    // Tìm order
-    const order = await Order.findById(orderId);
+    // Tìm order (dùng let để có thể reload sau khi splitLargeOrderItems)
+    let order = await Order.findById(orderId);
     if (!order) {
       return error(res, "Không tìm thấy đơn hàng", 404);
     }
 
-    // Kiểm tra order là preorder
-    if (order.status !== "preorder") {
-      return error(res, "Chỉ có thể hủy đơn đặt trước", 400);
+    // Cho phép hủy đơn đặt trước (preorder) hoặc đơn đã được approve (waiterResponse.status === "approved")
+    // Đơn đã approve có thể có status là "preorder", "confirmed", hoặc "preparing"
+    const isPreOrder = order.status === "preorder";
+    const isApprovedPreOrder = order.waiterResponse?.status === "approved" && 
+                               (order.status === "preorder" || order.status === "confirmed" || order.status === "preparing");
+    
+    if (!isPreOrder && !isApprovedPreOrder) {
+      return error(res, "Chỉ có thể hủy đơn đặt trước hoặc đơn đã được chấp nhận", 400);
     }
 
-    // Chuyển status từ "preorder" → "cancelled"
+    // Chuyển status → "cancelled"
     order.status = "cancelled";
 
     // KHÔNG động vào waiterResponse (vì đây là admin hủy, không liên quan đến waiter)
@@ -564,8 +918,8 @@ exports.recordDeposit = async (req, res) => {
       return error(res, "Số tiền cọc phải lớn hơn 0", 400);
     }
 
-    // Tìm order
-    const order = await Order.findById(orderId);
+    // Tìm order (dùng let để có thể reload sau khi splitLargeOrderItems)
+    let order = await Order.findById(orderId);
     if (!order) {
       return error(res, "Không tìm thấy đơn hàng", 404);
     }
@@ -740,15 +1094,19 @@ exports.modifyPreOrderItems = async (req, res) => {
     const { itemsToAdd = [], itemsToRemove = [], itemsToUpdate = [] } = req.body;
     const adminId = req.user.id;
 
-    // Tìm order
-    const order = await Order.findById(orderId);
+    // Tìm order (dùng let để có thể reload sau khi splitLargeOrderItems)
+    let order = await Order.findById(orderId);
     if (!order) {
       return error(res, "Không tìm thấy đơn hàng", 404);
     }
 
-    // Kiểm tra order là preorder
-    if (order.status !== "preorder") {
-      return error(res, "Chỉ có thể chỉnh sửa đơn đặt trước", 400);
+    // Cho phép sửa đơn đặt trước (preorder) hoặc đơn đã được approve (waiterResponse.status === "approved")
+    const isPreOrder = order.status === "preorder";
+    const isApprovedPreOrder = order.waiterResponse?.status === "approved" && 
+                               (order.status === "preorder" || order.status === "confirmed" || order.status === "preparing");
+    
+    if (!isPreOrder && !isApprovedPreOrder) {
+      return error(res, "Chỉ có thể chỉnh sửa đơn đặt trước hoặc đơn đã được chấp nhận", 400);
     }
 
     const OrderItem = require("../../models/OrderItem");
@@ -941,61 +1299,154 @@ exports.modifyPreOrderItems = async (req, res) => {
 exports.updatePreOrder = async (req, res) => {
   try {
     const { orderId } = req.params;
-    const { tableId, scheduledTime, adminNotes } = req.body;
+    const { tableId, tableIds, scheduledTime, adminNotes, forceUpdate } = req.body; // Hỗ trợ cả tableId (backward) và tableIds (mới), forceUpdate để bỏ qua conflict
     const adminId = req.user.id;
 
-    // Tìm order
-    const order = await Order.findById(orderId);
+    // Tìm order (dùng let để có thể reload sau khi splitLargeOrderItems)
+    let order = await Order.findById(orderId);
     if (!order) {
       return error(res, "Không tìm thấy đơn hàng", 404);
     }
 
-    // Kiểm tra order là preorder
-    if (order.status !== "preorder") {
-      return error(res, "Chỉ có thể cập nhật đơn đặt trước", 400);
+    // Cho phép cập nhật đơn đặt trước (preorder) hoặc đơn đã được approve (waiterResponse.status === "approved")
+    const isPreOrder = order.status === "preorder";
+    const isApprovedPreOrder = order.waiterResponse?.status === "approved" && 
+                               (order.status === "preorder" || order.status === "confirmed" || order.status === "preparing");
+    
+    if (!isPreOrder && !isApprovedPreOrder) {
+      return error(res, "Chỉ có thể cập nhật đơn đặt trước hoặc đơn đã được chấp nhận", 400);
     }
 
     const changes = [];
+    let finalTableIdsObjectIds = []; // Khai báo ở ngoài để dùng cho validation conflict
 
-    // Cập nhật tableId (nếu có)
-    if (tableId !== undefined) {
+    // Xử lý tableIds: ưu tiên tableIds[], fallback về tableId (backward compatibility)
+    let finalTableIds = [];
+    if (tableIds !== undefined) {
+      // Xử lý cả trường hợp tableIds là string (comma-separated) hoặc array
+      if (typeof tableIds === 'string') {
+        finalTableIds = tableIds.split(',').map(id => id.trim()).filter(id => id.length > 0);
+      } else if (Array.isArray(tableIds) && tableIds.length > 0) {
+        finalTableIds = tableIds
+          .filter(id => id != null && id !== "" && id !== undefined)
+          .map(id => {
+            if (id && typeof id === 'object' && id.toString) {
+              return id.toString();
+            }
+            return String(id).trim();
+          })
+          .filter(id => id.length > 0);
+      } else if (tableIds === null || tableIds === "") {
+        // Xóa tất cả bàn
+        finalTableIds = [];
+      }
+    } else if (tableId !== undefined) {
+      // Fallback về tableId nếu không có tableIds
       if (tableId === null || tableId === "") {
-        // Xóa bàn (set tableId = null)
-        if (order.tableId) {
-          const oldTable = await Table.findById(order.tableId);
-          if (oldTable && oldTable.orderNow) {
-            oldTable.orderNow = oldTable.orderNow.filter(oid => oid.toString() !== orderId);
-            if (oldTable.orderNow.length === 0) {
-              oldTable.status = "available";
-            }
-            await oldTable.save();
-          }
-          changes.push(`Xóa bàn ${oldTable?.tableNumber || ""}`);
-        }
-        order.tableId = null;
+        // Xóa tất cả bàn
+        finalTableIds = [];
+      } else if (Array.isArray(tableId)) {
+        finalTableIds = tableId
+          .filter(id => id != null && id !== "" && id !== undefined)
+          .map(id => String(id).trim())
+          .filter(id => id.length > 0);
+      } else if (typeof tableId === 'string') {
+        const splitIds = tableId.split(',').map(id => id.trim()).filter(id => id.length > 0);
+        finalTableIds = splitIds;
       } else {
-        // Gán bàn mới
-        const newTable = await Table.findById(tableId);
-        if (!newTable) {
-          return error(res, "Bàn không tồn tại", 404);
-        }
+        finalTableIds = [String(tableId).trim()];
+      }
+    }
 
-        // Xử lý bàn cũ (nếu có)
-        if (order.tableId && order.tableId.toString() !== tableId) {
-          const oldTable = await Table.findById(order.tableId);
-          if (oldTable && oldTable.orderNow) {
-            oldTable.orderNow = oldTable.orderNow.filter(oid => oid.toString() !== orderId);
-            if (oldTable.orderNow.length === 0) {
-              oldTable.status = "available";
-            }
-            await oldTable.save();
+    // Cập nhật tableIds (nếu có thay đổi)
+    if (tableIds !== undefined || tableId !== undefined) {
+      // Lấy danh sách bàn cũ để so sánh
+      const oldTableIds = (order.tableIds && order.tableIds.length > 0)
+        ? order.tableIds.map(id => id.toString())
+        : (order.tableId ? [order.tableId.toString()] : []);
+
+      // Xóa order khỏi các bàn cũ không còn được sử dụng
+      const tablesToRemove = oldTableIds.filter(oldId => !finalTableIds.includes(oldId));
+      for (const oldTableId of tablesToRemove) {
+        const oldTable = await Table.findById(oldTableId);
+        if (oldTable && oldTable.orderNow) {
+          oldTable.orderNow = oldTable.orderNow.filter(oid => oid.toString() !== orderId);
+          if (oldTable.orderNow.length === 0) {
+            oldTable.status = "available";
           }
-          changes.push(`Đổi bàn từ ${oldTable?.tableNumber || ""} sang ${newTable.tableNumber}`);
-        } else if (!order.tableId) {
-          changes.push(`Gán bàn ${newTable.tableNumber}`);
+          await oldTable.save();
+        }
+      }
+
+      // Validate và convert finalTableIds thành ObjectId
+      if (finalTableIds.length > 0) {
+        const invalidIds = [];
+        finalTableIdsObjectIds = []; // Reset array
+        for (const id of finalTableIds) {
+          if (!id || id === "" || id === null || id === undefined) {
+            invalidIds.push(`"${id}" (empty/null)`);
+            continue;
+          }
+          try {
+            const idString = String(id).trim();
+            if (idString.length === 0) {
+              invalidIds.push(`"${id}" (empty after trim)`);
+              continue;
+            }
+            if (!mongoose.Types.ObjectId.isValid(idString)) {
+              invalidIds.push(`"${idString}" (invalid ObjectId format)`);
+              continue;
+            }
+            const objectId = new mongoose.Types.ObjectId(idString);
+            finalTableIdsObjectIds.push(objectId);
+          } catch (err) {
+            console.error(`❌ Invalid tableId format: ${id}`, err);
+            invalidIds.push(`"${id}" (${err.message})`);
+          }
         }
 
-        order.tableId = new mongoose.Types.ObjectId(tableId);
+        if (invalidIds.length > 0) {
+          return error(res, `Một hoặc nhiều bàn có ID không hợp lệ: ${invalidIds.join(", ")}`, 400);
+        }
+
+        // Validate tất cả các bàn tồn tại
+        const tables = await Table.find({ _id: { $in: finalTableIdsObjectIds } });
+        if (tables.length !== finalTableIdsObjectIds.length) {
+          return error(res, "Một hoặc nhiều bàn không tồn tại", 404);
+        }
+
+        // Cập nhật tableIds
+        order.tableIds = finalTableIdsObjectIds;
+        // tableId sẽ được tự động sync = tableIds[0] bởi middleware
+
+        // Thêm order vào các bàn mới
+        const tableNumbers = [];
+        for (const table of tables) {
+          table.status = "occupied";
+          if (!table.orderNow.some(oid => oid.toString() === order._id.toString())) {
+            table.orderNow.push(order._id);
+          }
+          await table.save();
+          tableNumbers.push(table.tableNumber);
+        }
+
+        if (tableNumbers.length > 0) {
+          if (oldTableIds.length === 0) {
+            changes.push(`Gán bàn: ${tableNumbers.join(", ")}`);
+          } else {
+            // Lấy số bàn cũ
+            const oldTables = await Table.find({ _id: { $in: oldTableIds.map(id => new mongoose.Types.ObjectId(id)) } });
+            const oldTableNumbers = oldTables.map(t => t.tableNumber);
+            if (oldTableNumbers.sort().join(",") !== tableNumbers.sort().join(",")) {
+              changes.push(`Cập nhật bàn từ ${oldTableNumbers.join(", ")} sang ${tableNumbers.join(", ")}`);
+            }
+          }
+        }
+      } else {
+        // Xóa tất cả bàn
+        order.tableIds = [];
+        order.tableId = null;
+        changes.push("Xóa tất cả bàn");
       }
     }
 
@@ -1006,11 +1457,154 @@ exports.updatePreOrder = async (req, res) => {
         return error(res, "Thời gian đặt trước không hợp lệ", 400);
       }
 
+      // Validate: thời gian không được trong quá khứ (cho phép ít nhất 1 giờ trước)
+      const now = new Date();
+      const oneHourFromNow = new Date(now.getTime() + 60 * 60 * 1000);
+      if (newScheduledTime < oneHourFromNow) {
+        return error(res, "Thời gian đặt trước phải ít nhất 1 giờ từ bây giờ", 400);
+      }
+
       const oldTime = order.scheduledTime ? new Date(order.scheduledTime).toLocaleString("vi-VN") : "Chưa có";
       const newTime = newScheduledTime.toLocaleString("vi-VN");
       changes.push(`Đổi thời gian từ ${oldTime} sang ${newTime}`);
 
       order.scheduledTime = newScheduledTime;
+    }
+
+    // Kiểm tra trùng bàn và thời gian với các đơn khác (nếu có thay đổi bàn hoặc thời gian)
+    if ((tableIds !== undefined || tableId !== undefined || scheduledTime !== undefined)) {
+      // Sử dụng scheduledTime mới nếu có, nếu không dùng scheduledTime hiện tại
+      const checkScheduledTime = scheduledTime !== undefined ? new Date(scheduledTime) : (order.scheduledTime ? new Date(order.scheduledTime) : null);
+      
+      if (checkScheduledTime) {
+        // Lấy bàn để kiểm tra conflict
+        let checkTableIdsObjectIds = [];
+        if (tableIds !== undefined || tableId !== undefined) {
+          // Nếu đã có finalTableIdsObjectIds (từ phần xử lý tableIds ở trên), dùng nó
+          if (finalTableIdsObjectIds.length > 0) {
+            checkTableIdsObjectIds = finalTableIdsObjectIds;
+          } else {
+            // Nếu không có (trường hợp xóa bàn), không cần check conflict
+            checkTableIdsObjectIds = [];
+          }
+        } else {
+          // Không thay đổi bàn, dùng bàn hiện tại
+          if (order.tableIds && order.tableIds.length > 0) {
+            checkTableIdsObjectIds = order.tableIds;
+          } else if (order.tableId) {
+            checkTableIdsObjectIds = [order.tableId];
+          }
+        }
+
+        if (checkTableIdsObjectIds.length > 0) {
+          // Tìm các preorder khác đã được gán cùng bàn và có thời gian trùng lấn
+          const overlappingOrders = await Order.find({
+            _id: { $ne: orderId }, // Bỏ qua đơn hiện tại
+            scheduledTime: { $exists: true, $ne: null },
+            $and: [
+              {
+                $or: [
+                  { status: "preorder" },
+                  { "waiterResponse.status": "approved" } // Bao gồm cả đơn đã approve
+                ]
+              },
+              {
+                $or: [
+                  { tableId: { $in: checkTableIdsObjectIds } }, // Check tableId
+                  { tableIds: { $in: checkTableIdsObjectIds } } // Check tableIds
+                ]
+              }
+            ]
+          }).populate("tableId", "tableNumber").populate("tableIds", "tableNumber").populate("userId", "name email phone");
+          
+          // Kiểm tra overlap với từng đơn và từng bàn
+          const conflicts = [];
+          for (const otherOrder of overlappingOrders) {
+            // Lấy danh sách bàn của đơn khác
+            const otherTableIds = [];
+            if (otherOrder.tableIds && otherOrder.tableIds.length > 0) {
+              otherTableIds.push(...otherOrder.tableIds.map(t => t._id?.toString() || t.toString()));
+            } else if (otherOrder.tableId) {
+              otherTableIds.push(otherOrder.tableId._id?.toString() || otherOrder.tableId.toString());
+            }
+            
+            // Kiểm tra xem có bàn nào trùng không
+            const checkTableIdsStr = checkTableIdsObjectIds.map(id => id.toString());
+            const commonTables = checkTableIdsStr.filter(tid => otherTableIds.includes(tid));
+            if (commonTables.length === 0) continue; // Không có bàn trùng, bỏ qua
+            
+            let hasConflict = false;
+            
+            if (otherOrder.reservedEndTime && order.reservedEndTime) {
+              // Cả 2 đơn đều có reservedEndTime → kiểm tra overlap chính xác
+              const thisStart = order.preparationStartTime 
+                ? new Date(order.preparationStartTime) 
+                : checkScheduledTime;
+              const thisEnd = new Date(order.reservedEndTime);
+              const otherStart = otherOrder.preparationStartTime 
+                ? new Date(otherOrder.preparationStartTime) 
+                : new Date(otherOrder.scheduledTime);
+              const otherEnd = new Date(otherOrder.reservedEndTime);
+              
+              // Overlap: thisStart < otherEnd && otherStart < thisEnd
+              if (thisStart < otherEnd && otherStart < thisEnd) {
+                hasConflict = true;
+              }
+            } else {
+              // Một trong 2 đơn chưa có reservedEndTime → kiểm tra scheduledTime trong vòng 2 giờ
+              const otherTime = new Date(otherOrder.scheduledTime);
+              const timeDiff = Math.abs(checkScheduledTime.getTime() - otherTime.getTime());
+              const twoHours = 2 * 60 * 60 * 1000;
+              if (timeDiff < twoHours) {
+                hasConflict = true;
+              }
+            }
+            
+            if (hasConflict) {
+              // Lấy tên các bàn trùng
+              const allTablesForCheck = await Table.find({ _id: { $in: checkTableIdsObjectIds } });
+              const commonTableNumbers = commonTables.map(tid => {
+                const table = allTablesForCheck.find(t => t._id.toString() === tid);
+                return table ? `Bàn ${table.tableNumber}` : tid;
+              }).join(", ");
+              
+              // Lấy tableIds của đơn khác (để frontend có thể so sánh)
+              const otherTableIdsArray = [];
+              if (otherOrder.tableIds && otherOrder.tableIds.length > 0) {
+                otherTableIdsArray.push(...otherOrder.tableIds.map(t => t._id?.toString() || t.toString()));
+              } else if (otherOrder.tableId) {
+                otherTableIdsArray.push(otherOrder.tableId._id?.toString() || otherOrder.tableId.toString());
+              }
+              
+              conflicts.push({
+                orderId: otherOrder._id,
+                customerName: otherOrder.userId?.name || "Khách vãng lai",
+                tableNumbers: commonTableNumbers, // String để hiển thị
+                tableIds: commonTables, // Array of table IDs trùng
+                otherTableIds: otherTableIdsArray, // Tất cả tableIds của đơn khác
+                scheduledTime: otherOrder.scheduledTime,
+                preparationStartTime: otherOrder.preparationStartTime,
+                reservedEndTime: otherOrder.reservedEndTime
+              });
+            }
+          }
+          
+          // Nếu có conflict và chưa force update, trả về cảnh báo với conflicts data
+          if (conflicts.length > 0 && !forceUpdate) {
+            // Trả về error nhưng kèm theo conflicts data để frontend có thể hiển thị modal
+            return res.status(400).json({
+              success: false,
+              message: `Các bàn đã được đặt trước trong khoảng thời gian này. Các đơn trùng: ${conflicts.map(c => `Mã đơn: ${String(c.orderId).slice(-8)}, Khách: ${c.customerName}, Bàn trùng: ${c.tableNumbers}`).join("; ")}`,
+              conflicts: conflicts // Thêm conflicts data để frontend parse
+            });
+          }
+          
+          // Nếu có conflict nhưng admin force update, log cảnh báo nhưng vẫn tiếp tục
+          if (conflicts.length > 0 && forceUpdate) {
+            console.warn(`⚠️ Admin force update preorder ${orderId} despite conflicts:`, conflicts);
+          }
+        }
+      }
     }
 
     // Lưu lịch sử
@@ -1041,7 +1635,8 @@ exports.updatePreOrder = async (req, res) => {
         path: "orderItems",
         select: "itemName itemType quantity price itemId",
       })
-      .populate("tableId", "tableNumber status")
+      .populate("tableId", "tableNumber status") // Backward compatibility
+      .populate("tableIds", "tableNumber status") // Nhiều bàn
       .populate("userId", "name email phone");
 
     // Tự động fill itemName từ itemId nếu thiếu
@@ -1607,11 +2202,23 @@ exports.getCustomerInfo = async (req, res) => {
 exports.approvePreOrder = async (req, res) => {
   try {
     const { orderId } = req.params;
-    const { tableId, adminNotes } = req.body;
+    const { tableId, tableIds, adminNotes, preparationStartTime, reservedEndTime, forceApprove } = req.body; // Hỗ trợ cả tableId (backward) và tableIds (mới)
+    
+    // Validate thời gian
+    if (preparationStartTime && reservedEndTime) {
+      const prepStart = new Date(preparationStartTime);
+      const reservedEnd = new Date(reservedEndTime);
+      if (isNaN(prepStart.getTime()) || isNaN(reservedEnd.getTime())) {
+        return error(res, "Thời gian không hợp lệ", 400);
+      }
+      if (reservedEnd <= prepStart) {
+        return error(res, "Thời gian kết thúc phải sau thời gian bắt đầu chuẩn bị", 400);
+      }
+    }
     const adminId = req.user.id; // Lấy từ middleware auth
 
-    // Tìm order
-    const order = await Order.findById(orderId);
+    // Tìm order (dùng let để có thể reload sau khi splitLargeOrderItems)
+    let order = await Order.findById(orderId);
     if (!order) {
       return error(res, "Không tìm thấy đơn hàng", 404);
     }
@@ -1626,54 +2233,254 @@ exports.approvePreOrder = async (req, res) => {
       return error(res, "Đơn hàng đã được phản hồi trước đó", 400);
     }
 
+    // Xử lý tableIds: ưu tiên tableIds[], fallback về tableId (backward compatibility)
+    console.log(`🔍 Debug approvePreOrder: orderId=${orderId}, tableIds=`, tableIds, `(type: ${typeof tableIds}, isArray: ${Array.isArray(tableIds)}), tableId=`, tableId);
+    
+    let finalTableIds = [];
+    if (tableIds) {
+      // Xử lý cả trường hợp tableIds là string (comma-separated) hoặc array
+      if (typeof tableIds === 'string') {
+        // Nếu là string, split bằng dấu phẩy
+        finalTableIds = tableIds.split(',').map(id => id.trim()).filter(id => id.length > 0);
+        console.log(`🔍 Debug: tableIds is string, split by comma =`, finalTableIds);
+      } else if (Array.isArray(tableIds) && tableIds.length > 0) {
+        // Filter out null, undefined, empty string, và convert tất cả thành string
+        finalTableIds = tableIds
+          .filter(id => id != null && id !== "" && id !== undefined)
+          .map(id => {
+            // Nếu là ObjectId, convert thành string; nếu đã là string, giữ nguyên
+            if (id && typeof id === 'object' && id.toString) {
+              return id.toString();
+            }
+            return String(id).trim();
+          })
+          .filter(id => id.length > 0);
+        console.log(`🔍 Debug: tableIds from request (array) =`, tableIds, `→ filtered =`, finalTableIds);
+      }
+    }
+    
+    // Fallback về tableId nếu finalTableIds vẫn rỗng
+    if (finalTableIds.length === 0 && tableId) {
+      // Xử lý cả trường hợp tableId là array hoặc string
+      if (Array.isArray(tableId)) {
+        // Nếu là array, xử lý tương tự như tableIds
+        finalTableIds = tableId
+          .filter(id => id != null && id !== "" && id !== undefined)
+          .map(id => {
+            if (id && typeof id === 'object' && id.toString) {
+              return id.toString();
+            }
+            return String(id).trim();
+          })
+          .filter(id => id.length > 0);
+        console.log(`🔍 Debug: using tableId (array) =`, finalTableIds);
+      } else if (typeof tableId === 'string') {
+        // Nếu là string, có thể là comma-separated hoặc single ID
+        const splitIds = tableId.split(',').map(id => id.trim()).filter(id => id.length > 0);
+        finalTableIds = splitIds;
+        console.log(`🔍 Debug: using tableId (string, split by comma) =`, finalTableIds);
+      } else {
+        // Single value (ObjectId hoặc string)
+        finalTableIds = [String(tableId).trim()];
+        console.log(`🔍 Debug: using tableId (single) =`, finalTableIds);
+      }
+    } else if (finalTableIds.length === 0 && order.tableIds && order.tableIds.length > 0) {
+      finalTableIds = order.tableIds.map(id => id.toString()).filter(id => id != null && id !== ""); // Sử dụng bàn hiện có
+      console.log(`🔍 Debug: using order.tableIds =`, finalTableIds);
+    } else if (finalTableIds.length === 0 && order.tableId) {
+      finalTableIds = [order.tableId.toString()]; // Fallback về tableId cũ
+      console.log(`🔍 Debug: using order.tableId (fallback) =`, finalTableIds);
+    }
+
     // Validate table selection
-    if (!tableId && !order.tableId) {
-      return error(res, "Cần chọn bàn khi xác nhận", 400);
+    if (finalTableIds.length === 0) {
+      return error(res, "Cần chọn ít nhất 1 bàn khi xác nhận", 400);
     }
 
-    let table;
-    let finalTableId;
+    console.log(`🔍 Debug: finalTableIds (before conversion) =`, finalTableIds, `(types:`, finalTableIds.map(id => typeof id).join(", "), `)`);
 
-    // Ưu tiên bàn mà admin chọn
-    if (tableId) {
-      table = await Table.findById(tableId);
-      if (!table) {
-        return error(res, "Bàn không tồn tại", 404);
+    // Convert finalTableIds thành ObjectId để query MongoDB
+    const finalTableIdsObjectIds = [];
+    const invalidIds = [];
+    for (const id of finalTableIds) {
+      if (!id || id === "" || id === null || id === undefined) {
+        invalidIds.push(`"${id}" (empty/null)`);
+        continue;
       }
-      finalTableId = tableId;
-    } else if (order.tableId) {
-      table = await Table.findById(order.tableId);
-      if (!table) {
-        return error(res, "Bàn auto-assigned không tồn tại", 404);
+      try {
+        // Ensure it's a string before converting
+        const idString = String(id).trim();
+        if (idString.length === 0) {
+          invalidIds.push(`"${id}" (empty after trim)`);
+          continue;
+        }
+        // Check if it's a valid ObjectId format
+        if (!mongoose.Types.ObjectId.isValid(idString)) {
+          invalidIds.push(`"${idString}" (invalid ObjectId format)`);
+          continue;
+        }
+        const objectId = new mongoose.Types.ObjectId(idString);
+        finalTableIdsObjectIds.push(objectId);
+      } catch (err) {
+        console.error(`❌ Invalid tableId format: ${id} (type: ${typeof id})`, err);
+        invalidIds.push(`"${id}" (${err.message})`);
       }
-      finalTableId = order.tableId;
     }
 
-    // Cập nhật tableId cho order (nếu khác với bàn hiện tại)
-    let oldTableId = null;
-    if (order.tableId?.toString() !== finalTableId.toString()) {
-      oldTableId = order.tableId;
-      order.tableId = new mongoose.Types.ObjectId(finalTableId);
+    if (invalidIds.length > 0) {
+      console.error(`❌ Invalid table IDs:`, invalidIds);
+      return error(res, `Một hoặc nhiều bàn có ID không hợp lệ: ${invalidIds.join(", ")}`, 400);
+    }
 
-      // Xử lý bàn cũ (nếu có)
-      if (oldTableId) {
-        const oldTable = await Table.findById(oldTableId);
-        if (oldTable && oldTable.orderNow) {
-          oldTable.orderNow = oldTable.orderNow.filter(oid => oid.toString() !== orderId);
-          if (oldTable.orderNow.length === 0) {
-            oldTable.status = "available";
+    if (finalTableIdsObjectIds.length === 0) {
+      return error(res, "Không có bàn hợp lệ nào được chọn", 400);
+    }
+
+    console.log(`✅ Debug: finalTableIdsObjectIds (after conversion) =`, finalTableIdsObjectIds.map(id => id.toString()));
+
+    // Validate tất cả các bàn tồn tại
+    const tables = await Table.find({ _id: { $in: finalTableIdsObjectIds } });
+    if (tables.length !== finalTableIdsObjectIds.length) {
+      return error(res, "Một hoặc nhiều bàn không tồn tại", 404);
+    }
+
+    // Lưu oldTableIds để cleanup sau
+    const oldTableIds = order.tableIds && order.tableIds.length > 0 
+      ? order.tableIds.map(id => id.toString())
+      : (order.tableId ? [order.tableId.toString()] : []);
+
+    // Kiểm tra trùng bàn trước khi approve (chỉ khi có thời gian chuẩn bị và kết thúc)
+    if (preparationStartTime && reservedEndTime) {
+      const prepStart = new Date(preparationStartTime);
+      const reservedEnd = new Date(reservedEndTime);
+      
+      // Tìm các preorder khác đã được gán cùng bàn (trong tableIds) và có thời gian trùng lấn
+      // Check cả tableId và tableIds
+      const overlappingOrders = await Order.find({
+        _id: { $ne: orderId }, // Bỏ qua đơn hiện tại
+        scheduledTime: { $exists: true, $ne: null }, // Chỉ kiểm tra preorders
+        $and: [
+          {
+            $or: [
+              { status: "preorder" },
+              { "waiterResponse.status": "approved" } // Bao gồm cả đơn đã approve
+            ]
+          },
+          {
+            $or: [
+              { tableId: { $in: finalTableIdsObjectIds } }, // Check tableId
+              { tableIds: { $in: finalTableIdsObjectIds } } // Check tableIds
+            ]
           }
-          await oldTable.save();
+        ]
+      }).populate("tableId", "tableNumber").populate("tableIds", "tableNumber").populate("userId", "name email phone");
+      
+      // Kiểm tra overlap với từng đơn và từng bàn
+      const conflicts = [];
+      for (const otherOrder of overlappingOrders) {
+        // Lấy danh sách bàn của đơn khác
+        const otherTableIds = [];
+        if (otherOrder.tableIds && otherOrder.tableIds.length > 0) {
+          otherTableIds.push(...otherOrder.tableIds.map(t => t._id?.toString() || t.toString()));
+        } else if (otherOrder.tableId) {
+          otherTableIds.push(otherOrder.tableId._id?.toString() || otherOrder.tableId.toString());
+        }
+        
+        // Kiểm tra xem có bàn nào trùng không
+        const commonTables = finalTableIds.filter(tid => otherTableIds.includes(tid));
+        if (commonTables.length === 0) continue; // Không có bàn trùng, bỏ qua
+        
+        let hasConflict = false;
+        
+        if (otherOrder.reservedEndTime) {
+          // Đơn đã có reservedEndTime → kiểm tra overlap chính xác
+          const otherStart = otherOrder.preparationStartTime 
+            ? new Date(otherOrder.preparationStartTime) 
+            : new Date(otherOrder.scheduledTime);
+          const otherEnd = new Date(otherOrder.reservedEndTime);
+          
+          // Overlap: prepStart < otherEnd && otherStart < reservedEnd
+          if (prepStart < otherEnd && otherStart < reservedEnd) {
+            hasConflict = true;
+          }
+        } else if (otherOrder.scheduledTime) {
+          // Đơn chưa có reservedEndTime → kiểm tra scheduledTime trong vòng 2 giờ
+          const otherTime = new Date(otherOrder.scheduledTime);
+          const timeDiff = Math.abs(prepStart.getTime() - otherTime.getTime());
+          const twoHours = 2 * 60 * 60 * 1000;
+          if (timeDiff < twoHours) {
+            hasConflict = true;
+          }
+        }
+        
+        if (hasConflict) {
+          // Lấy tên các bàn trùng
+          const commonTableNumbers = commonTables.map(tid => {
+            const table = tables.find(t => t._id.toString() === tid);
+            return table ? `Bàn ${table.tableNumber}` : tid;
+          }).join(", ");
+          
+          conflicts.push({
+            orderId: otherOrder._id,
+            customerName: otherOrder.userId?.name || "Khách vãng lai",
+            tableNumbers: commonTableNumbers,
+            scheduledTime: otherOrder.scheduledTime,
+            preparationStartTime: otherOrder.preparationStartTime,
+            reservedEndTime: otherOrder.reservedEndTime
+          });
         }
       }
+      
+      // Nếu có conflict và admin chưa force approve, trả về cảnh báo
+      if (conflicts.length > 0 && !forceApprove) {
+        const conflictDetails = conflicts.map(c => 
+          `Mã đơn: ${String(c.orderId).slice(-8)}, Khách: ${c.customerName}, Bàn trùng: ${c.tableNumbers}`
+        ).join("; ");
+        return error(res, `Các bàn đã được đặt trước trong khoảng thời gian này. Các đơn trùng: ${conflictDetails}`, 400);
+      }
+      
+      // Nếu có conflict nhưng admin force approve, log cảnh báo nhưng vẫn tiếp tục
+      if (conflicts.length > 0 && forceApprove) {
+        console.warn(`⚠️ Admin force approve preorder ${orderId} despite conflicts:`, conflicts);
+      }
     }
 
-    // Admin approve → tự động confirm luôn (không cần chờ customer)
-    order.waiterResponse.status = "approved";
-    order.waiterResponse.reason = null;
-    order.waiterResponse.respondedAt = new Date();
-    order.status = "confirmed";
-    order.customerConfirmed = true;
+    // Cập nhật tableIds cho order (sử dụng finalTableIdsObjectIds đã convert)
+    order.tableIds = finalTableIdsObjectIds;
+    // tableId sẽ được tự động sync = tableIds[0] bởi middleware
+
+    // 🧹 Xử lý bàn cũ: xóa order khỏi các bàn không còn được sử dụng
+    const tablesToRemove = oldTableIds.filter(oldId => !finalTableIds.includes(oldId));
+    for (const oldTableId of tablesToRemove) {
+      const oldTable = await Table.findById(oldTableId);
+      if (oldTable && oldTable.orderNow) {
+        oldTable.orderNow = oldTable.orderNow.filter(oid => oid.toString() !== orderId);
+        if (oldTable.orderNow.length === 0) {
+          oldTable.status = "available";
+        }
+        await oldTable.save();
+        console.log(`🧹 Đã xóa order khỏi bàn cũ: ${oldTable.tableNumber}`);
+      }
+    }
+
+    // Lưu các thay đổi cần apply vào order (trước khi splitLargeOrderItems)
+    const orderUpdates = {
+      waiterResponse: {
+        status: "approved",
+        reason: null,
+        respondedAt: new Date()
+      },
+      status: "confirmed",
+      customerConfirmed: true
+    };
+    
+    // Lưu thời gian chuẩn bị và kết thúc dành bàn
+    if (preparationStartTime) {
+      orderUpdates.preparationStartTime = new Date(preparationStartTime);
+    }
+    if (reservedEndTime) {
+      orderUpdates.reservedEndTime = new Date(reservedEndTime);
+    }
 
     // Gọi splitLargeOrderItems để chia OrderItem lớn thành nhiều OrderItem nhỏ hơn
     const { splitLargeOrderItems } = require("../../utils/customerHelpers");
@@ -1682,15 +2489,91 @@ exports.approvePreOrder = async (req, res) => {
       console.log(`✅ Đã chia ${splitCount} OrderItem lớn thành nhiều OrderItem nhỏ hơn sau khi admin approve`);
     }
 
+    // ⚠️ QUAN TRỌNG: Reload order sau khi splitLargeOrderItems vì nó đã save order (tăng version)
+    // Nếu không reload, sẽ bị VersionError khi save lại
+    order = await Order.findById(orderId);
+    if (!order) {
+      return error(res, "Không tìm thấy đơn hàng sau khi chia OrderItem", 404);
+    }
+
+    // Apply lại các thay đổi đã lưu
+    order.tableIds = finalTableIdsObjectIds; // Cập nhật lại tableIds
+    order.waiterResponse.status = orderUpdates.waiterResponse.status;
+    order.waiterResponse.reason = orderUpdates.waiterResponse.reason;
+    order.waiterResponse.respondedAt = orderUpdates.waiterResponse.respondedAt;
+    order.status = orderUpdates.status;
+    order.customerConfirmed = orderUpdates.customerConfirmed;
+    if (orderUpdates.preparationStartTime) {
+      order.preparationStartTime = orderUpdates.preparationStartTime;
+    }
+    if (orderUpdates.reservedEndTime) {
+      order.reservedEndTime = orderUpdates.reservedEndTime;
+    }
+
     // Reload order sau khi chia để có OrderItem mới
     await order.populate("orderItems");
 
-    // Cập nhật table status
-    table.status = "occupied";
-    if (!table.orderNow.includes(order._id)) {
-      table.orderNow.push(order._id);
+    // Trừ nguyên liệu từ kho khi approve pre-order
+    const { deductIngredientsFromStock } = require("../../utils/customerHelpers");
+    const OrderItem = require("../../models/OrderItem");
+    const Item = require("../../models/Item");
+    const Menu = require("../../models/Menu");
+    
+    try {
+      // Populate orderItems với itemId để lấy thông tin món
+      const populatedOrderItems = await OrderItem.find({ _id: { $in: order.orderItems } })
+        .populate("itemId");
+      
+      for (const orderItem of populatedOrderItems) {
+        try {
+          let item;
+          
+          // Lấy item hoặc menu tùy theo itemType
+          if (orderItem.itemType === 'item') {
+            item = await Item.findById(orderItem.itemId).populate('ingredients.ingredient');
+          } else if (orderItem.itemType === 'menu') {
+            item = await Menu.findById(orderItem.itemId).populate('items');
+          }
+          
+          if (item) {
+            // Trừ nguyên liệu cho món đơn
+            if (orderItem.itemType === 'item') {
+              await deductIngredientsFromStock(item, orderItem.quantity);
+            } 
+            // Trừ nguyên liệu cho combo
+            else if (orderItem.itemType === 'menu' && item.type === 'combo' && item.items && item.items.length > 0) {
+              for (const comboItemId of item.items) {
+                const comboItem = await Item.findById(comboItemId).populate('ingredients.ingredient');
+                if (comboItem) {
+                  await deductIngredientsFromStock(comboItem, orderItem.quantity);
+                }
+              }
+            }
+          }
+        } catch (error) {
+          console.error(`❌ Lỗi khi trừ nguyên liệu cho OrderItem ${orderItem._id} khi approve pre-order:`, error);
+          // Không throw error để không làm gián đoạn quá trình approve
+        }
+      }
+      
+      console.log(`✅ Đã trừ nguyên liệu từ kho cho pre-order ${orderId} sau khi admin approve`);
+    } catch (error) {
+      console.error(`❌ Lỗi khi trừ nguyên liệu cho pre-order ${orderId}:`, error);
+      // Không throw error để không làm gián đoạn quá trình approve
+      // Admin có thể kiểm tra lại sau
     }
-    await table.save();
+
+    // ✅ Thêm order vào các bàn mới
+    const tableNumbers = [];
+    for (const table of tables) {
+      table.status = "occupied";
+      if (!table.orderNow.some(oid => oid.toString() === order._id.toString())) {
+        table.orderNow.push(order._id);
+      }
+      await table.save();
+      tableNumbers.push(table.tableNumber);
+      console.log(`✅ Đã thêm order vào bàn: ${table.tableNumber}`);
+    }
 
     // Lưu lịch sử
     if (!order.confirmationHistory) {
@@ -1699,7 +2582,7 @@ exports.approvePreOrder = async (req, res) => {
     order.confirmationHistory.push({
       action: "admin_approved",
       timestamp: new Date(),
-      details: `Admin ${adminId} approve và confirm đơn (bàn ${table.tableNumber})`
+      details: `Admin ${adminId} approve và confirm đơn (${tableNumbers.length} bàn: ${tableNumbers.join(", ")})`
     });
 
     if (adminNotes) {
@@ -1718,7 +2601,8 @@ exports.approvePreOrder = async (req, res) => {
         path: "orderItems",
         select: "itemName itemType quantity price itemId",
       })
-      .populate("tableId", "tableNumber status")
+      .populate("tableId", "tableNumber status") // Backward compatibility
+      .populate("tableIds", "tableNumber status") // Nhiều bàn
       .populate("userId", "name email phone");
 
     // Tự động fill itemName từ itemId nếu thiếu
@@ -1748,18 +2632,23 @@ exports.cancelPreOrder = async (req, res) => {
     const { adminNotes } = req.body;
     const adminId = req.user.id; // Lấy từ middleware auth
 
-    // Tìm order
-    const order = await Order.findById(orderId);
+    // Tìm order (dùng let để có thể reload sau khi splitLargeOrderItems)
+    let order = await Order.findById(orderId);
     if (!order) {
       return error(res, "Không tìm thấy đơn hàng", 404);
     }
 
-    // Kiểm tra order là preorder
-    if (order.status !== "preorder") {
-      return error(res, "Chỉ có thể hủy đơn đặt trước", 400);
+    // Cho phép hủy đơn đặt trước (preorder) hoặc đơn đã được approve (waiterResponse.status === "approved")
+    // Đơn đã approve có thể có status là "preorder", "confirmed", hoặc "preparing"
+    const isPreOrder = order.status === "preorder";
+    const isApprovedPreOrder = order.waiterResponse?.status === "approved" && 
+                               (order.status === "preorder" || order.status === "confirmed" || order.status === "preparing");
+    
+    if (!isPreOrder && !isApprovedPreOrder) {
+      return error(res, "Chỉ có thể hủy đơn đặt trước hoặc đơn đã được chấp nhận", 400);
     }
 
-    // Chuyển status từ "preorder" → "cancelled"
+    // Chuyển status → "cancelled"
     order.status = "cancelled";
 
     // KHÔNG động vào waiterResponse (vì đây là admin hủy, không liên quan đến waiter)
@@ -1844,8 +2733,8 @@ exports.recordDeposit = async (req, res) => {
       return error(res, "Số tiền cọc phải lớn hơn 0", 400);
     }
 
-    // Tìm order
-    const order = await Order.findById(orderId);
+    // Tìm order (dùng let để có thể reload sau khi splitLargeOrderItems)
+    let order = await Order.findById(orderId);
     if (!order) {
       return error(res, "Không tìm thấy đơn hàng", 404);
     }
@@ -2020,15 +2909,19 @@ exports.modifyPreOrderItems = async (req, res) => {
     const { itemsToAdd = [], itemsToRemove = [], itemsToUpdate = [] } = req.body;
     const adminId = req.user.id;
 
-    // Tìm order
-    const order = await Order.findById(orderId);
+    // Tìm order (dùng let để có thể reload sau khi splitLargeOrderItems)
+    let order = await Order.findById(orderId);
     if (!order) {
       return error(res, "Không tìm thấy đơn hàng", 404);
     }
 
-    // Kiểm tra order là preorder
-    if (order.status !== "preorder") {
-      return error(res, "Chỉ có thể chỉnh sửa đơn đặt trước", 400);
+    // Cho phép sửa đơn đặt trước (preorder) hoặc đơn đã được approve (waiterResponse.status === "approved")
+    const isPreOrder = order.status === "preorder";
+    const isApprovedPreOrder = order.waiterResponse?.status === "approved" && 
+                               (order.status === "preorder" || order.status === "confirmed" || order.status === "preparing");
+    
+    if (!isPreOrder && !isApprovedPreOrder) {
+      return error(res, "Chỉ có thể chỉnh sửa đơn đặt trước hoặc đơn đã được chấp nhận", 400);
     }
 
     const OrderItem = require("../../models/OrderItem");
@@ -2221,61 +3114,154 @@ exports.modifyPreOrderItems = async (req, res) => {
 exports.updatePreOrder = async (req, res) => {
   try {
     const { orderId } = req.params;
-    const { tableId, scheduledTime, adminNotes } = req.body;
+    const { tableId, tableIds, scheduledTime, adminNotes, forceUpdate } = req.body; // Hỗ trợ cả tableId (backward) và tableIds (mới), forceUpdate để bỏ qua conflict
     const adminId = req.user.id;
 
-    // Tìm order
-    const order = await Order.findById(orderId);
+    // Tìm order (dùng let để có thể reload sau khi splitLargeOrderItems)
+    let order = await Order.findById(orderId);
     if (!order) {
       return error(res, "Không tìm thấy đơn hàng", 404);
     }
 
-    // Kiểm tra order là preorder
-    if (order.status !== "preorder") {
-      return error(res, "Chỉ có thể cập nhật đơn đặt trước", 400);
+    // Cho phép cập nhật đơn đặt trước (preorder) hoặc đơn đã được approve (waiterResponse.status === "approved")
+    const isPreOrder = order.status === "preorder";
+    const isApprovedPreOrder = order.waiterResponse?.status === "approved" && 
+                               (order.status === "preorder" || order.status === "confirmed" || order.status === "preparing");
+    
+    if (!isPreOrder && !isApprovedPreOrder) {
+      return error(res, "Chỉ có thể cập nhật đơn đặt trước hoặc đơn đã được chấp nhận", 400);
     }
 
     const changes = [];
+    let finalTableIdsObjectIds = []; // Khai báo ở ngoài để dùng cho validation conflict
 
-    // Cập nhật tableId (nếu có)
-    if (tableId !== undefined) {
+    // Xử lý tableIds: ưu tiên tableIds[], fallback về tableId (backward compatibility)
+    let finalTableIds = [];
+    if (tableIds !== undefined) {
+      // Xử lý cả trường hợp tableIds là string (comma-separated) hoặc array
+      if (typeof tableIds === 'string') {
+        finalTableIds = tableIds.split(',').map(id => id.trim()).filter(id => id.length > 0);
+      } else if (Array.isArray(tableIds) && tableIds.length > 0) {
+        finalTableIds = tableIds
+          .filter(id => id != null && id !== "" && id !== undefined)
+          .map(id => {
+            if (id && typeof id === 'object' && id.toString) {
+              return id.toString();
+            }
+            return String(id).trim();
+          })
+          .filter(id => id.length > 0);
+      } else if (tableIds === null || tableIds === "") {
+        // Xóa tất cả bàn
+        finalTableIds = [];
+      }
+    } else if (tableId !== undefined) {
+      // Fallback về tableId nếu không có tableIds
       if (tableId === null || tableId === "") {
-        // Xóa bàn (set tableId = null)
-        if (order.tableId) {
-          const oldTable = await Table.findById(order.tableId);
-          if (oldTable && oldTable.orderNow) {
-            oldTable.orderNow = oldTable.orderNow.filter(oid => oid.toString() !== orderId);
-            if (oldTable.orderNow.length === 0) {
-              oldTable.status = "available";
-            }
-            await oldTable.save();
-          }
-          changes.push(`Xóa bàn ${oldTable?.tableNumber || ""}`);
-        }
-        order.tableId = null;
+        // Xóa tất cả bàn
+        finalTableIds = [];
+      } else if (Array.isArray(tableId)) {
+        finalTableIds = tableId
+          .filter(id => id != null && id !== "" && id !== undefined)
+          .map(id => String(id).trim())
+          .filter(id => id.length > 0);
+      } else if (typeof tableId === 'string') {
+        const splitIds = tableId.split(',').map(id => id.trim()).filter(id => id.length > 0);
+        finalTableIds = splitIds;
       } else {
-        // Gán bàn mới
-        const newTable = await Table.findById(tableId);
-        if (!newTable) {
-          return error(res, "Bàn không tồn tại", 404);
-        }
+        finalTableIds = [String(tableId).trim()];
+      }
+    }
 
-        // Xử lý bàn cũ (nếu có)
-        if (order.tableId && order.tableId.toString() !== tableId) {
-          const oldTable = await Table.findById(order.tableId);
-          if (oldTable && oldTable.orderNow) {
-            oldTable.orderNow = oldTable.orderNow.filter(oid => oid.toString() !== orderId);
-            if (oldTable.orderNow.length === 0) {
-              oldTable.status = "available";
-            }
-            await oldTable.save();
+    // Cập nhật tableIds (nếu có thay đổi)
+    if (tableIds !== undefined || tableId !== undefined) {
+      // Lấy danh sách bàn cũ để so sánh
+      const oldTableIds = (order.tableIds && order.tableIds.length > 0)
+        ? order.tableIds.map(id => id.toString())
+        : (order.tableId ? [order.tableId.toString()] : []);
+
+      // Xóa order khỏi các bàn cũ không còn được sử dụng
+      const tablesToRemove = oldTableIds.filter(oldId => !finalTableIds.includes(oldId));
+      for (const oldTableId of tablesToRemove) {
+        const oldTable = await Table.findById(oldTableId);
+        if (oldTable && oldTable.orderNow) {
+          oldTable.orderNow = oldTable.orderNow.filter(oid => oid.toString() !== orderId);
+          if (oldTable.orderNow.length === 0) {
+            oldTable.status = "available";
           }
-          changes.push(`Đổi bàn từ ${oldTable?.tableNumber || ""} sang ${newTable.tableNumber}`);
-        } else if (!order.tableId) {
-          changes.push(`Gán bàn ${newTable.tableNumber}`);
+          await oldTable.save();
+        }
+      }
+
+      // Validate và convert finalTableIds thành ObjectId
+      if (finalTableIds.length > 0) {
+        const invalidIds = [];
+        finalTableIdsObjectIds = []; // Reset array
+        for (const id of finalTableIds) {
+          if (!id || id === "" || id === null || id === undefined) {
+            invalidIds.push(`"${id}" (empty/null)`);
+            continue;
+          }
+          try {
+            const idString = String(id).trim();
+            if (idString.length === 0) {
+              invalidIds.push(`"${id}" (empty after trim)`);
+              continue;
+            }
+            if (!mongoose.Types.ObjectId.isValid(idString)) {
+              invalidIds.push(`"${idString}" (invalid ObjectId format)`);
+              continue;
+            }
+            const objectId = new mongoose.Types.ObjectId(idString);
+            finalTableIdsObjectIds.push(objectId);
+          } catch (err) {
+            console.error(`❌ Invalid tableId format: ${id}`, err);
+            invalidIds.push(`"${id}" (${err.message})`);
+          }
         }
 
-        order.tableId = new mongoose.Types.ObjectId(tableId);
+        if (invalidIds.length > 0) {
+          return error(res, `Một hoặc nhiều bàn có ID không hợp lệ: ${invalidIds.join(", ")}`, 400);
+        }
+
+        // Validate tất cả các bàn tồn tại
+        const tables = await Table.find({ _id: { $in: finalTableIdsObjectIds } });
+        if (tables.length !== finalTableIdsObjectIds.length) {
+          return error(res, "Một hoặc nhiều bàn không tồn tại", 404);
+        }
+
+        // Cập nhật tableIds
+        order.tableIds = finalTableIdsObjectIds;
+        // tableId sẽ được tự động sync = tableIds[0] bởi middleware
+
+        // Thêm order vào các bàn mới
+        const tableNumbers = [];
+        for (const table of tables) {
+          table.status = "occupied";
+          if (!table.orderNow.some(oid => oid.toString() === order._id.toString())) {
+            table.orderNow.push(order._id);
+          }
+          await table.save();
+          tableNumbers.push(table.tableNumber);
+        }
+
+        if (tableNumbers.length > 0) {
+          if (oldTableIds.length === 0) {
+            changes.push(`Gán bàn: ${tableNumbers.join(", ")}`);
+          } else {
+            // Lấy số bàn cũ
+            const oldTables = await Table.find({ _id: { $in: oldTableIds.map(id => new mongoose.Types.ObjectId(id)) } });
+            const oldTableNumbers = oldTables.map(t => t.tableNumber);
+            if (oldTableNumbers.sort().join(",") !== tableNumbers.sort().join(",")) {
+              changes.push(`Cập nhật bàn từ ${oldTableNumbers.join(", ")} sang ${tableNumbers.join(", ")}`);
+            }
+          }
+        }
+      } else {
+        // Xóa tất cả bàn
+        order.tableIds = [];
+        order.tableId = null;
+        changes.push("Xóa tất cả bàn");
       }
     }
 
@@ -2286,11 +3272,154 @@ exports.updatePreOrder = async (req, res) => {
         return error(res, "Thời gian đặt trước không hợp lệ", 400);
       }
 
+      // Validate: thời gian không được trong quá khứ (cho phép ít nhất 1 giờ trước)
+      const now = new Date();
+      const oneHourFromNow = new Date(now.getTime() + 60 * 60 * 1000);
+      if (newScheduledTime < oneHourFromNow) {
+        return error(res, "Thời gian đặt trước phải ít nhất 1 giờ từ bây giờ", 400);
+      }
+
       const oldTime = order.scheduledTime ? new Date(order.scheduledTime).toLocaleString("vi-VN") : "Chưa có";
       const newTime = newScheduledTime.toLocaleString("vi-VN");
       changes.push(`Đổi thời gian từ ${oldTime} sang ${newTime}`);
 
       order.scheduledTime = newScheduledTime;
+    }
+
+    // Kiểm tra trùng bàn và thời gian với các đơn khác (nếu có thay đổi bàn hoặc thời gian)
+    if ((tableIds !== undefined || tableId !== undefined || scheduledTime !== undefined)) {
+      // Sử dụng scheduledTime mới nếu có, nếu không dùng scheduledTime hiện tại
+      const checkScheduledTime = scheduledTime !== undefined ? new Date(scheduledTime) : (order.scheduledTime ? new Date(order.scheduledTime) : null);
+      
+      if (checkScheduledTime) {
+        // Lấy bàn để kiểm tra conflict
+        let checkTableIdsObjectIds = [];
+        if (tableIds !== undefined || tableId !== undefined) {
+          // Nếu đã có finalTableIdsObjectIds (từ phần xử lý tableIds ở trên), dùng nó
+          if (finalTableIdsObjectIds.length > 0) {
+            checkTableIdsObjectIds = finalTableIdsObjectIds;
+          } else {
+            // Nếu không có (trường hợp xóa bàn), không cần check conflict
+            checkTableIdsObjectIds = [];
+          }
+        } else {
+          // Không thay đổi bàn, dùng bàn hiện tại
+          if (order.tableIds && order.tableIds.length > 0) {
+            checkTableIdsObjectIds = order.tableIds;
+          } else if (order.tableId) {
+            checkTableIdsObjectIds = [order.tableId];
+          }
+        }
+
+        if (checkTableIdsObjectIds.length > 0) {
+          // Tìm các preorder khác đã được gán cùng bàn và có thời gian trùng lấn
+          const overlappingOrders = await Order.find({
+            _id: { $ne: orderId }, // Bỏ qua đơn hiện tại
+            scheduledTime: { $exists: true, $ne: null },
+            $and: [
+              {
+                $or: [
+                  { status: "preorder" },
+                  { "waiterResponse.status": "approved" } // Bao gồm cả đơn đã approve
+                ]
+              },
+              {
+                $or: [
+                  { tableId: { $in: checkTableIdsObjectIds } }, // Check tableId
+                  { tableIds: { $in: checkTableIdsObjectIds } } // Check tableIds
+                ]
+              }
+            ]
+          }).populate("tableId", "tableNumber").populate("tableIds", "tableNumber").populate("userId", "name email phone");
+          
+          // Kiểm tra overlap với từng đơn và từng bàn
+          const conflicts = [];
+          for (const otherOrder of overlappingOrders) {
+            // Lấy danh sách bàn của đơn khác
+            const otherTableIds = [];
+            if (otherOrder.tableIds && otherOrder.tableIds.length > 0) {
+              otherTableIds.push(...otherOrder.tableIds.map(t => t._id?.toString() || t.toString()));
+            } else if (otherOrder.tableId) {
+              otherTableIds.push(otherOrder.tableId._id?.toString() || otherOrder.tableId.toString());
+            }
+            
+            // Kiểm tra xem có bàn nào trùng không
+            const checkTableIdsStr = checkTableIdsObjectIds.map(id => id.toString());
+            const commonTables = checkTableIdsStr.filter(tid => otherTableIds.includes(tid));
+            if (commonTables.length === 0) continue; // Không có bàn trùng, bỏ qua
+            
+            let hasConflict = false;
+            
+            if (otherOrder.reservedEndTime && order.reservedEndTime) {
+              // Cả 2 đơn đều có reservedEndTime → kiểm tra overlap chính xác
+              const thisStart = order.preparationStartTime 
+                ? new Date(order.preparationStartTime) 
+                : checkScheduledTime;
+              const thisEnd = new Date(order.reservedEndTime);
+              const otherStart = otherOrder.preparationStartTime 
+                ? new Date(otherOrder.preparationStartTime) 
+                : new Date(otherOrder.scheduledTime);
+              const otherEnd = new Date(otherOrder.reservedEndTime);
+              
+              // Overlap: thisStart < otherEnd && otherStart < thisEnd
+              if (thisStart < otherEnd && otherStart < thisEnd) {
+                hasConflict = true;
+              }
+            } else {
+              // Một trong 2 đơn chưa có reservedEndTime → kiểm tra scheduledTime trong vòng 2 giờ
+              const otherTime = new Date(otherOrder.scheduledTime);
+              const timeDiff = Math.abs(checkScheduledTime.getTime() - otherTime.getTime());
+              const twoHours = 2 * 60 * 60 * 1000;
+              if (timeDiff < twoHours) {
+                hasConflict = true;
+              }
+            }
+            
+            if (hasConflict) {
+              // Lấy tên các bàn trùng
+              const allTablesForCheck = await Table.find({ _id: { $in: checkTableIdsObjectIds } });
+              const commonTableNumbers = commonTables.map(tid => {
+                const table = allTablesForCheck.find(t => t._id.toString() === tid);
+                return table ? `Bàn ${table.tableNumber}` : tid;
+              }).join(", ");
+              
+              // Lấy tableIds của đơn khác (để frontend có thể so sánh)
+              const otherTableIdsArray = [];
+              if (otherOrder.tableIds && otherOrder.tableIds.length > 0) {
+                otherTableIdsArray.push(...otherOrder.tableIds.map(t => t._id?.toString() || t.toString()));
+              } else if (otherOrder.tableId) {
+                otherTableIdsArray.push(otherOrder.tableId._id?.toString() || otherOrder.tableId.toString());
+              }
+              
+              conflicts.push({
+                orderId: otherOrder._id,
+                customerName: otherOrder.userId?.name || "Khách vãng lai",
+                tableNumbers: commonTableNumbers, // String để hiển thị
+                tableIds: commonTables, // Array of table IDs trùng
+                otherTableIds: otherTableIdsArray, // Tất cả tableIds của đơn khác
+                scheduledTime: otherOrder.scheduledTime,
+                preparationStartTime: otherOrder.preparationStartTime,
+                reservedEndTime: otherOrder.reservedEndTime
+              });
+            }
+          }
+          
+          // Nếu có conflict và chưa force update, trả về cảnh báo với conflicts data
+          if (conflicts.length > 0 && !forceUpdate) {
+            // Trả về error nhưng kèm theo conflicts data để frontend có thể hiển thị modal
+            return res.status(400).json({
+              success: false,
+              message: `Các bàn đã được đặt trước trong khoảng thời gian này. Các đơn trùng: ${conflicts.map(c => `Mã đơn: ${String(c.orderId).slice(-8)}, Khách: ${c.customerName}, Bàn trùng: ${c.tableNumbers}`).join("; ")}`,
+              conflicts: conflicts // Thêm conflicts data để frontend parse
+            });
+          }
+          
+          // Nếu có conflict nhưng admin force update, log cảnh báo nhưng vẫn tiếp tục
+          if (conflicts.length > 0 && forceUpdate) {
+            console.warn(`⚠️ Admin force update preorder ${orderId} despite conflicts:`, conflicts);
+          }
+        }
+      }
     }
 
     // Lưu lịch sử
@@ -2321,7 +3450,8 @@ exports.updatePreOrder = async (req, res) => {
         path: "orderItems",
         select: "itemName itemType quantity price itemId",
       })
-      .populate("tableId", "tableNumber status")
+      .populate("tableId", "tableNumber status") // Backward compatibility
+      .populate("tableIds", "tableNumber status") // Nhiều bàn
       .populate("userId", "name email phone");
 
     // Tự động fill itemName từ itemId nếu thiếu
