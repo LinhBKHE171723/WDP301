@@ -37,6 +37,13 @@ const {
   markMenuUnavailable,
 } = require("../controllers/kitchen.menu.controller");
 const { getAllChef } = require("../controllers/kitchen.chef.controller");
+const {
+  getTodayChefAttendance,
+  checkInChef,
+  checkOutChef,
+  getActiveChefs,
+  getWorkShifts,
+} = require("../controllers/kitchen.chef.attendance.controller");
 
 const inv = require("../controllers/kitchen.inventory.controller");
 
@@ -57,13 +64,19 @@ router.patch("/orders/:orderId/start-preparing", startPreparingOrder);
 router.patch("/order-items/:orderItemId/ready", markItemReady);
 
 // 4.1. Đầu bếp cập nhật trạng thái từng món trong combo (PATCH)
-router.patch("/order-items/:orderItemId/combo-items/:comboItemIndex/status", updateComboItemStatus);
+router.patch(
+  "/order-items/:orderItemId/combo-items/:comboItemIndex/status",
+  updateComboItemStatus
+);
 
 // 5. Phân công món (PATCH)
 router.patch("/order-items/:orderItemId/assign-chef", assignChefToItem);
 
 // 5.1. Phân công đầu bếp cho từng món trong combo (PATCH)
-router.patch("/order-items/:orderItemId/combo-items/:comboItemIndex/assign-chef", assignChefToComboItem);
+router.patch(
+  "/order-items/:orderItemId/combo-items/:comboItemIndex/assign-chef",
+  assignChefToComboItem
+);
 
 // 6. Lấy danh sách các order
 router.get("/orders/:orderId", getOrderDetails);
@@ -130,4 +143,12 @@ router.delete("/ingredients/:id", inv.deleteIngredient);
 
 // --- Quản lý nhân viên bếp ---
 router.get("/chefs", getAllChef);
+
+// --- Quản lý điểm danh nhân viên bếp ---
+router.get("/chefs/attendance/today", getTodayChefAttendance); // Danh sách chef với trạng thái check-in hôm nay
+router.post("/chefs/:chefId/check-in", checkInChef); // Check-in cho chef
+router.post("/chefs/:chefId/check-out", checkOutChef); // Check-out cho chef
+router.get("/chefs/active", getActiveChefs); // Danh sách chef đang làm việc (đã check-in)
+router.get("/work-shifts", getWorkShifts); // Danh sách ca làm việc
+
 module.exports = router;
