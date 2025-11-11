@@ -1,27 +1,22 @@
 import { useState } from "react";
 import userApi from "../api/userApi";
 import { toast } from "react-toastify";
-import { useNavigate } from "react-router-dom";
 
 export default function ForgotPassword() {
     const [email, setEmail] = useState("");
-    const navigate = useNavigate();
 
     const handleSubmit = async (e) => {
         e.preventDefault();
         try {
             await userApi.ForgotPassword(email);
 
-            // ✅ Lưu email để dùng khi reset
-            localStorage.setItem("resetEmail", email);
+            toast.success("✅ Đã gửi link đặt lại mật khẩu vào email! Vui lòng kiểm tra hộp thư.");
 
-            toast.success("✅ Mật khẩu tạm đã được gửi đến email!");
-
-            // ✅ Điều hướng sang trang reset password sau 2 giây
-            setTimeout(() => navigate("/reset-password"), 2000);
+            // Clear form sau khi gửi thành công
+            setEmail("");
 
         } catch (err) {
-            toast.error(err.response?.data?.message || "Email không tồn tại!");
+            toast.error(err.message || "Email không tồn tại!");
         }
     };
 
@@ -39,8 +34,8 @@ export default function ForgotPassword() {
                     required
                 />
 
-                <button className="w-full bg-orange-500 text-white py-2 rounded hover:bg-orange-600">
-                    Gửi mật khẩu mới
+                <button type="submit" className="w-full bg-orange-500 text-white py-2 rounded hover:bg-orange-600">
+                    Gửi link đặt lại mật khẩu
                 </button>
             </form>
         </div>

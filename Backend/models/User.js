@@ -70,6 +70,15 @@ const userSchema = new mongoose.Schema(
   enum: ["active", "banned"],
   default: "active",
 },
+    // Reset password token và thời gian hết hạn
+    resetPasswordToken: {
+      type: String,
+      select: false,
+    },
+    resetPasswordExpires: {
+      type: Date,
+      select: false,
+    },
   },
   { timestamps: true }
 );

@@ -59,7 +59,7 @@ exports.updateProfile = async (req, res) => {
     }
 };
 
-// Gửi mật khẩu tạm về email
+// Gửi link reset password về email
 exports.forgotPassword = async (req, res) => {
     try {
         const { email } = req.body;
@@ -68,12 +68,21 @@ exports.forgotPassword = async (req, res) => {
         if (!user)
             return res.status(404).json({ success: false, message: "Email không tồn tại!" });
 
-        // Tạo mật khẩu tạm
-        const tempPassword = Math.random().toString(36).slice(-8);
+        // Tạo JWT token để reset password (hết hạn sau 1 giờ)
+        const resetToken = jwt.sign(
+            { id: user._id, email: user.email },
+            process.env.JWT_SECRET,
+            { expiresIn: "1h" }
+        );
 
-        // Gán mật khẩu tạm và lưu để model tự hash
-        user.password = tempPassword;
+        // Lưu token và thời gian hết hạn vào database
+        user.resetPasswordToken = resetToken;
+        user.resetPasswordExpires = new Date(Date.now() + 3600000); // 1 giờ = 3600000ms
         await user.save();
+
+        // Tạo link reset password
+        const frontendUrl = process.env.FRONTEND_URL || "http://localhost:3000";
+        const resetLink = `${frontendUrl}/reset-password?token=${resetToken}`;
 
         // Gửi email
         const transporter = nodemailer.createTransport({
@@ -88,11 +97,31 @@ exports.forgotPassword = async (req, res) => {
         await transporter.sendMail({
             from: `Nhà hàng WDP`,
             to: email,
-            subject: "Mật khẩu khôi phục tài khoản",
-            text: `Mật khẩu tạm của bạn là: ${tempPassword}`
+            subject: "Khôi phục mật khẩu tài khoản",
+            html: `
+                <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+                    <h2 style="color: #ea580c;">Khôi phục mật khẩu</h2>
+                    <p>Xin chào <b>${user.name}</b>,</p>
+                    <p>Bạn đã yêu cầu đặt lại mật khẩu cho tài khoản của mình.</p>
+                    <p>Vui lòng click vào link bên dưới để đặt lại mật khẩu:</p>
+                    <p style="margin: 20px 0;">
+                        <a href="${resetLink}" 
+                           style="background-color: #ea580c; color: white; padding: 12px 24px; 
+                                  text-decoration: none; border-radius: 5px; display: inline-block;">
+                            Đặt lại mật khẩu
+                        </a>
+                    </p>
+                    <p>Hoặc copy link sau vào trình duyệt:</p>
+                    <p style="word-break: break-all; color: #666;">${resetLink}</p>
+                    <p style="color: #999; font-size: 12px; margin-top: 30px;">
+                        <b>Lưu ý:</b> Link này chỉ có hiệu lực trong 1 giờ. Nếu bạn không yêu cầu đặt lại mật khẩu, 
+                        vui lòng bỏ qua email này.
+                    </p>
+                </div>
+            `
         });
 
-        res.json({ success: true, message: "✅ Đã gửi mật khẩu mới vào email!" });
+        res.json({ success: true, message: "✅ Đã gửi link đặt lại mật khẩu vào email!" });
 
     } catch (err) {
         console.error("❌ Forgot Password Error:", err);
@@ -101,25 +130,81 @@ exports.forgotPassword = async (req, res) => {
 };
 
 
-// Reset mật khẩu bằng mật khẩu tạm + mật khẩu mới
+// Verify token reset password (để frontend kiểm tra token có hợp lệ không)
+exports.verifyResetToken = async (req, res) => {
+    try {
+        const { token } = req.query;
+
+        if (!token) {
+            return res.status(400).json({ success: false, message: "Token không được để trống!" });
+        }
+
+        // Giải mã token
+        let decoded;
+        try {
+            decoded = jwt.verify(token, process.env.JWT_SECRET);
+        } catch (err) {
+            return res.status(400).json({ success: false, message: "Token không hợp lệ hoặc đã hết hạn!" });
+        }
+
+        // Tìm user và kiểm tra token trong database
+        const user = await User.findOne({
+            _id: decoded.id,
+            resetPasswordToken: token,
+            resetPasswordExpires: { $gt: new Date() } // Token chưa hết hạn
+        }).select("+resetPasswordToken +resetPasswordExpires");
+
+        if (!user) {
+            return res.status(400).json({ success: false, message: "Token không hợp lệ hoặc đã hết hạn!" });
+        }
+
+        res.json({ success: true, message: "Token hợp lệ", email: user.email });
+
+    } catch (err) {
+        console.error("❌ Verify Reset Token Error:", err);
+        res.status(500).json({ success: false, message: "Lỗi server" });
+    }
+};
+
+// Reset mật khẩu bằng token
 exports.resetPassword = async (req, res) => {
     try {
-        const { email, tempPassword, newPassword } = req.body;
+        const { token, newPassword } = req.body;
 
-        const user = await User.findOne({ email }).select("+password");
-        if (!user)
-            return res.status(404).json({ success: false, message: "Tài khoản không tồn tại!" });
+        if (!token || !newPassword) {
+            return res.status(400).json({ success: false, message: "Token và mật khẩu mới không được để trống!" });
+        }
 
-        const isMatch = await bcrypt.compare(tempPassword, user.password);
-        if (!isMatch)
-            return res.status(400).json({ success: false, message: "Mật khẩu tạm không đúng!" });
+        // Giải mã token
+        let decoded;
+        try {
+            decoded = jwt.verify(token, process.env.JWT_SECRET);
+        } catch (err) {
+            return res.status(400).json({ success: false, message: "Token không hợp lệ hoặc đã hết hạn!" });
+        }
 
+        // Tìm user và kiểm tra token trong database
+        const user = await User.findOne({
+            _id: decoded.id,
+            resetPasswordToken: token,
+            resetPasswordExpires: { $gt: new Date() } // Token chưa hết hạn
+        }).select("+resetPasswordToken +resetPasswordExpires");
+
+        if (!user) {
+            return res.status(400).json({ success: false, message: "Token không hợp lệ hoặc đã hết hạn!" });
+        }
+
+        // Đổi mật khẩu
         user.password = newPassword;
+        // Xóa token và expiry sau khi đổi mật khẩu thành công
+        user.resetPasswordToken = undefined;
+        user.resetPasswordExpires = undefined;
         await user.save();
 
         res.json({ success: true, message: "✅ Đổi mật khẩu thành công!" });
 
     } catch (err) {
+        console.error("❌ Reset Password Error:", err);
         res.status(500).json({ success: false, message: "Lỗi server" });
     }
 };

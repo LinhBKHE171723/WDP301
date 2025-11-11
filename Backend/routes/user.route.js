@@ -12,6 +12,9 @@ router.put("/updateProfile", authRequired, userController.updateProfile);
 // forgot password
 router.post("/forgotPassword", userController.forgotPassword);
 
+// verify reset token
+router.get("/verifyResetToken", userController.verifyResetToken);
+
 // reset password
 router.post("/resetPassword", userController.resetPassword);
 
