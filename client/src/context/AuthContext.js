@@ -1,5 +1,6 @@
 import { createContext, useContext, useState, useEffect } from "react";
 import { getCookie, setCookie, eraseCookie } from "../utils/cookie";
+import { API_ENDPOINTS } from "../utils/apiConfig";
 
 const AuthContext = createContext();
 
@@ -27,7 +28,7 @@ export const AuthProvider = ({ children }) => {
       }
       try {
         // Gọi API xác minh token
-        const res = await fetch("http://localhost:5000/api/auth/checkme", {
+        const res = await fetch(API_ENDPOINTS.AUTH.CHECK_ME, {
           headers: { Authorization: `Bearer ${token}` },
         });
 

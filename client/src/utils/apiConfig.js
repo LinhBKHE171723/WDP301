@@ -1,6 +1,27 @@
 // API configuration constants
 
-export const API_BASE_URL = 'http://localhost:5000/api';
+export const API_BASE_URL = process.env.REACT_APP_API_BASE_URL || 'http://localhost:5000/api';
+
+// Helper function to resolve WebSocket URL
+const resolveWebSocketUrl = () => {
+  // If explicit WebSocket URL is provided, use it
+  if (process.env.REACT_APP_WS_URL) {
+    return process.env.REACT_APP_WS_URL;
+  }
+  
+  // Otherwise, derive from API_BASE_URL
+  try {
+    const apiUrl = new URL(API_BASE_URL);
+    const wsProtocol = apiUrl.protocol === 'https:' ? 'wss:' : 'ws:';
+    const wsHost = apiUrl.host;
+    return `${wsProtocol}//${wsHost}/ws`;
+  } catch (error) {
+    // Fallback to default if URL parsing fails
+    return 'ws://localhost:5000/ws';
+  }
+};
+
+export const WEBSOCKET_URL = resolveWebSocketUrl();
 
 export const API_ENDPOINTS = {
   // Customer endpoints
@@ -22,16 +43,21 @@ export const API_ENDPOINTS = {
     REQUEST_PAYMENT: (id) => `${API_BASE_URL}/customer/orders/${id}/request-payment`,
     ORDER_CAN_FEEDBACK: (id) => `${API_BASE_URL}/customer/orders/${id}/can-feedback`,
     ORDER_FEEDBACK: (id) => `${API_BASE_URL}/customer/orders/${id}/feedback`,
-    PREORDERS: `${API_BASE_URL}/customer/preorders`
+    PREORDERS: `${API_BASE_URL}/customer/preorders`,
+    ORDER_EMPLOYEES: (id) => `${API_BASE_URL}/customer/orders/${id}/employees`
   },
   
   // Auth endpoints
   AUTH: {
     LOGIN: `${API_BASE_URL}/auth/login`,
-    CHECK_ME: `${API_BASE_URL}/auth/checkme`
+    REGISTER: `${API_BASE_URL}/auth/register`,
+    CHECK_ME: `${API_BASE_URL}/auth/checkme`,
+    FORGOT_PASSWORD: `${API_BASE_URL}/auth/forgotPassword`,
+    VERIFY_RESET_TOKEN: `${API_BASE_URL}/auth/verifyResetToken`,
+    RESET_PASSWORD: `${API_BASE_URL}/auth/resetPassword`
   },
   
   // WebSocket
-  WEBSOCKET: 'ws://localhost:5000/ws'
+  WEBSOCKET: WEBSOCKET_URL
 };
 

@@ -1,11 +1,11 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { authenticatedFetch } from '../utils/fetchHelper';
+import { WEBSOCKET_URL, API_ENDPOINTS } from '../utils/apiConfig';
 
 // WebSocket configuration constants
 const RETRY_INTERVALS = [1000, 2000, 4000, 8000, 16000, 30000];
 const HEARTBEAT_INTERVAL = 25000;
 const PONG_TIMEOUT = 10000;
-const WS_URL = 'ws://localhost:5000/ws';
 
 export const useOrderWebSocket = (orderId) => {
   const [connectionState, setConnectionState] = useState('disconnected');
@@ -84,7 +84,7 @@ export const useOrderWebSocket = (orderId) => {
       setConnectionState('connecting');
       setError(null);
 
-      const ws = new WebSocket(WS_URL);
+      const ws = new WebSocket(WEBSOCKET_URL);
       wsRef.current = ws;
 
       ws.onopen = () => {
@@ -183,7 +183,7 @@ export const useOrderWebSocket = (orderId) => {
     if (!orderId) return null;
 
     try {
-      const response = await authenticatedFetch(`http://localhost:5000/api/customer/orders/${orderId}`);
+      const response = await authenticatedFetch(API_ENDPOINTS.CUSTOMER.ORDER_BY_ID(orderId));
       const data = await response.json();
       
       if (data.success) {

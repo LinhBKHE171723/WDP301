@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import './LoginModal.css';
+import { API_ENDPOINTS } from '../utils/apiConfig';
 
 const LoginModal = ({ isOpen, onClose, onLogin, onSwitchToRegister, onSwitchToForgotPassword }) => {
   const [form, setForm] = useState({ email: "", password: "" });
@@ -17,7 +18,7 @@ const LoginModal = ({ isOpen, onClose, onLogin, onSwitchToRegister, onSwitchToFo
     setLoading(true);
 
     try {
-      const res = await fetch("http://localhost:5000/api/auth/login", {
+      const res = await fetch(API_ENDPOINTS.AUTH.LOGIN, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",

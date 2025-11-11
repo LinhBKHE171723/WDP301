@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import './LoginModal.css';
+import { API_ENDPOINTS } from '../utils/apiConfig';
 
 const ResetPassword = () => {
   const [searchParams] = useSearchParams();
@@ -25,7 +26,7 @@ const ResetPassword = () => {
       }
 
       try {
-        const res = await fetch(`http://localhost:5000/api/auth/verifyResetToken?token=${token}`);
+        const res = await fetch(`${API_ENDPOINTS.AUTH.VERIFY_RESET_TOKEN}?token=${token}`);
         const data = await res.json();
 
         if (res.ok && data.success) {
@@ -61,7 +62,7 @@ const ResetPassword = () => {
 
     try {
       setIsSubmitting(true);
-      const res = await fetch("http://localhost:5000/api/auth/resetPassword", {
+      const res = await fetch(API_ENDPOINTS.AUTH.RESET_PASSWORD, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",

@@ -15,6 +15,12 @@ import {
   ResponsiveContainer,
 } from "recharts";
 
+// Get API base URL from environment variable
+const getApiBaseUrl = () => {
+  const apiUrl = process.env.REACT_APP_API_URL || "http://localhost:5000/api";
+  return apiUrl;
+};
+
 const ItemPerformanceReport = () => {
   // State cho dữ liệu gốc từ API và các bộ lọc
   const [originalData, setOriginalData] = useState([]);
@@ -51,7 +57,7 @@ const ItemPerformanceReport = () => {
     if (itemLimit !== "all") {
       params.append("limit", itemLimit);
     }
-    const apiUrl = `http://localhost:5000/api/admin/top-items?${params.toString()}`;
+    const apiUrl = `${getApiBaseUrl()}/admin/top-items?${params.toString()}`;
 
     console.log("Đang gọi đến URL:", apiUrl);
 
@@ -91,7 +97,7 @@ const ItemPerformanceReport = () => {
     params.append("type", timeGroup);
     params.append("topN", "10000"); // Tăng lên để đảm bảo lấy tất cả items và combos
 
-    const apiUrl = `http://localhost:5000/api/admin/items/sales-by-time?${params.toString()}`;
+    const apiUrl = `${getApiBaseUrl()}/admin/items/sales-by-time?${params.toString()}`;
 
     axios
       .get(apiUrl)
@@ -151,7 +157,7 @@ const ItemPerformanceReport = () => {
       params.append("topN", topItemsCount);
     }
 
-    const apiUrl = `http://localhost:5000/api/admin/items/sales-by-time?${params.toString()}`;
+    const apiUrl = `${getApiBaseUrl()}/admin/items/sales-by-time?${params.toString()}`;
 
     axios
       .get(apiUrl)

@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import './LoginModal.css';
+import { API_ENDPOINTS } from '../utils/apiConfig';
 
 const ForgotPasswordModal = ({ isOpen, onClose, onSwitchToLogin }) => {
   const [email, setEmail] = useState("");
@@ -20,7 +21,7 @@ const ForgotPasswordModal = ({ isOpen, onClose, onSwitchToLogin }) => {
     setLoading(true);
 
     try {
-      const res = await fetch("http://localhost:5000/api/auth/forgotPassword", {
+      const res = await fetch(API_ENDPOINTS.AUTH.FORGOT_PASSWORD, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
