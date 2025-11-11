@@ -16,21 +16,20 @@ const getTodayRange = () => {
 
 /**
  * Cron job test: chạy mỗi 1 phút (dễ test)
- * - Reset status tất cả nhân viên
  * - Tạo shift cho tất cả nhân viên theo ca làm
+ *
+ * ⚠️ Đã XÓA phần reset status vì hệ thống dùng Shift model để quản lý check-in/out
  */
 cron.schedule("*/1 * * * *", async () => {
-  console.log("⏱ Cron job test: Reset employee status + tạo shift mới...");
+  console.log(
+    "⏱ Cron job test: Tạo shift mới cho nhân viên trong WorkShift..."
+  );
 
   try {
-    // 1️⃣ Reset status tất cả nhân viên
-    await User.updateMany(
-      { role: { $in: ["waiter", "chef", "cashier", "kitchen_manager"] } },
-      { status: "inactive" }
+    // Lấy tất cả ca làm active
+    const workShifts = await WorkShift.find({ isActive: true }).populate(
+      "employees"
     );
-
-    // 2️⃣ Lấy tất cả ca làm active
-    const workShifts = await WorkShift.find({ isActive: true }).populate("employees");
     if (!workShifts.length) {
       console.log("⚠️ Không có ca làm active nào.");
       return;
@@ -38,7 +37,7 @@ cron.schedule("*/1 * * * *", async () => {
 
     const { startOfDay, endOfDay } = getTodayRange();
 
-    // 3️⃣ Tạo shift cho từng nhân viên
+    // Tạo shift cho từng nhân viên trong WorkShift.employees
     for (const ws of workShifts) {
       for (const employee of ws.employees) {
         await Shift.findOneAndUpdate(
@@ -55,7 +54,9 @@ cron.schedule("*/1 * * * *", async () => {
       }
     }
 
-    console.log("✅ Shift hôm nay đã được tạo cho tất cả nhân viên");
+    console.log(
+      "✅ Shift hôm nay đã được tạo cho tất cả nhân viên trong WorkShift"
+    );
   } catch (err) {
     console.error("❌ Lỗi cron test:", err.message);
   }
@@ -81,7 +82,9 @@ cron.schedule("59 23 * * *", async () => {
       await shift.save();
     }
 
-    console.log(`✅ ${shifts.length} shift chưa check-in đã được set thành absent`);
+    console.log(
+      `✅ ${shifts.length} shift chưa check-in đã được set thành absent`
+    );
   } catch (err) {
     console.error("❌ Lỗi cron 23:59:", err.message);
   }
