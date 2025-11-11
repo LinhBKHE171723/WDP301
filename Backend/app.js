@@ -31,7 +31,7 @@ mongoose
   .connect(process.env.MONGO_URI)
   .then(async () => {
     console.log("✅ MongoDB connected");
-     
+    seedDatabase();
     console.log("✅ Database seeding completed");
     // Sau khi DB đã có dữ liệu, require cron
     require("./utils/cron");
