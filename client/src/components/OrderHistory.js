@@ -77,7 +77,7 @@ const OrderHistory = ({ onBack }) => {
     // Price filter
     if (priceFilter !== 'all') {
       filtered = filtered.filter(order => {
-        const price = order.totalAmount;
+        const price = order.totalAmount || 0;
         switch (priceFilter) {
           case 'under-100k':
             return price < 100000;
@@ -101,9 +101,9 @@ const OrderHistory = ({ onBack }) => {
         case 'oldest':
           return new Date(a.createdAt) - new Date(b.createdAt);
         case 'price-high':
-          return b.totalAmount - a.totalAmount;
+          return (b.totalAmount || 0) - (a.totalAmount || 0);
         case 'price-low':
-          return a.totalAmount - b.totalAmount;
+          return (a.totalAmount || 0) - (b.totalAmount || 0);
         default:
           return 0;
       }
@@ -320,7 +320,7 @@ const OrderHistory = ({ onBack }) => {
                     )}
                     <div className="order-detail-item">
                       <span className="detail-label">Tổng tiền:</span>
-                      <span className="detail-value">{order.totalAmount.toLocaleString('vi-VN')}đ</span>
+                      <span className="detail-value">{(order.totalAmount || 0).toLocaleString('vi-VN')}đ</span>
                     </div>
                     <div className="order-detail-item">
                       <span className="detail-label">Tình trạng:</span>

@@ -50,6 +50,9 @@ const OrderStatus = React.memo(({ orderId, onBack }) => {
   
   // State cho loading khi refresh
   const [isRefreshing, setIsRefreshing] = useState(false);
+  
+  // State để lưu rank label (tên hạng) của khách hàng
+  const [rankLabel, setRankLabel] = useState(null);
 
   // Ref để lưu trữ trạng thái order trước đó
   const prevOrderRef = useRef(null);
@@ -179,13 +182,41 @@ const OrderStatus = React.memo(({ orderId, onBack }) => {
       
       setDisplayOrderItems(mergedItems);
       
-      // Tính tổng tiền từ displayOrderItems
-      const totalAmount = mergedItems.reduce((sum, item) => {
+      // Tính tổng tiền từ displayOrderItems (tổng gốc, chưa trừ discount)
+      const totalAmountBeforeDiscount = mergedItems.reduce((sum, item) => {
         return sum + (item.price * item.quantity);
       }, 0);
-      setCalculatedTotalAmount(totalAmount);
+      
+      // Nếu có discount, trừ discount từ tổng gốc
+      // Discount được tính dựa trên tổng gốc mới (nếu đang edit) hoặc dùng discount cũ
+      const discount = order.discount || 0;
+      const finalTotalAmount = totalAmountBeforeDiscount - discount;
+      
+      setCalculatedTotalAmount(finalTotalAmount);
     }
   }, [order, pendingChanges]);
+
+  // Fetch rank label từ API loyalty-info
+  const fetchRankLabel = useCallback(async () => {
+    try {
+      const token = getCookie('customer_token');
+      if (!token) return;
+      
+      const response = await fetch(API_ENDPOINTS.CUSTOMER.LOYALTY_INFO, {
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
+      });
+      
+      const data = await response.json();
+      if (data.success && data.data.rank) {
+        setRankLabel(data.data.rank.label);
+      }
+    } catch (err) {
+      console.error('Error fetching rank label:', err);
+      // Không set error, chỉ log để không làm gián đoạn flow chính
+    }
+  }, []);
 
   // WebSocket connection
   const { connectionState, lastMessage, manualRefresh } = useOrderWebSocket(orderId);
@@ -210,6 +241,13 @@ const OrderStatus = React.memo(({ orderId, onBack }) => {
         
         // Set canEditOrder dựa trên trạng thái order
         const order = data.data;
+        
+        // Fetch rank label nếu order có userId và có discount
+        if (order.userId && order.discount > 0) {
+          fetchRankLabel();
+        } else {
+          setRankLabel(null);
+        }
         
         // Debug: Log orderItems để kiểm tra
         console.log('📦 Frontend received orderItems:', order.orderItems);
@@ -911,10 +949,62 @@ const OrderStatus = React.memo(({ orderId, onBack }) => {
             <span className="label">Bàn số:</span>
             <span className="value">{order.tableId?.tableNumber || 'N/A'}</span>
           </div>
-          <div className="info-row">
-            <span className="label">Tổng tiền:</span>
-            <span className="value price">{(calculatedTotalAmount || order.totalAmount)?.toLocaleString('vi-VN')} VNĐ</span>
-          </div>
+          {(() => {
+            // Tính tổng tiền gốc (trước discount)
+            // Nếu có calculatedTotalAmount (đang edit), tính từ displayOrderItems
+            // Nếu không, dùng order.totalAmount + order.discount
+            const totalBeforeDiscount = calculatedTotalAmount > 0 && (pendingChanges.itemsToAdd.length > 0 || pendingChanges.itemsToRemove.length > 0)
+              ? displayOrderItems.reduce((sum, item) => sum + (item.price * item.quantity), 0)
+              : (order.totalAmount + (order.discount || 0));
+            
+            const discount = order.discount || 0;
+            const finalTotal = calculatedTotalAmount > 0 && (pendingChanges.itemsToAdd.length > 0 || pendingChanges.itemsToRemove.length > 0)
+              ? calculatedTotalAmount
+              : order.totalAmount;
+            
+            if (discount > 0) {
+              return (
+                <>
+                  <div className="info-row">
+                    <span className="label">Tổng tiền gốc:</span>
+                    <span className="value">{totalBeforeDiscount.toLocaleString('vi-VN')} VNĐ</span>
+                  </div>
+                  <div className="info-row" style={{ color: '#28a745', fontWeight: 'bold' }}>
+                    <span className="label">
+                      Giảm giá {rankLabel ? `(hạng ${rankLabel.toLowerCase()})` : '(tự động)'}:
+                    </span>
+                    <span className="value">-{discount.toLocaleString('vi-VN')} VNĐ</span>
+                  </div>
+                  <div className="info-row">
+                    <span className="label">Tổng tiền:</span>
+                    <span className="value price">{finalTotal.toLocaleString('vi-VN')} VNĐ</span>
+                  </div>
+                </>
+              );
+            } else {
+              return (
+                <div className="info-row">
+                  <span className="label">Tổng tiền:</span>
+                  <span className="value price">{finalTotal.toLocaleString('vi-VN')} VNĐ</span>
+                </div>
+              );
+            }
+          })()}
+          {/* Hiển thị tiền cọc và số tiền còn lại nếu đơn là đặt trước và có tiền cọc */}
+          {(order.status === 'preorder' || order.scheduledTime) && order.totalDeposit > 0 && (
+            <>
+              <div className="info-row" style={{ color: '#007bff', fontWeight: 'bold' }}>
+                <span className="label">Tiền đã cọc:</span>
+                <span className="value">{order.totalDeposit.toLocaleString('vi-VN')} VNĐ</span>
+              </div>
+              {order.remainingAmount !== undefined && order.remainingAmount > 0 && (
+                <div className="info-row" style={{ color: '#ff6b00', fontWeight: 'bold' }}>
+                  <span className="label">Còn lại phải trả:</span>
+                  <span className="value">{order.remainingAmount.toLocaleString('vi-VN')} VNĐ</span>
+                </div>
+              )}
+            </>
+          )}
         </div>
 
         <div className="status-section">

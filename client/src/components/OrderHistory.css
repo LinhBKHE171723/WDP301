@@ -146,6 +146,11 @@
   color: #856404;
 }
 
+.status-preorder {
+  background: #e7f3ff;
+  color: #1976D2;
+}
+
 .status-waiting {
   background: #d1ecf1;
   color: #0c5460;
@@ -291,6 +296,30 @@
 .payment-status.unpaid {
   background: #f8d7da;
   color: #721c24;
+}
+
+.preorder-badge {
+  background: #e7f3ff;
+  padding: 8px 12px;
+  border-radius: 8px;
+  border-left: 4px solid #2196F3;
+  margin-bottom: 8px;
+}
+
+.preorder-tag {
+  background: #2196F3;
+  color: white;
+  padding: 4px 10px;
+  border-radius: 12px;
+  font-size: 12px;
+  font-weight: 600;
+  margin-right: 8px;
+}
+
+.scheduled-time {
+  color: #1976D2;
+  font-size: 13px;
+  font-weight: 500;
 }
 
 /* Responsive */

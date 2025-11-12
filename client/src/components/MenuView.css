@@ -181,6 +181,30 @@
   box-shadow: 0 4px 12px rgba(244, 67, 54, 0.3);
 }
 
+.preorder-btn {
+  background: #4CAF50;
+  color: white;
+  border: none;
+  padding: 10px 20px;
+  border-radius: 8px;
+  cursor: pointer;
+  font-weight: 600;
+  font-size: 14px;
+  transition: all 0.3s ease;
+  height: 40px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  white-space: nowrap;
+  margin: 0;
+}
+
+.preorder-btn:hover {
+  background: #45a049;
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(76, 175, 80, 0.3);
+}
+
 .cart-btn, .back-btn {
   padding: 10px 20px;
   border: none;

@@ -8,6 +8,7 @@ import GuestOrderHistory from "./components/GuestOrderHistory"
 import OrderStatus from "./components/OrderStatus"
 import PreOrder from "./components/PreOrder"
 import ResetPassword from "./components/ResetPassword"
+import LoyaltyInfo from "./components/LoyaltyInfo"
 
 import "./App.css"
 
@@ -21,6 +22,11 @@ function OrderHistoryRoute() {
 function GuestOrderHistoryRoute() {
   const navigate = useNavigate()
   return <GuestOrderHistory onBack={() => navigate('/reservation')} />
+}
+
+function LoyaltyInfoRoute() {
+  const navigate = useNavigate()
+  return <LoyaltyInfo onBack={() => navigate('/reservation')} />
 }
 
 function OrderStatusRoute() {
@@ -78,6 +84,12 @@ function App() {
             <Route
               path="/guest-order-history"
               element={<GuestOrderHistoryRoute />}
+            />
+
+            {/* Thông tin Loyalty (điểm, rank) */}
+            <Route
+              path="/loyalty-info"
+              element={<LoyaltyInfoRoute />}
             />
 
             {/* Xem chi tiết đơn hàng */}

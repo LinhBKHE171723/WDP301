@@ -44,7 +44,8 @@ export const API_ENDPOINTS = {
     ORDER_CAN_FEEDBACK: (id) => `${API_BASE_URL}/customer/orders/${id}/can-feedback`,
     ORDER_FEEDBACK: (id) => `${API_BASE_URL}/customer/orders/${id}/feedback`,
     PREORDERS: `${API_BASE_URL}/customer/preorders`,
-    ORDER_EMPLOYEES: (id) => `${API_BASE_URL}/customer/orders/${id}/employees`
+    ORDER_EMPLOYEES: (id) => `${API_BASE_URL}/customer/orders/${id}/employees`,
+    LOYALTY_INFO: `${API_BASE_URL}/customer/loyalty-info`
   },
   
   // Auth endpoints
@@ -55,6 +56,12 @@ export const API_ENDPOINTS = {
     FORGOT_PASSWORD: `${API_BASE_URL}/auth/forgotPassword`,
     VERIFY_RESET_TOKEN: `${API_BASE_URL}/auth/verifyResetToken`,
     RESET_PASSWORD: `${API_BASE_URL}/auth/resetPassword`
+  },
+  
+  // User endpoints
+  USER: {
+    PROFILE: `${API_BASE_URL}/user/profile`,
+    UPDATE_PROFILE: `${API_BASE_URL}/user/updateProfile`
   },
   
   // WebSocket

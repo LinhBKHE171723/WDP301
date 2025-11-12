@@ -141,7 +141,7 @@ export default function PreOrderCalendar({ preorders, onSelectEvent }) {
         };
         
         const tableNumbersStr = getTableNumbers(order);
-        const customerName = order.userId?.name || 'Khách vãng lai';
+        const customerName = order.preorderName || order.userId?.name || 'Khách vãng lai';
         
         // Chỉ hiển thị số bàn, bỏ tên khách hàng
         const shortTitle = tableNumbersStr !== 'Chưa gán' 

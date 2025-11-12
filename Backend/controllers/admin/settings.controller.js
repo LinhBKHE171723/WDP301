@@ -56,6 +56,37 @@ exports.updateSetting = async (req, res) => {
       value = Number(value);
     }
 
+    // Validation cho loyalty settings
+    if (key === "loyalty.pointRate") {
+      const numValue = typeof value === "number" ? value : Number(value);
+      if (isNaN(numValue) || numValue <= 0) {
+        return error(res, "loyalty.pointRate phải là số dương", 400);
+      }
+      value = numValue;
+    }
+
+    if (key === "loyalty.ranks") {
+      if (!Array.isArray(value)) {
+        return error(res, "loyalty.ranks phải là một mảng", 400);
+      }
+      
+      // Validate từng rank
+      for (const rank of value) {
+        if (!rank.name || typeof rank.name !== "string") {
+          return error(res, "Mỗi rank phải có name (string)", 400);
+        }
+        if (typeof rank.minPoints !== "number" || rank.minPoints < 0) {
+          return error(res, "Mỗi rank phải có minPoints là số >= 0", 400);
+        }
+        if (typeof rank.discount !== "number" || rank.discount < 0 || rank.discount > 100) {
+          return error(res, "Mỗi rank phải có discount là số từ 0 đến 100", 400);
+        }
+        if (!rank.label || typeof rank.label !== "string") {
+          return error(res, "Mỗi rank phải có label (string)", 400);
+        }
+      }
+    }
+
     const setting = await Setting.setSetting(
       key,
       value,
