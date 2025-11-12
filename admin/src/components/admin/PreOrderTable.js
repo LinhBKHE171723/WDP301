@@ -14,6 +14,7 @@ import {
   DialogTrigger,
 } from "../ui/admin/dialog";
 import { Button } from "../ui/admin/button";
+import { Download } from "lucide-react";
 import adminApi from "../../api/adminApi";
 import waiterApi from "../../api/waiterApi";
 import useAdminWebSocket from "../../hooks/useAdminWebSocket";
@@ -108,6 +109,7 @@ export function PreOrderTable() {
   const [updateOverlapWarning, setUpdateOverlapWarning] = useState(null); // { overlappingOrders: [], showConfirm: false }
   const [allTables, setAllTables] = useState([]);
   const [actionLoading, setActionLoading] = useState(false);
+  const [exportLoading, setExportLoading] = useState(false);
   const [viewMode, setViewMode] = useState("table"); // "table" or "calendar"
   const [overlapWarning, setOverlapWarning] = useState(null); // { overlappingOrders: [], showConfirm: false }
 
@@ -532,6 +534,43 @@ export function PreOrderTable() {
     });
   }, [preorders, search]);
 
+  // Handle export preorders
+  const handleExportPreOrders = async () => {
+    try {
+      setExportLoading(true);
+      const params = {};
+      
+      // Apply current filters
+      if (waiterResponseStatus) params.waiterResponseStatus = waiterResponseStatus;
+      if (fromDate) params.fromDate = fromDate;
+      if (toDate) params.toDate = toDate;
+      if (minAmount) params.minAmount = minAmount;
+      if (maxAmount) params.maxAmount = maxAmount;
+      params.format = "xlsx";
+
+      const blob = await adminApi.exportPreOrders(params);
+      
+      // Create download link
+      const url = window.URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = `don-dat-truoc-${new Date().toISOString().split("T")[0]}.xlsx`;
+      document.body.appendChild(link);
+      link.click();
+      
+      // Cleanup
+      document.body.removeChild(link);
+      window.URL.revokeObjectURL(url);
+      
+      toast.success("Đã xuất file Excel thành công");
+    } catch (err) {
+      console.error("Lỗi khi xuất file:", err);
+      toast.error(err?.message || "Không thể xuất file Excel");
+    } finally {
+      setExportLoading(false);
+    }
+  };
+
   if (loading) {
     return (
       <div className="preorder-container">
@@ -624,6 +663,22 @@ export function PreOrderTable() {
             className="preorder-filter-btn"
           >
             {showFilters ? "Ẩn bộ lọc" : "Hiện bộ lọc"}
+          </Button>
+          <Button
+            variant="default"
+            onClick={handleExportPreOrders}
+            disabled={exportLoading}
+            className="preorder-filter-btn"
+            style={{ 
+              display: "flex", 
+              alignItems: "center", 
+              gap: "8px",
+              color: "white",
+              backgroundColor: "#2563eb"
+            }}
+          >
+            <Download size={16} />
+            {exportLoading ? "Đang xuất..." : "Xuất Excel"}
           </Button>
         </div>
 

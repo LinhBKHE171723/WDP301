@@ -272,7 +272,7 @@ const MenuView = ({ table, onBack }) => {
         </div>
         <div className="header-actions">
           <button onClick={() => navigate('/preorder')} className="preorder-btn">
-            🍽️ Đặt bàn trước
+            Đặt bàn trước
           </button>
           {isLoggedIn ? (
             <UserDropdown onLogout={handleLogout} />
@@ -312,57 +312,24 @@ const MenuView = ({ table, onBack }) => {
       <div className="menu-content">
         {activeTab === 'menus' && (
           <>
-            <div className="price-filter">
-              <h3>Lọc theo giá:</h3>
-              <div className="filter-buttons">
-                <button
-                  className={priceFilter === 'all' ? 'active' : ''}
-                  onClick={() => setPriceFilter('all')}
+            <div className="item-filters">
+              <div className="filter-group">
+                <label htmlFor="menu-price-filter">Lọc theo giá:</label>
+                <select
+                  id="menu-price-filter"
+                  value={priceFilter}
+                  onChange={(e) => setPriceFilter(e.target.value)}
+                  className="filter-select"
                 >
-                  Tất cả
-                </button>
-                <button
-                  className={priceFilter === 'under-100k' ? 'active' : ''}
-                  onClick={() => setPriceFilter('under-100k')}
-                >
-                  Dưới 100k
-                </button>
-                <button
-                  className={priceFilter === '100k-200k' ? 'active' : ''}
-                  onClick={() => setPriceFilter('100k-200k')}
-                >
-                  100k - 200k
-                </button>
-                <button
-                  className={priceFilter === '200k-500k' ? 'active' : ''}
-                  onClick={() => setPriceFilter('200k-500k')}
-                >
-                  200k - 500k
-                </button>
-                <button
-                  className={priceFilter === '500k-1000k' ? 'active' : ''}
-                  onClick={() => setPriceFilter('500k-1000k')}
-                >
-                  500k - 1000k
-                </button>
-                <button
-                  className={priceFilter === '1000k-2000k' ? 'active' : ''}
-                  onClick={() => setPriceFilter('1000k-2000k')}
-                >
-                  1000k - 2000k
-                </button>
-                <button
-                  className={priceFilter === '2000k-5000k' ? 'active' : ''}
-                  onClick={() => setPriceFilter('2000k-5000k')}
-                >
-                  2000k - 5000k
-                </button>
-                <button
-                  className={priceFilter === 'over-5000k' ? 'active' : ''}
-                  onClick={() => setPriceFilter('over-5000k')}
-                >
-                  Trên 5000k
-                </button>
+                  <option value="all">Tất cả giá</option>
+                  <option value="under-100k">Dưới 100k</option>
+                  <option value="100k-200k">100k - 200k</option>
+                  <option value="200k-500k">200k - 500k</option>
+                  <option value="500k-1000k">500k - 1000k</option>
+                  <option value="1000k-2000k">1000k - 2000k</option>
+                  <option value="2000k-5000k">2000k - 5000k</option>
+                  <option value="over-5000k">Trên 5000k</option>
+                </select>
               </div>
             </div>
             <div className="menu-grid">
@@ -452,38 +419,21 @@ const MenuView = ({ table, onBack }) => {
             <div className="menu-grid">
               {filterItemsByPriceAndCategory(items, itemPriceFilter, categoryFilter).map(item => (
               <div key={item._id} className="menu-card">
-                <div 
-                  className="menu-image clickable"
-                  onClick={() => handleViewDetail(item, 'item')}
-                >
+                <div className="menu-image">
                   {item.image ? (
                     <img src={item.image} alt={item.name} />
                   ) : (
                     <div></div>
                   )}
-                  <div className="view-detail-overlay">
-                    <span></span>
-                  </div>
                 </div>
                 <div className="menu-info">
-                  <h3 
-                    className="clickable"
-                    onClick={() => handleViewDetail(item, 'item')}
-                  >
-                    {item.name}
-                  </h3>
+                  <h3>{item.name}</h3>
                   <p className="menu-description">{item.description}</p>
                   <div className="menu-category">{item.category}</div>
                   <div className="menu-price">
                     {item.price?.toLocaleString('vi-VN')} VNĐ
                   </div>
                   <div className="menu-actions">
-                    <button
-                      onClick={() => handleViewDetail(item, 'item')}
-                      className="view-detail-btn"
-                    >
-                      Chi tiết
-                    </button>
                     <button
                       onClick={() => addToCart(item, 'item')}
                       className="add-to-cart-btn"
