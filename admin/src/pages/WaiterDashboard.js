@@ -310,15 +310,6 @@ WaiterDashboard có một useEffect lắng nghe lastMessage → xử lý cập n
                     <h4 className="fw-bold text-dark mb-3 mb-md-0">
                         🧾 Quản lý đơn hàng
                     </h4>
-                    <div className="d-flex align-items-center gap-3">
-                        {/* WebSocket Connection Status */}
-                        <div className={`connection-status ${connectionState}`}>
-                            {connectionState === 'connected' && '🟢 Kết nối realtime'}
-                            {connectionState === 'connecting' && '🟡 Đang kết nối...'}
-                            {connectionState === 'reconnecting' && '🟡 Đang kết nối lại...'}
-                            {connectionState === 'disconnected' && '🔴 Mất kết nối'}
-                        </div>
-                    </div>
                 </div>
 
                 {/* Tabs */}

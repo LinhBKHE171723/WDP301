@@ -10,6 +10,7 @@ import {
 } from "react-bootstrap";
 import { useAuth } from "../../context/AuthContext";
 import Header from "../waiter/Header";
+import CashierHeader from "../cashier/CashierHeader";
 import userApi from "../../api/userApi";
 import { toast } from "react-toastify";
 import "react-toastify/dist/ReactToastify.css";
@@ -117,10 +118,21 @@ export default function Profile() {
     };
 
 
+    // Hiển thị header phù hợp với role
+    const renderHeader = () => {
+        if (user?.role === "cashier") {
+            return <CashierHeader />;
+        } else if (user?.role === "waiter") {
+            return <Header />;
+        }
+        // Các role khác (kitchen_manager, admin) có thể không cần header hoặc header đơn giản
+        return null;
+    };
+
     return (
         <Container className="py-4">
             {/* 🧭 Header */}
-            <Header />
+            {renderHeader()}
 
             <h3 className="my-4">Hồ sơ cá nhân</h3>
 

@@ -1158,15 +1158,6 @@ const OrderStatus = React.memo(({ orderId, onBack }) => {
         </div>
 
         <div className="actions">
-          <div className="connection-status">
-            <div className={`status-indicator ${connectionState}`}>
-              {connectionState === 'connected' && '🟢 Đang kết nối realtime'}
-              {connectionState === 'connecting' && '🟡 Đang kết nối...'}
-              {connectionState === 'reconnecting' && '🟡 Đang kết nối lại...'}
-              {connectionState === 'disconnected' && '🔴 Mất kết nối - hãy kiểm tra mạng'}
-            </div>
-            {hasNewUpdate && <span className="new-update-indicator"> ✨ Có cập nhật mới!</span>}
-          </div>
           <div className="action-buttons">
             {/* Chỉ hiển thị nút khi có pending changes, waiter đã từ chối, hoặc đang trong editing mode */}
             {order?.status === 'pending' && (pendingChanges.itemsToAdd.length > 0 || pendingChanges.itemsToRemove.length > 0 || order?.waiterResponse?.status === 'rejected' || canEditOrder) && (
