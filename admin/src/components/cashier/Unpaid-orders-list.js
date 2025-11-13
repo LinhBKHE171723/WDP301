@@ -1,6 +1,6 @@
-import { ArrowLeft, Clock, Users } from "lucide-react"
+import { ArrowLeft, Clock, Users, Search } from "lucide-react"
 import "./unpaid-orders-list.css"
-import { useEffect, useState } from "react"
+import { useEffect, useState, useMemo } from "react"
 import OrderPayment from "./order-payment"
 import Client from "../../api/Client"
 
@@ -29,6 +29,7 @@ function UnpaidOrdersList({
   const [unpaidOrders, setUnpaidOrders] = useState(initialOrders)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState("")
+  const [tableFilter, setTableFilter] = useState("")
 
   const containerClassName = [
     "unpaid-orders-container",
@@ -73,6 +74,18 @@ function UnpaidOrdersList({
 
   const formatTime = (dateString) =>
     new Intl.DateTimeFormat("vi-VN", { hour: "2-digit", minute: "2-digit" }).format(new Date(dateString))
+
+  // Filter orders by table number
+  const filteredOrders = useMemo(() => {
+    if (!tableFilter.trim()) {
+      return unpaidOrders
+    }
+    const filterValue = tableFilter.trim().toLowerCase()
+    return unpaidOrders.filter((order) => {
+      const tableNumber = order.tableNumber?.toString().toLowerCase() || ""
+      return tableNumber.includes(filterValue)
+    })
+  }, [unpaidOrders, tableFilter])
 
   const handlePaymentComplete = async (orderId, paymentMethod) => {
     const paidOrder = unpaidOrders.find((order) => order.id === orderId)
@@ -132,7 +145,51 @@ function UnpaidOrdersList({
           )}
         <div className="header-content">
           <h1 className="header-title">Đơn Chờ Thanh Toán</h1>
-          <p className="header-subtitle">{unpaidOrders.length} đơn hàng đang chờ</p>
+          <p className="header-subtitle">
+            {tableFilter ? `${filteredOrders.length}/${unpaidOrders.length} đơn hàng` : `${unpaidOrders.length} đơn hàng đang chờ`}
+          </p>
+        </div>
+      </div>
+      <div className="unpaid-orders-header-action">
+        <div className="orders-search">
+          <div style={{ position: "relative", display: "flex", alignItems: "center" }}>
+            <Search 
+              className="search-icon" 
+              style={{ 
+                position: "absolute", 
+                left: "0.75rem", 
+                width: "1rem", 
+                height: "1rem", 
+                color: "var(--muted-foreground)" 
+              }} 
+            />
+            <input
+              type="text"
+              className="orders-search-input"
+              placeholder="Tìm số bàn..."
+              value={tableFilter}
+              onChange={(e) => setTableFilter(e.target.value)}
+              style={{ paddingLeft: "2.5rem" }}
+            />
+            {tableFilter && (
+              <button
+                onClick={() => setTableFilter("")}
+                style={{
+                  position: "absolute",
+                  right: "0.5rem",
+                  background: "none",
+                  border: "none",
+                  cursor: "pointer",
+                  padding: "0.25rem",
+                  display: "flex",
+                  alignItems: "center",
+                  color: "var(--muted-foreground)",
+                }}
+              >
+                ×
+              </button>
+            )}
+          </div>
         </div>
       </div>
       </div>
@@ -164,7 +221,7 @@ function UnpaidOrdersList({
 
       {/* Orders List */}
       <div className="orders-list">
-        {unpaidOrders.map((order) => (
+        {filteredOrders.map((order) => (
           <div
             key={order.id}
             className="order-card"
@@ -246,6 +303,17 @@ function UnpaidOrdersList({
           </div>
           <h3 className="empty-title">Không có đơn chờ thanh toán</h3>
           <p className="empty-description">Tất cả đơn hàng đã được thanh toán</p>
+        </div>
+      )}
+
+      {/* No results for filter */}
+      {unpaidOrders.length > 0 && filteredOrders.length === 0 && !loading && (
+        <div className="empty-state">
+          <div className="empty-icon">
+            <Search />
+          </div>
+          <h3 className="empty-title">Không tìm thấy đơn hàng</h3>
+          <p className="empty-description">Không có đơn nào phù hợp với số bàn "{tableFilter}"</p>
         </div>
       )}
 

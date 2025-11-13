@@ -32,6 +32,7 @@ import CashierDashboard from "../components/cashier/CashierDashboard";
 import OrderPayment from "../components/cashier/order-payment";
 import TableManagement from "../components/cashier/table-management";
 import UnpaidOrdersList from "../components/cashier/Unpaid-orders-list";
+import CashierLayout from "../components/cashier/CashierLayout";
 
 // auth
 import ForgotPassword from "../pages/ForgotPassword";
@@ -139,7 +140,14 @@ function CashierApp() {
       <Route path="orderpayment" element={<AdminCashierOrderPaymentRoute />} />
       <Route path="unpaid" element={<AdminCashierUnpaidOrdersRoute />} />
       <Route path="tables" element={<AdminCashierTableManagementRoute />} />
-      <Route path="preorders" element={<PreOrderPage />} />
+      <Route 
+        path="preorders" 
+        element={
+          <CashierLayout>
+            <PreOrderPage />
+          </CashierLayout>
+        } 
+      />
       <Route path="*" element={<Navigate to="dashboard" replace />} />
     </Routes>
   );

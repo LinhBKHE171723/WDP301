@@ -1,59 +1,59 @@
 import React from "react";
-import { Button, Navbar, Container } from "react-bootstrap";
-import { Link } from "react-router-dom";
-import { useAuth } from "../../context/AuthContext";
 import { useNavigate } from "react-router-dom";
+import { ArrowLeft } from "lucide-react";
+import CashierUserBadge from "./CashierUserBadge";
+import "./CashierDashboard.css";
 
-export default function CashierHeader() {
-    const { user, logout } = useAuth();
+/**
+ * Header đơn giản cho cashier - tái sử dụng user badge từ dashboard
+ * Dùng cho trang Profile và các trang khác của cashier
+ * @param {boolean} showBackButton - Hiển thị nút quay lại
+ * @param {string} backPath - Đường dẫn quay lại (mặc định: /admin/cashier/dashboard)
+ */
+export default function CashierHeader({ showBackButton = false, backPath = "/admin/cashier/dashboard" }) {
     const navigate = useNavigate();
     
+    const handleBack = () => {
+        navigate(backPath);
+    };
+    
     return (
-        <Navbar
-            bg="white"
-            expand={false}
-            className="shadow-sm sticky-top border-bottom"
-            style={{ zIndex: 1030 }}
-        >
-            <Container fluid className="px-2 px-md-3 py-2">
-                <div className="d-flex align-items-center justify-content-between w-100">
+        <div className="dashboard-header" style={{ marginBottom: '1.5rem' }}>
+            <div className="dashboard-header-content">
+                <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
+                    {/* Nút quay lại */}
+                    {showBackButton && (
+                        <button 
+                            onClick={handleBack} 
+                            className="button button-secondary"
+                            style={{ 
+                                display: 'inline-flex', 
+                                alignItems: 'center', 
+                                gap: '0.5rem',
+                                padding: '0.5rem 1rem'
+                            }}
+                        >
+                            <ArrowLeft className="button-icon" />
+                            Quay lại
+                        </button>
+                    )}
+                    
                     {/* Logo */}
-                    <Navbar.Brand
-                        className="fw-bold text-dark d-flex align-items-center p-0"
-                        style={{ cursor: "pointer", flexShrink: 0 }}
+                    <div 
+                        className="dashboard-title-section"
+                        style={{ cursor: "pointer" }}
                         onClick={() => navigate("/admin/cashier/dashboard")}
                     >
-                        <span style={{ fontSize: '22px' }}>🍽️</span>
-                        <span className="ms-2" style={{ fontSize: '16px' }}>Nhà hàng WDP</span>
-                    </Navbar.Brand>
-
-                    {/* Profile */}
-                    <div className="d-flex align-items-center gap-2">
-                        <Link to="/admin/profile" className="text-dark text-decoration-none">
-                            <img
-                                src={user?.avatar || "https://cdn-icons-png.flaticon.com/512/149/149071.png"}
-                                alt="profile"
-                                width="36"
-                                height="36"
-                                className="rounded-circle border"
-                                style={{ objectFit: 'cover' }}
-                            />
-                        </Link>
-                        <span className="fw-bold text-dark" style={{ fontSize: '14px' }}>
-                            {user?.name}
-                        </span>
-                        <Button
-                            variant="outline-danger"
-                            size="sm"
-                            onClick={logout}
-                            className="fw-semibold px-2"
-                        >
-                            Đăng xuất
-                        </Button>
+                        <h1 className="dashboard-title" style={{ fontSize: '1.5rem', margin: 0 }}>
+                            🍽️ Nhà hàng WDP
+                        </h1>
                     </div>
                 </div>
-            </Container>
-        </Navbar>
+
+                {/* User Badge - tái sử dụng từ dashboard */}
+                <CashierUserBadge />
+            </div>
+        </div>
     );
 }
 

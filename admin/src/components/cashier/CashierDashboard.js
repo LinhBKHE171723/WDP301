@@ -13,8 +13,6 @@ import {
   Printer,
   Grid3x3,
   Calendar,
-  User,
-  ChevronDown,
 } from "lucide-react"
 import { useNavigate } from "react-router-dom"
 import { toast } from "react-toastify"
@@ -26,6 +24,7 @@ import useCashierSocket from "../../hooks/useCashierSocket"
 import adminApi from "../../api/adminApi"
 import useAdminWebSocket from "../../hooks/useAdminWebSocket"
 import { useAuth } from "../../context/AuthContext"
+import CashierUserBadge from "./CashierUserBadge"
 
 /**
  * Props hỗ trợ cả phiên bản cũ và mới:
@@ -47,13 +46,10 @@ export default function CashierDashboard({
   const [showPaymentHistory, setShowPaymentHistory] = useState(false)
   const [showTableManagement, setShowTableManagement] = useState(false)
 
-  // ====== User menu (tên thu ngân + Profile + Logout) ======
-  const [isUserMenuOpen, setIsUserMenuOpen] = useState(false)
-  const userMenuRef = useRef(null)
+  // ====== User menu đã được tách ra thành CashierUserBadge component ======
 
   // ====== Preorders (đơn đặt trước) ======
   const [pendingPreordersCount, setPendingPreordersCount] = useState(0)
-  const [todaysPreordersCount, setTodaysPreordersCount] = useState(0)
   const [loadingPreorders, setLoadingPreorders] = useState(true)
 
   // WebSocket để nhận thông báo preorder mới
@@ -110,25 +106,7 @@ export default function CashierDashboard({
       new Date(dateString)
     )
 
-  // ====== Thông tin thu ngân (badge) ======
-  const cashierName = user?.name || "Thu Ngân"
-  const cashierInitials = useMemo(() => {
-    if (!cashierName) return "TN"
-    const parts = cashierName.trim().split(/\s+/)
-    const letters = parts.map((p) => p[0]).join("")
-    return letters.slice(-2).toUpperCase()
-  }, [cashierName])
-
-  // Đóng dropdown khi click ra ngoài
-  useEffect(() => {
-    const handleClickOutside = (e) => {
-      if (userMenuRef.current && !userMenuRef.current.contains(e.target)) {
-        setIsUserMenuOpen(false)
-      }
-    }
-    document.addEventListener("mousedown", handleClickOutside)
-    return () => document.removeEventListener("mousedown", handleClickOutside)
-  }, [])
+  // ====== Thông tin thu ngân đã được tách ra thành CashierUserBadge component ======
 
   // ====== Callback từ UnpaidOrdersList khi thanh toán xong ======
   const handlePaymentCompleteFromUnpaid = (payment) => {
@@ -210,37 +188,13 @@ export default function CashierDashboard({
     try {
       setLoadingPreorders(true)
 
-      // 1. Đơn đang chờ duyệt
+      // Đơn đang chờ duyệt
       const pendingResponse = await adminApi.getPreOrders({ waiterResponseStatus: "pending" })
       const pendingOrders = Array.isArray(pendingResponse?.data) ? pendingResponse.data : []
       setPendingPreordersCount(pendingOrders.length)
-
-      // 2. Đơn đã duyệt, scheduledTime trong hôm nay
-      const today = new Date()
-      today.setHours(0, 0, 0, 0)
-      const tomorrow = new Date(today)
-      tomorrow.setDate(tomorrow.getDate() + 1)
-
-      const todaysResponse = await adminApi.getPreOrders({
-        waiterResponseStatus: "approved",
-        fromDate: today.toISOString(),
-        toDate: tomorrow.toISOString(),
-        filterBy: "scheduledTime",
-      })
-      const todaysOrders = Array.isArray(todaysResponse?.data) ? todaysResponse.data : []
-
-      const filteredTodaysOrders = todaysOrders.filter((order) => {
-        if (!order.scheduledTime) return false
-        const d = new Date(order.scheduledTime)
-        d.setHours(0, 0, 0, 0)
-        return d.getTime() === today.getTime()
-      })
-
-      setTodaysPreordersCount(filteredTodaysOrders.length)
     } catch (error) {
       console.error("Không thể tải số lượng đơn đặt trước:", error)
       setPendingPreordersCount(0)
-      setTodaysPreordersCount(0)
     } finally {
       setLoadingPreorders(false)
     }
@@ -337,17 +291,7 @@ export default function CashierDashboard({
   const pageItems = useMemo(() => payments.slice(start, end), [payments, start, end])
   const goTo = (p) => setPage(Math.min(totalPages, Math.max(1, p)))
 
-  // ====== Handler Profile + Logout ======
-  const handleGoProfile = () => {
-    setIsUserMenuOpen(false)
-    navigate("/admin/profile")
-  }
-
-  const handleDashboardLogoutClick = () => {
-    setIsUserMenuOpen(false)
-    logout()
-    navigate("/login") // đổi thành "/" nếu login nằm ở "/"
-  }
+  // ====== Handler Profile + Logout đã được tách ra thành CashierUserBadge component ======
 
   // ====== Màn lịch sử thanh toán ======
   if (showPaymentHistory) {
@@ -542,35 +486,8 @@ export default function CashierDashboard({
               </button>
             </div>
 
-            {/* Badge tên thu ngân + menu */}
-            <div className="dashboard-user-wrapper" ref={userMenuRef}>
-              <button
-                type="button"
-                className="user-badge-button"
-                onClick={() => setIsUserMenuOpen((v) => !v)}
-              >
-                <div className="user-avatar-circle">{cashierInitials}</div>
-                <div className="user-badge-info">
-                  <p className="user-badge-name">{cashierName}</p>
-                  <p className="user-badge-role">Thu ngân</p>
-                </div>
-                <ChevronDown className="user-badge-chevron" />
-              </button>
-
-              {isUserMenuOpen && (
-                <div className="user-menu-dropdown">
-                  <button className="user-menu-item" onClick={handleGoProfile}>
-                    <User className="user-menu-item-icon" />
-                    <span>Hồ sơ cá nhân</span>
-                  </button>
-                  <div className="user-menu-separator" />
-                  <button className="user-menu-item logout" onClick={handleDashboardLogoutClick}>
-                    <LogOut className="user-menu-item-icon" />
-                    <span>Đăng xuất</span>
-                  </button>
-                </div>
-              )}
-            </div>
+            {/* Badge tên thu ngân + menu - tái sử dụng component */}
+            <CashierUserBadge />
           </div>
         </div>
       </div>
@@ -662,7 +579,7 @@ export default function CashierDashboard({
           </div>
         </div>
 
-        {/* Card 1: Đơn đặt trước đang chờ duyệt */}
+        {/* Card: Đơn đặt trước đang chờ duyệt */}
         <div
           className="revenue-card revenue-card-preorder-pending"
           style={{
@@ -697,59 +614,6 @@ export default function CashierDashboard({
               }}
             >
               Xem đơn chờ duyệt
-            </button>
-          </div>
-        </div>
-
-        {/* Card 2: Đơn đặt trước hôm nay */}
-        <div
-          className="revenue-card revenue-card-preorder-today"
-          style={{
-            cursor: "pointer",
-            transition: "transform 0.2s, box-shadow 0.2s",
-          }}
-          onMouseEnter={(e) => {
-            e.currentTarget.style.transform = "translateY(-2px)"
-            e.currentTarget.style.boxShadow = "0 4px 12px rgba(0,0,0,0.15)"
-          }}
-          onMouseLeave={(e) => {
-            e.currentTarget.style.transform = "translateY(0)"
-            e.currentTarget.style.boxShadow = ""
-          }}
-          onClick={() => {
-            const today = new Date()
-            today.setHours(0, 0, 0, 0)
-            const tomorrow = new Date(today)
-            tomorrow.setDate(tomorrow.getDate() + 1)
-            navigate(
-              `/admin/cashier/preorders?waiterResponseStatus=approved&fromDate=${today.toISOString()}&toDate=${tomorrow.toISOString()}&filterBy=scheduledTime`
-            )
-          }}
-        >
-          <div className="revenue-card-header">
-            <div className="revenue-icon-wrapper" style={{ backgroundColor: "rgba(251, 146, 60, 0.1)" }}>
-              <Clock className="revenue-icon" style={{ color: "#fb923c" }} />
-            </div>
-            <span className="revenue-label">Đơn đặt trước hôm nay</span>
-          </div>
-          <div className="revenue-amount" style={{ color: "#fb923c", fontSize: "2rem", fontWeight: "bold" }}>
-            {loadingPreorders ? "..." : todaysPreordersCount}
-          </div>
-          <div className="revenue-footer">
-            <button
-              className="button button-view-orders"
-              onClick={(e) => {
-                e.stopPropagation()
-                const today = new Date()
-                today.setHours(0, 0, 0, 0)
-                const tomorrow = new Date(today)
-                tomorrow.setDate(tomorrow.getDate() + 1)
-                navigate(
-                  `/admin/cashier/preorders?waiterResponseStatus=approved&fromDate=${today.toISOString()}&toDate=${tomorrow.toISOString()}&filterBy=scheduledTime`
-                )
-              }}
-            >
-              Xem đơn hôm nay
             </button>
           </div>
         </div>

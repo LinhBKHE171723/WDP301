@@ -8,13 +8,14 @@
 .unpaid-orders-container--embedded {
   min-height: auto;
   background: var(--card);
-  padding: 1.5rem;
+  padding: 1rem;
   border-radius: 0.75rem;
   border: 1px solid var(--border);
   box-shadow: 0 1px 3px rgb(15 23 42 / 0.12);
 }
 .unpaid-orders-container--embedded .unpaid-orders-header {
-  margin-bottom: 1.5rem;
+  margin-bottom: 1rem;
+  padding-bottom: 0.75rem;
 }
 
 /* Header */
@@ -74,6 +75,11 @@
   margin: 0 0 0.25rem 0;
 }
 
+.unpaid-orders-container--embedded .header-title {
+  font-size: 1.25rem;
+  margin: 0 0 0.125rem 0;
+}
+
 .header-subtitle {
   font-size: 0.875rem;
   color: var(--muted-foreground);
@@ -82,9 +88,26 @@
 
 /* Orders List */
 .orders-list {
-  display: flex;
-  flex-direction: column;
-  gap: 1.5rem;
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 1rem;
+}
+
+.unpaid-orders-container--embedded .orders-list {
+  gap: 0.75rem;
+  grid-template-columns: repeat(2, 1fr);
+}
+
+@media (min-width: 1400px) {
+  .unpaid-orders-container--embedded .orders-list {
+    grid-template-columns: repeat(3, 1fr);
+  }
+}
+
+@media (max-width: 1024px) {
+  .unpaid-orders-container--embedded .orders-list {
+    grid-template-columns: 1fr;
+  }
 }
 
 /* Order Card */
@@ -106,9 +129,13 @@
   display: flex;
   justify-content: space-between;
   align-items: flex-start;
-  padding: 1.5rem;
+  padding: 1rem;
   background: color-mix(in srgb, var(--primary) 5%, transparent);
   border-bottom: 1px solid var(--border);
+}
+
+.unpaid-orders-container--embedded .order-card-header {
+  padding: 0.75rem 1rem;
 }
 
 .order-info {
@@ -120,6 +147,11 @@
   font-weight: 700;
   color: var(--foreground);
   margin: 0 0 0.75rem 0;
+}
+
+.unpaid-orders-container--embedded .order-number {
+  font-size: 1rem;
+  margin: 0 0 0.5rem 0;
 }
 
 .order-meta {
@@ -188,6 +220,10 @@
   padding: 1.5rem;
 }
 
+.unpaid-orders-container--embedded .order-items {
+  padding: 0.75rem 1rem;
+}
+
 .items-table {
   width: 100%;
   border-collapse: collapse;
@@ -205,6 +241,11 @@
   color: var(--muted-foreground);
   text-transform: uppercase;
   letter-spacing: 0.05em;
+}
+
+.unpaid-orders-container--embedded .items-table-header {
+  padding: 0.5rem 0.5rem;
+  font-size: 0.6875rem;
 }
 
 .items-header-name {
@@ -243,6 +284,11 @@
   color: var(--foreground);
 }
 
+.unpaid-orders-container--embedded .items-table-cell {
+  padding: 0.5rem 0.5rem;
+  font-size: 0.8125rem;
+}
+
 .item-name {
   font-weight: 500;
 }
@@ -269,6 +315,10 @@
   border-top: 1px solid var(--border);
 }
 
+.unpaid-orders-container--embedded .order-card-footer {
+  padding: 0.75rem 1rem;
+}
+
 .footer-total {
   display: flex;
   justify-content: space-between;
@@ -285,6 +335,14 @@
   font-size: 1.5rem;
   font-weight: 700;
   color: var(--primary);
+}
+
+.unpaid-orders-container--embedded .footer-total-amount {
+  font-size: 1.25rem;
+}
+
+.unpaid-orders-container--embedded .footer-total-label {
+  font-size: 0.875rem;
 }
 
 /* Empty State */
@@ -379,22 +437,36 @@
 
 .orders-search-input {
   height: 2.25rem;
-  min-width: 220px;
+  min-width: 200px;
+  width: 200px;
   padding: 0 .75rem;
   border: 1px solid var(--border);
   border-radius: .5rem;
   background: var(--card);
   color: var(--foreground);
-  font-weight: 600;
+  font-size: 0.875rem;
+  font-weight: 500;
 }
+
+.unpaid-orders-container--embedded .orders-search-input {
+  height: 2rem;
+  min-width: 160px;
+  width: 160px;
+  font-size: 0.8125rem;
+}
+
 .orders-search-input::placeholder {
   color: var(--muted-foreground);
-  font-weight: 500;
+  font-weight: 400;
 }
 .orders-search-input:focus {
   outline: none;
   box-shadow: 0 0 0 3px color-mix(in srgb, var(--primary) 25%, transparent);
   border-color: color-mix(in srgb, var(--primary) 35%, var(--border));
+}
+
+.search-icon {
+  pointer-events: none;
 }
 
 /* Khi màn nhỏ: đẩy ô search xuống hàng để không chật chội */
