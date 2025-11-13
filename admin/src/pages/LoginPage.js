@@ -23,7 +23,7 @@ export default function LoginPage() {
       if (res.user.role === "admin") {
         navigate("/admin");
       } else if (res.user.role === "cashier") {
-        navigate("/admin/cashier/dashboard");
+        navigate("/admin/cashier/shift");
       } else if (res.user.role === "kitchen_manager") {
         navigate("/kitchen/dashboard");
       } else if (res.user.role === "waiter") {

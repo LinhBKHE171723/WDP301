@@ -136,7 +136,7 @@ function AdminCashierOrderPaymentRoute() {
 function CashierApp() {
   return (
     <Routes>
-      <Route path="/" element={<Navigate to="dashboard" replace />} />
+      <Route path="/" element={<Navigate to="shift" replace />} />
       <Route path="dashboard" element={<AdminCashierDashboardRoute />} />
       <Route path="shift" element={<CashierShiftManager />} />
       <Route path="orderpayment" element={<AdminCashierOrderPaymentRoute />} />
@@ -199,7 +199,7 @@ export default function AppRouter() {
           ) : user?.role === "admin" ? (
             <Navigate to="/admin" replace />
           ) : user?.role === "cashier" ? (
-            <Navigate to="/admin/cashier/dashboard" replace />
+            <Navigate to="/admin/cashier/shift" replace />
           ) : user?.role === "kitchen_manager" ? (
             <Navigate to="/kitchen/dashboard" replace />
           ) : user?.role === "waiter" ? (

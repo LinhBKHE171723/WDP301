@@ -51,6 +51,11 @@
   margin-bottom: 0;
 }
 
+/* User badge & menu */
+.user-badge-wrapper {
+  position: relative;
+}
+
 .user-badge {
   display: flex;
   align-items: center;
@@ -61,6 +66,8 @@
   padding: 0.75rem 1rem;
   box-shadow: 0 1px 2px 0 rgb(0 0 0 / 0.05);
   border: 1px solid var(--border);
+  cursor: pointer;
+  border-style: solid;
 }
 
 .user-badge-icon {
@@ -85,6 +92,56 @@
   /* Fixed color variable */
   color: var(--muted-foreground);
   margin: 0;
+}
+
+.user-badge-chevron {
+  width: 16px;
+  height: 16px;
+  color: var(--muted-foreground);
+}
+
+.user-menu {
+  position: absolute;
+  right: 0;
+  top: calc(100% + 0.5rem);
+  min-width: 180px;
+  background-color: #fff;
+  border-radius: 0.75rem;
+  border: 1px solid var(--border);
+  box-shadow: 0 12px 30px rgba(15, 23, 42, 0.15);
+  padding: 0.25rem 0;
+  z-index: 30;
+}
+
+.user-menu-item {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.5rem 0.9rem;
+  background: transparent;
+  border: none;
+  text-align: left;
+  font-size: 0.875rem;
+  color: var(--foreground);
+  cursor: pointer;
+}
+
+.user-menu-item:hover {
+  background-color: var(--muted);
+}
+
+.user-menu-item-danger {
+  color: #dc2626;
+}
+
+.user-menu-item-danger:hover {
+  background-color: #fee2e2;
+}
+
+.user-menu-icon {
+  width: 16px;
+  height: 16px;
 }
 
 /* Added card styles to replace shadcn Card component */
@@ -317,6 +374,11 @@
   display: flex;
   flex-direction: column;
   gap: 0.5rem;
+}
+
+/* đẩy các dòng Tiền đầu ca / Tiền cuối ca xuống thấp một chút */
+.shift-input-group {
+  margin-top: 0.5rem;
 }
 
 .input-wrapper {
@@ -717,18 +779,22 @@
   margin: 0;
 }
 
+/* hạn chế chiều rộng input trong card để gọn hơn */
 .card .input-group {
-  max-width: 520px;     /* bạn có thể chỉnh 420–560px */
+  max-width: 520px;
   width: 100%;
 }
 
 /* Chừa khoảng cho icon $ */
 .card .input-group .input-with-icon {
-  padding-left: 2.75rem;   /* trước là 2.25rem bị đè chữ */
+  padding-left: 2.75rem;
   box-sizing: border-box;
 }
 
 /* (tùy chọn) ép thắng nếu vẫn bị CSS cũ ghi đè */
-.card .input-group { max-width: 520px !important; }
-.card .input-group .input-with-icon { padding-left: 2.75rem !important; }
-
+.card .input-group {
+  max-width: 520px !important;
+}
+.card .input-group .input-with-icon {
+  padding-left: 2.75rem !important;
+}
