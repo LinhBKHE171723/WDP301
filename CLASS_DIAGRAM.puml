@@ -1,0 +1,213 @@
+@startuml
+!theme plain
+skinparam linetype ortho
+skinparam classAttributeIconSize 0
+
+' ===== Core Entities =====
+
+class User {
+  + _id: ObjectId
+  + name: String
+  + username: String
+  + email: String
+  + password: String
+  + phone: String
+  + avatar: String
+  + role: String
+  + status: String
+  + point: Number
+  + accountStatus: String
+  --
+  + comparePassword(): Boolean
+}
+
+class Order {
+  + _id: ObjectId
+  + userId: ObjectId
+  + tableIds: ObjectId[]
+  + orderItems: ObjectId[]
+  + paymentIds: ObjectId[]
+  + status: String
+  + totalAmount: Number
+  + discount: Number
+  + scheduledTime: Date
+  + preorderName: String
+}
+
+class OrderItem {
+  + _id: ObjectId
+  + orderId: ObjectId
+  + itemId: ObjectId
+  + itemName: String
+  + itemType: String
+  + quantity: Number
+  + price: Number
+  + expense: Number
+  + assignedChef: ObjectId
+  + servedBy: ObjectId
+  + status: String
+  + note: String
+}
+
+class Item {
+  + _id: ObjectId
+  + name: String
+  + description: String
+  + category: String
+  + price: Number
+  + isAvailable: Boolean
+  + image: String
+}
+
+class Menu {
+  + _id: ObjectId
+  + name: String
+  + description: String
+  + items: ObjectId[]
+  + price: Number
+  + type: String
+  + isAvailable: Boolean
+  + image: String
+}
+
+class Ingredient {
+  + _id: ObjectId
+  + name: String
+  + unit: String
+  + stockQuantity: Number
+  + minStock: Number
+}
+
+class PurchaseOrder {
+  + _id: ObjectId
+  + ingredientId: ObjectId
+  + quantity: Number
+  + unit: String
+  + price: Number
+  + time: Date
+  + expiryDate: Date
+  + usedQuantity: Number
+  + status: String
+}
+
+class Payment {
+  + _id: ObjectId
+  + orderId: ObjectId
+  + payTime: Date
+  + paymentMethod: String
+  + status: String
+  + amountPaid: Number
+  + cashierId: ObjectId
+  + isDeposit: Boolean
+}
+
+class Table {
+  + _id: ObjectId
+  + tableNumber: Number
+  + qrCode: String
+  + status: String
+  + orderNow: ObjectId[]
+}
+
+class Shift {
+  + _id: ObjectId
+  + userId: ObjectId
+  + workShiftId: ObjectId
+  + date: Date
+  + startTime: Date
+  + endTime: Date
+  + lateMinutes: Number
+  + totalWorkedMinutes: Number
+  + status: String
+}
+
+class WorkShift {
+  + _id: ObjectId
+  + name: String
+  + startTime: String
+  + endTime: String
+  + daysOfWeek: Number[]
+  + employees: ObjectId[]
+  + isActive: Boolean
+}
+
+class Feedback {
+  + _id: ObjectId
+  + orderId: ObjectId
+  + userId: ObjectId
+  + rating: Number
+  + comment: String
+  + waiterRating: Number
+  + chefRating: Number
+}
+
+class Setting {
+  + _id: ObjectId
+  + key: String
+  + value: Mixed
+  + description: String
+  + category: String
+  --
+  + getSetting(): Any
+  + setSetting(): Setting
+}
+
+class VerificationToken {
+  + _id: ObjectId
+  + userId: ObjectId
+  + token: String
+  + expiresAt: Date
+  + usedAt: Date
+}
+
+' ===== Relationships =====
+
+User "1" -- "0..*" Order : places
+User "1" -- "0..*" Shift : works
+User "1" -- "0..*" Feedback : gives
+User "1" -- "0..*" VerificationToken : has
+
+Order "1" *-- "1..*" OrderItem : contains
+Order "0..*" -- "1..*" Table : uses
+Order "1" -- "0..*" Payment : has
+Order "1" -- "0..*" Feedback : receives
+
+OrderItem "0..*" -- "1" Item : ordered
+OrderItem "0..*" -- "0..1" User : assigned to chef
+
+Item "0..*" -- "0..*" Ingredient : requires
+
+Menu "0..*" -- "1..*" Item : includes
+
+Ingredient "1" -- "0..*" PurchaseOrder : stocked by
+
+Payment "0..*" -- "0..1" User : processed by cashier
+
+Shift "0..*" -- "1" WorkShift : based on
+WorkShift "1" -- "0..*" User : assigned to
+
+note right of Order
+  Supports multiple tables
+  and multiple payments
+  (deposit + final payment)
+end note
+
+note right of OrderItem
+  expense = FIFO cost
+  price = selling price
+  Chef assignment for dishes
+end note
+
+note right of User
+  6 roles: admin, kitchen_manager,
+  chef, waiter, cashier, customer
+  point field for customers only
+end note
+
+note right of Shift
+  Auto-calculate late time
+  and worked hours via
+  pre-save middleware
+end note
+
+@enduml
