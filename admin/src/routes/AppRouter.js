@@ -60,10 +60,7 @@ function AdminCashierDashboardRoute() {
   const handleAddPettyCash = (transaction) => {
     setShiftData((prev) => ({
       ...prev,
-      pettyCashTransactions: [
-        transaction,
-        ...(prev.pettyCashTransactions || []),
-      ],
+      pettyCashTransactions: [transaction, ...(prev.pettyCashTransactions || [])],
     }));
   };
 
@@ -147,19 +144,10 @@ function CashierApp() {
     </Routes>
   );
 }
+
 export default function AppRouter() {
   const { user, token, isLoggedIn, loading } = useAuth();
 
-  /*
-  function PrivateRoute({ element, roles }) {
-    const { isLoggedIn, user } = useAuth();
-    if (!isLoggedIn) return <Navigate to="/auth/login" replace />;
-    if (roles && !roles.includes(user.role)) return <Navigate to="/auth/login" replace />;
-    return element;
-  }
-  */
-
-  // AppRouter để điều hướng các trang
   // Khi đang xác minh token (chưa biết login hay chưa)
   if (loading) {
     return (
@@ -175,6 +163,7 @@ export default function AppRouter() {
     <Routes>
       {/* Route login luôn có sẵn (không cần điều kiện) */}
       <Route path="/auth/login" element={<LoginPage />} />
+
       {/* Nếu đã đăng nhập rồi thì không cho vào trang quên mật khẩu / đặt lại mật khẩu */}
       <Route
         path="forgot-password"
@@ -289,8 +278,14 @@ export default function AppRouter() {
         </>
       )}
 
+      {/* Cashier routes */}
       {isLoggedIn && user?.role === "cashier" && token && (
-        <Route path="/admin/cashier/*" element={<CashierApp />} />
+        <>
+          <Route path="/admin/cashier/*" element={<CashierApp />} />
+          {/* Hồ sơ + chấm công cho cashier */}
+          <Route path="/admin/profile" element={<Profile />} />
+          <Route path="/user/attendance" element={<Attendance />} />
+        </>
       )}
 
       {/* Nếu user điền URL linh tinh hoặc cố tình điền url ko thuộc role của mình */}

@@ -52,8 +52,8 @@ export default function CashierDashboard({
   const userMenuRef = useRef(null)
 
   // ====== Preorders (đơn đặt trước) ======
-  const [pendingPreordersCount, setPendingPreordersCount] = useState(0) // Đơn đang chờ duyệt
-  const [todaysPreordersCount, setTodaysPreordersCount] = useState(0) // Đơn đã duyệt, scheduledTime hôm nay
+  const [pendingPreordersCount, setPendingPreordersCount] = useState(0)
+  const [todaysPreordersCount, setTodaysPreordersCount] = useState(0)
   const [loadingPreorders, setLoadingPreorders] = useState(true)
 
   // WebSocket để nhận thông báo preorder mới
@@ -79,7 +79,7 @@ export default function CashierDashboard({
   const addPettyCash = onAddPettyCash || noop
   const printXReport = onPrintXReport || noop
 
-  // ====== Lịch sử thanh toán ======
+  // ====== Lịch sử thanh toán & danh sách đơn chờ ======
   const [paymentHistory, setPaymentHistory] = useState([])
   const [unpaidOrdersData, setUnpaidOrdersData] = useState([])
   const [pendingOrdersCount, setPendingOrdersCount] = useState(0)
@@ -110,8 +110,8 @@ export default function CashierDashboard({
       new Date(dateString)
     )
 
-  // ====== Tên thu ngân từ AuthContext (chỉ UI) ======
-  const cashierName = user?.name || "Thu ngân"
+  // ====== Thông tin thu ngân (badge) ======
+  const cashierName = user?.name || "Thu Ngân"
   const cashierInitials = useMemo(() => {
     if (!cashierName) return "TN"
     const parts = cashierName.trim().split(/\s+/)
@@ -130,7 +130,7 @@ export default function CashierDashboard({
     return () => document.removeEventListener("mousedown", handleClickOutside)
   }, [])
 
-  // ====== Điều hướng sang danh sách đơn chờ, nhận callback thanh toán xong ======
+  // ====== Callback từ UnpaidOrdersList khi thanh toán xong ======
   const handlePaymentCompleteFromUnpaid = (payment) => {
     const newPayment = {
       id: Date.now(),
@@ -150,12 +150,12 @@ export default function CashierDashboard({
     [updateOrders]
   )
 
+  // ====== Realtime: đơn preparing ======
   const handleRealtimePreparing = useCallback(
     (order) => {
       if (!order?.id) return
       const orderId = order.id
 
-      // Kiểm tra xem đơn có phải là đơn mới không (chưa có trong danh sách)
       let isNewOrder = false
       updateOrders((prev) => {
         const index = prev.findIndex((item) => item.id === orderId)
@@ -163,13 +163,11 @@ export default function CashierDashboard({
           isNewOrder = true
           return [...prev, order]
         }
-        // Đơn đã tồn tại - chỉ cập nhật thông tin
         const next = [...prev]
         next[index] = { ...next[index], ...order }
         return next
       })
 
-      // Hiển thị toast notification cho đơn mới
       if (isNewOrder) {
         const tableText = order.tableNumber || "Mang đi"
         const message = `🆕 Có đơn hàng mới ${order.orderNumber || ""} từ ${tableText} cần thanh toán!`
@@ -179,6 +177,7 @@ export default function CashierDashboard({
     [updateOrders]
   )
 
+  // ====== Realtime: đơn paid ======
   const handleRealtimePaid = useCallback(
     (order) => {
       if (!order?.id) return
@@ -187,11 +186,10 @@ export default function CashierDashboard({
     [updateOrders]
   )
 
-  // ====== Tải danh sách đơn chưa thanh toán ======
+  // ====== Lấy danh sách đơn chờ thanh toán ======
   const fetchUnpaidOrders = useCallback(async () => {
     try {
       const res = await Client.get("/cashier/orders/preparing")
-      // API trả về { message, data: [...] }, interceptor đã lấy res.data nên res = { message, data }
       const orders = Array.isArray(res?.data) ? res.data : Array.isArray(res) ? res : []
       console.log("Fetched unpaid orders:", orders.length, orders)
       updateOrders(orders)
@@ -207,7 +205,7 @@ export default function CashierDashboard({
     fetchUnpaidOrders()
   }, [fetchUnpaidOrders])
 
-  // ====== Fetch số lượng preorders đang chờ & hôm nay ======
+  // ====== Lấy số lượng preorders ======
   const fetchPreordersCounts = useCallback(async () => {
     try {
       setLoadingPreorders(true)
@@ -233,9 +231,9 @@ export default function CashierDashboard({
 
       const filteredTodaysOrders = todaysOrders.filter((order) => {
         if (!order.scheduledTime) return false
-        const scheduledDate = new Date(order.scheduledTime)
-        scheduledDate.setHours(0, 0, 0, 0)
-        return scheduledDate.getTime() === today.getTime()
+        const d = new Date(order.scheduledTime)
+        d.setHours(0, 0, 0, 0)
+        return d.getTime() === today.getTime()
       })
 
       setTodaysPreordersCount(filteredTodaysOrders.length)
@@ -255,7 +253,6 @@ export default function CashierDashboard({
   // ====== Listen WebSocket preorder ======
   useEffect(() => {
     if (!preorderMessage) return
-
     const messageType = preorderMessage.type
     console.log(`📨 CashierDashboard received WebSocket message: ${messageType}`, preorderMessage)
 
@@ -265,12 +262,11 @@ export default function CashierDashboard({
       messageType === "preorder:approved" ||
       messageType === "order:confirmed"
     ) {
-      console.log(`🔄 Refreshing preorder counts due to ${messageType}`)
       fetchPreordersCounts()
     }
   }, [preorderMessage, fetchPreordersCounts])
 
-  // ====== Thông báo khi bàn yêu cầu thanh toán ======
+  // ====== Notification khi khách yêu cầu thanh toán ======
   const handlePaymentRequested = useCallback((data) => {
     console.log("💳 Payment requested:", data)
     const tableNumber = data.tableNumber || "N/A"
@@ -287,7 +283,7 @@ export default function CashierDashboard({
     onPaymentRequested: handlePaymentRequested,
   })
 
-  // ====== Doanh thu ======
+  // ====== Doanh thu trong ca ======
   const cashRevenue = paymentHistory.filter((p) => p.method === "Tiền mặt").reduce((s, p) => s + p.amount, 0)
   const cardRevenue = paymentHistory
     .filter((p) => p.method === "Thẻ" || p.method === "QR Code")
@@ -341,7 +337,7 @@ export default function CashierDashboard({
   const pageItems = useMemo(() => payments.slice(start, end), [payments, start, end])
   const goTo = (p) => setPage(Math.min(totalPages, Math.max(1, p)))
 
-  // ====== Handler Profile + Logout (LOGOUT THẬT) ======
+  // ====== Handler Profile + Logout ======
   const handleGoProfile = () => {
     setIsUserMenuOpen(false)
     navigate("/admin/profile")
@@ -349,8 +345,8 @@ export default function CashierDashboard({
 
   const handleDashboardLogoutClick = () => {
     setIsUserMenuOpen(false)
-    logout()           // xoá user, token trong AuthContext
-    navigate("/login") // điều hướng về trang login
+    logout()
+    navigate("/login") // đổi thành "/" nếu login nằm ở "/"
   }
 
   // ====== Màn lịch sử thanh toán ======
@@ -515,7 +511,7 @@ export default function CashierDashboard({
     return <TableManagement onBack={() => setShowTableManagement(false)} />
   }
 
-  // ====== Màn chính ======
+  // ====== Màn chính Dashboard ======
   return (
     <div className="dashboard-container">
       {/* Header */}
@@ -526,15 +522,8 @@ export default function CashierDashboard({
             <p className="dashboard-subtitle">Tổng quan ca làm việc</p>
           </div>
 
-          {/* Dãy nút + badge thu ngân bên phải */}
-          <div
-            style={{
-              display: "flex",
-              gap: "1rem",
-              alignItems: "center",
-            }}
-          >
-            <div style={{ display: "flex", gap: "0.75rem" }}>
+          <div className="dashboard-header-actions">
+            <div className="dashboard-header-buttons">
               <button onClick={() => navigate("/admin/cashier/preorders")} className="button button-secondary">
                 <Calendar className="button-icon" />
                 Đơn đặt trước
@@ -553,104 +542,30 @@ export default function CashierDashboard({
               </button>
             </div>
 
-            {/* Badge thu ngân + menu */}
-            <div ref={userMenuRef} style={{ position: "relative" }}>
+            {/* Badge tên thu ngân + menu */}
+            <div className="dashboard-user-wrapper" ref={userMenuRef}>
               <button
                 type="button"
+                className="user-badge-button"
                 onClick={() => setIsUserMenuOpen((v) => !v)}
-                style={{
-                  display: "flex",
-                  alignItems: "center",
-                  gap: "0.5rem",
-                  padding: "0.35rem 0.6rem",
-                  borderRadius: "999px",
-                  border: "1px solid rgba(148, 163, 184, 0.6)",
-                  background: "white",
-                  cursor: "pointer",
-                  minWidth: "0",
-                }}
               >
-                <div
-                  style={{
-                    width: 32,
-                    height: 32,
-                    borderRadius: "999px",
-                    background: "linear-gradient(135deg, #22c55e, #16a34a)",
-                    display: "flex",
-                    alignItems: "center",
-                    justifyContent: "center",
-                    color: "white",
-                    fontWeight: 600,
-                    fontSize: 14,
-                    flexShrink: 0,
-                  }}
-                >
-                  {cashierInitials}
+                <div className="user-avatar-circle">{cashierInitials}</div>
+                <div className="user-badge-info">
+                  <p className="user-badge-name">{cashierName}</p>
+                  <p className="user-badge-role">Thu ngân</p>
                 </div>
-                <div style={{ display: "flex", flexDirection: "column", textAlign: "left" }}>
-                  <span style={{ fontSize: 13, fontWeight: 600, lineHeight: 1.1 }}>{cashierName}</span>
-                  <span style={{ fontSize: 11, color: "#6b7280", lineHeight: 1.1 }}>Thu ngân</span>
-                </div>
-                <ChevronDown size={16} style={{ color: "#6b7280", flexShrink: 0 }} />
+                <ChevronDown className="user-badge-chevron" />
               </button>
 
               {isUserMenuOpen && (
-                <div
-                  style={{
-                    position: "absolute",
-                    right: 0,
-                    marginTop: 6,
-                    minWidth: 180,
-                    background: "white",
-                    borderRadius: 12,
-                    boxShadow: "0 10px 25px rgba(15, 23, 42, 0.15)",
-                    padding: "0.4rem 0",
-                    zIndex: 20,
-                    border: "1px solid rgba(226, 232, 240, 0.9)",
-                  }}
-                >
-                  <button
-                    onClick={handleGoProfile}
-                    style={{
-                      width: "100%",
-                      border: "none",
-                      background: "transparent",
-                      padding: "0.45rem 0.9rem",
-                      display: "flex",
-                      alignItems: "center",
-                      gap: "0.5rem",
-                      fontSize: 13,
-                      cursor: "pointer",
-                    }}
-                  >
-                    <User size={16} style={{ color: "#4b5563" }} />
+                <div className="user-menu-dropdown">
+                  <button className="user-menu-item" onClick={handleGoProfile}>
+                    <User className="user-menu-item-icon" />
                     <span>Hồ sơ cá nhân</span>
                   </button>
-
-                  <div
-                    style={{
-                      height: 1,
-                      background: "rgba(229, 231, 235, 0.9)",
-                      margin: "0.25rem 0",
-                    }}
-                  />
-
-                  <button
-                    onClick={handleDashboardLogoutClick}
-                    style={{
-                      width: "100%",
-                      border: "none",
-                      background: "transparent",
-                      padding: "0.45rem 0.9rem",
-                      display: "flex",
-                      alignItems: "center",
-                      gap: "0.5rem",
-                      fontSize: 13,
-                      cursor: "pointer",
-                      color: "#b91c1c",
-                    }}
-                  >
-                    <LogOut size={16} />
+                  <div className="user-menu-separator" />
+                  <button className="user-menu-item logout" onClick={handleDashboardLogoutClick}>
+                    <LogOut className="user-menu-item-icon" />
                     <span>Đăng xuất</span>
                   </button>
                 </div>
@@ -840,7 +755,7 @@ export default function CashierDashboard({
         </div>
       </div>
 
-      {/* Danh sách đơn chưa thanh toán */}
+      {/* Danh sách đơn chờ thanh toán */}
       <div className="pending-orders-wrapper" ref={pendingOrdersRef}>
         <UnpaidOrdersList
           variant="embedded"
@@ -852,8 +767,7 @@ export default function CashierDashboard({
         />
       </div>
 
-      {/* Khối phiếu thu/chi hiện vẫn đang comment như bạn, nên mình giữ nguyên comment để không ảnh hưởng */}
-      {/* ... */}
+      {/* Khối phiếu thu/chi hiện đang comment, bạn có thể mở lại sau nếu cần */}
     </div>
   )
 }
