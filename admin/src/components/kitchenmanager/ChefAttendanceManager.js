@@ -19,7 +19,6 @@ const ChefAttendanceManager = () => {
         kitchenApi.getWorkShifts(),
       ]);
 
-      // Backend trả về data trực tiếp trong response.data
       const chefsData = attendanceRes?.data || [];
       const shiftsData = shiftsRes?.data || [];
 

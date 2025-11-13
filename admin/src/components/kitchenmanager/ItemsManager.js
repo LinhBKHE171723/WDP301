@@ -21,13 +21,13 @@ export default function ItemsManager({ items, setItems }) {
         )
       );
     } catch (err) {
-      alert("❌ Lỗi khi cập nhật trạng thái món ăn!");
+      alert(" Lỗi khi cập nhật trạng thái món ăn!");
     } finally {
       setLoading(false);
     }
   };
 
-  // ✅ Xóa món ăn
+  //  Xóa món ăn
   const handleDelete = async (id) => {
     if (!window.confirm("Bạn có chắc muốn xóa món này?")) return;
     try {
@@ -35,24 +35,24 @@ export default function ItemsManager({ items, setItems }) {
       await kitchenApi.deleteItem(id);
       setItems((prev) => prev.filter((item) => item._id !== id));
     } catch (err) {
-      alert("❌ Lỗi khi xóa món ăn!");
+      alert(" Lỗi khi xóa món ăn!");
     } finally {
       setLoading(false);
     }
   };
 
-  // ✅ Lọc theo từ khóa tìm kiếm
+  //  Lọc theo từ khóa tìm kiếm
   const filtered = items.filter((i) =>
     i.name.toLowerCase().includes(search.toLowerCase())
   );
 
-  // ✅ Mở modal thêm món
+  //  Mở modal thêm món
   const handleAddItem = () => {
     setEditingItem(null);
     setShowModal(true);
   };
 
-  // ✅ Mở modal sửa món
+  //  Mở modal sửa món
   const handleEditItem = (item) => {
     setEditingItem(item);
     setShowModal(true);

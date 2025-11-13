@@ -13,7 +13,7 @@ import AddItemModal from "../components/kitchenmanager/AddItemModal";
 import AddMenuModal from "../components/kitchenmanager/AddMenuModal";
 import InventoryManager from "../components/kitchenmanager/InventoryManager";
 import PurchaseHistoryManager from "../components/kitchenmanager/PurchaseHistoryManager";
-import ChefAttendanceManager from "../components/kitchenmanager/ChefAttendanceManager"; // ✅ import mới
+import ChefAttendanceManager from "../components/kitchenmanager/ChefAttendanceManager"; // import mới
 
 export default function KitchenDashboard() {
   const navigate = useNavigate();
@@ -34,7 +34,7 @@ export default function KitchenDashboard() {
   const [chefs, setChefs] = useState([]);
   const [showProfileMenu, setShowProfileMenu] = useState(false);
 
-  // ✅ WebSocket hook cho real-time updates
+  // WebSocket hook cho real-time updates
   const {
     connectionState,
     lastMessage,
@@ -42,13 +42,13 @@ export default function KitchenDashboard() {
     unsubscribeFromAllOrders,
   } = useKitchenWebSocket();
 
-  // ✅ Hàm xử lý đăng xuất
+  // Hàm xử lý đăng xuất
   const handleLogout = () => {
     logout();
     navigate("/auth/login");
   };
 
-  // ✅ Đóng dropdown khi click bên ngoài
+  // Đóng dropdown khi click bên ngoài
   useEffect(() => {
     const handleClickOutside = (event) => {
       if (showProfileMenu && !event.target.closest(".profile-dropdown")) {
@@ -60,7 +60,7 @@ export default function KitchenDashboard() {
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, [showProfileMenu]);
 
-  // ✅ Fetch orders function
+  // Fetch orders function
   const fetchOrders = async () => {
     setLoading(true);
     setError("");
@@ -114,7 +114,7 @@ export default function KitchenDashboard() {
     fetchData();
   }, [activeTab, connectionState]); // Added connectionState to dependencies
 
-  // ✅ Subscribe to orders when WebSocket connects
+  //  Subscribe to orders when WebSocket connects
   useEffect(() => {
     if (connectionState === "connected" && orders.length > 0) {
       const orderIds = orders.map((order) => order._id);
@@ -130,7 +130,7 @@ export default function KitchenDashboard() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [connectionState, activeTab, orders.length]);
 
-  // ✅ Format order từ WebSocket để match với format từ API
+  //  Format order từ WebSocket để match với format từ API
   const formatOrderFromWebSocket = (rawOrder) => {
     // Nếu order đã được format (có items), đảm bảo items có đầy đủ thông tin
     if (rawOrder.items && Array.isArray(rawOrder.items)) {
@@ -143,7 +143,10 @@ export default function KitchenDashboard() {
         comboItems: (item.comboItems || []).map((ci) => ({
           itemId: ci.itemId || null,
           itemName: ci.itemName || "Món đã xóa",
-          status: ci.status !== undefined && ci.status !== null ? ci.status : "pending", // ✅ Giữ nguyên status từ WebSocket
+          status:
+            ci.status !== undefined && ci.status !== null
+              ? ci.status
+              : "pending", // Giữ nguyên status từ WebSocket
           assignedChef: ci.assignedChef || null,
           servedBy: ci.servedBy || null,
           readyAt: ci.readyAt || null,
@@ -209,31 +212,31 @@ export default function KitchenDashboard() {
     };
   };
 
-  // ✅ Handle WebSocket messages for real-time updates
+  // Handle WebSocket messages for real-time updates
   useEffect(() => {
     if (lastMessage) {
-      console.log("📨 Kitchen received WebSocket message:", lastMessage);
+      console.log(" Kitchen received WebSocket message:", lastMessage);
 
       switch (lastMessage.type) {
         case "order:updated":
-          // Cập nhật order trong danh sách
           if (lastMessage.data && activeTab === "kds") {
-            // Update orders có status confirmed hoặc preparing (giống như API getConfirmedOrders)
-            // API getConfirmedOrders chỉ lấy confirmed, nhưng khi start preparing, order vẫn cần hiển thị
-            if (lastMessage.data.status === "confirmed" || lastMessage.data.status === "preparing") {
+            if (
+              lastMessage.data.status === "confirmed" ||
+              lastMessage.data.status === "preparing"
+            ) {
               const formattedOrder = formatOrderFromWebSocket(lastMessage.data);
-              console.log(
-                "📦 Formatted order with comboItems:",
-                formattedOrder
-              );
+              console.log(" Formatted order with comboItems:", formattedOrder);
               // Debug: Log comboItems status để kiểm tra
               if (formattedOrder.items) {
                 formattedOrder.items.forEach((item, idx) => {
                   if (item.comboItems && item.comboItems.length > 0) {
-                    console.log(`📦 Item ${idx} comboItems status:`, item.comboItems.map(ci => ({
-                      itemName: ci.itemName,
-                      status: ci.status
-                    })));
+                    console.log(
+                      ` Item ${idx} comboItems status:`,
+                      item.comboItems.map((ci) => ({
+                        itemName: ci.itemName,
+                        status: ci.status,
+                      }))
+                    );
                   }
                 });
               }
@@ -251,7 +254,7 @@ export default function KitchenDashboard() {
                 }
                 return updated;
               });
-              console.log("✅ Updated order in queue:", formattedOrder._id);
+              console.log(" Updated order in queue:", formattedOrder._id);
             } else {
               // Nếu order không còn confirmed/preparing, xóa khỏi danh sách
               setOrders((prevOrders) => {
@@ -285,12 +288,12 @@ export default function KitchenDashboard() {
               }
               return prevOrders;
             });
-            console.log("🆕 New confirmed order added:", formattedOrder._id);
+            console.log(" New confirmed order added:", formattedOrder._id);
           }
           break;
 
         default:
-          console.log("📨 Unknown message type:", lastMessage.type);
+          console.log(" Unknown message type:", lastMessage.type);
       }
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -299,7 +302,7 @@ export default function KitchenDashboard() {
   useEffect(() => {
     const fetchChefs = async () => {
       try {
-        // ✅ Chỉ lấy danh sách chef đã check-in (đang làm việc)
+        //  Chỉ lấy danh sách chef đã check-in (đang làm việc)
         const res = await kitchenApi.getActiveChefs();
 
         console.log("Active chefs response:", res);
@@ -307,13 +310,13 @@ export default function KitchenDashboard() {
 
         setChefs(res?.data || []);
       } catch (err) {
-        console.error("❌ Lỗi khi tải danh sách đầu bếp:", err);
+        console.error(" Lỗi khi tải danh sách đầu bếp:", err);
       }
     };
     fetchChefs();
   }, [showChefModal]);
 
-  // ✅ Đồng bộ selectedOrder khi 'orders' thay đổi
+  //  Đồng bộ selectedOrder khi 'orders' thay đổi
   useEffect(() => {
     if (selectedOrder) {
       const updatedOrder = orders.find((o) => o._id === selectedOrder._id);
@@ -328,7 +331,7 @@ export default function KitchenDashboard() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [orders]);
 
-  // ✅ Cập nhật thời gian chờ đơn hàng
+  //  Cập nhật thời gian chờ đơn hàng
   useEffect(() => {
     const interval = setInterval(() => {
       setOrders((prev) =>
@@ -340,7 +343,7 @@ export default function KitchenDashboard() {
     return () => clearInterval(interval);
   }, []);
 
-  // ✅ Refresh helpers
+  //  Refresh helpers
   const handleRefreshItems = async () => {
     const res = await kitchenApi.getAllItems();
     setItems(res.data || []);

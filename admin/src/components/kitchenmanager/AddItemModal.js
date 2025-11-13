@@ -12,14 +12,14 @@ export default function AddItemModal({ show, onClose, setItems, editItem }) {
     isAvailable: true,
   });
 
-  const [ingredientsList, setIngredientsList] = useState([]); // 🔹 danh sách nguyên liệu từ API
-  const [selectedIngredients, setSelectedIngredients] = useState([]); // 🔹 [{ ingredient, quantity }]
+  const [ingredientsList, setIngredientsList] = useState([]);
+  const [selectedIngredients, setSelectedIngredients] = useState([]);
   const [imageFile, setImageFile] = useState(null);
   const [preview, setPreview] = useState(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
 
-  // ✅ Lấy danh sách nguyên liệu khi mở modal
+  //  Lấy danh sách nguyên liệu khi mở modal
   useEffect(() => {
     if (show) {
       kitchenApi
@@ -28,12 +28,12 @@ export default function AddItemModal({ show, onClose, setItems, editItem }) {
           setIngredientsList(res || []);
         })
         .catch((err) => {
-          console.error("❌ Lỗi lấy nguyên liệu:", err);
+          console.error(" Lỗi lấy nguyên liệu:", err);
         });
     }
   }, [show]);
 
-  // ✅ Khi sửa món ăn → tự fetch chi tiết
+  //  Khi sửa món ăn → tự fetch chi tiết
   useEffect(() => {
     const fetchItemDetails = async () => {
       if (isEdit && editItem?._id) {
@@ -51,7 +51,7 @@ export default function AddItemModal({ show, onClose, setItems, editItem }) {
           });
           setPreview(item.image || null);
 
-          // ✅ Chuẩn hóa mảng ingredients: { ingredient: _id, quantity }
+          //  Chuẩn hóa mảng ingredients: { ingredient: _id, quantity }
           if (item.ingredients && Array.isArray(item.ingredients)) {
             const normalized = item.ingredients.map((i) => ({
               ingredient:
@@ -65,7 +65,7 @@ export default function AddItemModal({ show, onClose, setItems, editItem }) {
             setSelectedIngredients([]);
           }
         } catch (err) {
-          console.error("❌ Lỗi khi tải chi tiết món ăn:", err);
+          console.error(" Lỗi khi tải chi tiết món ăn:", err);
         } finally {
           setLoading(false);
         }
@@ -105,7 +105,7 @@ export default function AddItemModal({ show, onClose, setItems, editItem }) {
     }
   };
 
-  // ☁️ Upload Cloudinary
+  //  Upload Cloudinary
   const uploadToCloudinary = async (file) => {
     const sigRes = await kitchenApi.getCloudinarySignature();
     const { signature, timestamp, apiKey, cloudName } = sigRes;
@@ -124,8 +124,7 @@ export default function AddItemModal({ show, onClose, setItems, editItem }) {
     if (!res.ok) throw new Error(data.error?.message || "Upload ảnh thất bại");
     return data.secure_url;
   };
-
-  // 🧩 Chọn nguyên liệu
+  //  Chọn nguyên liệu
   const handleSelectIngredient = (ingredientId) => {
     setSelectedIngredients((prev) => {
       const exists = prev.find((i) => i.ingredient === ingredientId);
@@ -139,7 +138,7 @@ export default function AddItemModal({ show, onClose, setItems, editItem }) {
     });
   };
 
-  // 🔢 Thay đổi số lượng
+  //  Thay đổi số lượng
   const handleQuantityChange = (ingredientId, value) => {
     setSelectedIngredients((prev) =>
       prev.map((i) =>
@@ -150,7 +149,7 @@ export default function AddItemModal({ show, onClose, setItems, editItem }) {
     );
   };
 
-  // 🧾 Submit form
+  //  Submit form
   const handleSubmit = async (e) => {
     e.preventDefault();
     setLoading(true);
@@ -181,23 +180,23 @@ export default function AddItemModal({ show, onClose, setItems, editItem }) {
         setItems((prev) =>
           prev.map((item) => (item._id === editItem._id ? res.data : item))
         );
-        alert("✅ Cập nhật món ăn thành công!");
+        alert(" Cập nhật món ăn thành công!");
       } else {
         res = await kitchenApi.createItem(payload);
         setItems((prev) => [...prev, res.data]);
-        alert("✅ Thêm món ăn thành công!");
+        alert(" Thêm món ăn thành công!");
       }
 
       onClose();
     } catch (err) {
-      console.error("❌ Lỗi khi lưu món ăn:", err);
-      setError("❌ Lỗi khi lưu món ăn. Vui lòng thử lại!");
+      console.error(" Lỗi khi lưu món ăn:", err);
+      setError(" Lỗi khi lưu món ăn. Vui lòng thử lại!");
     } finally {
       setLoading(false);
     }
   };
 
-  // 🖼️ UI
+  //  UI
   return (
     <div className="fixed inset-0 bg-black bg-opacity-30 flex justify-center items-center z-50">
       <div className="bg-white rounded-2xl shadow-2xl w-full max-w-3xl p-8 relative animate-fadeIn max-h-[90vh] overflow-y-auto border border-gray-200">

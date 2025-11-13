@@ -8,7 +8,7 @@ export default function MenusManager({ menus, items = [], setMenus }) {
   const [showModal, setShowModal] = useState(false);
   const [editingMenu, setEditingMenu] = useState(null);
 
-  // ✅ Xử lý đổi trạng thái hoạt động
+  // Xử lý đổi trạng thái hoạt động
   const handleToggleAvailable = async (id, currentStatus) => {
     try {
       setLoading(true);
@@ -21,13 +21,13 @@ export default function MenusManager({ menus, items = [], setMenus }) {
         )
       );
     } catch (err) {
-      alert("❌ Lỗi khi cập nhật trạng thái thực đơn!");
+      alert(" Lỗi khi cập nhật trạng thái thực đơn!");
     } finally {
       setLoading(false);
     }
   };
 
-  // ✅ Xóa thực đơn
+  // Xóa thực đơn
   const handleDelete = async (id) => {
     if (!window.confirm("Bạn có chắc muốn xóa thực đơn này?")) return;
     try {
@@ -35,13 +35,13 @@ export default function MenusManager({ menus, items = [], setMenus }) {
       await kitchenApi.deleteMenu(id);
       setMenus((prev) => prev.filter((m) => m._id !== id));
     } catch (err) {
-      alert("❌ Lỗi khi xóa thực đơn!");
+      alert(" Lỗi khi xóa thực đơn!");
     } finally {
       setLoading(false);
     }
   };
 
-  // ✅ Hiển thị danh sách món trong thực đơn
+  //  Hiển thị danh sách món trong thực đơn
   const resolveItemNames = (menu) => {
     if (!menu.items || menu.items.length === 0) return "Không có món";
 
@@ -58,13 +58,13 @@ export default function MenusManager({ menus, items = [], setMenus }) {
     (m) => m && m.name && m.name.toLowerCase().includes(search.toLowerCase())
   );
 
-  // ✅ Mở modal thêm
+  //  Mở modal thêm
   const handleAddMenu = () => {
     setEditingMenu(null);
     setShowModal(true);
   };
 
-  // ✅ Mở modal sửa
+  //  Mở modal sửa
   const handleEditMenu = (menu) => {
     setEditingMenu(menu);
     setShowModal(true);

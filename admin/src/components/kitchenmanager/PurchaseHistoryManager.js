@@ -11,13 +11,6 @@ export default function PurchaseHistoryManager({ purchaseOrders, onRefresh }) {
   const fileInputRef = useRef(null);
   const perPage = 10;
 
-  // ✅ Log để debug
-  console.log(
-    "📊 PurchaseHistoryManager - purchaseOrders count:",
-    purchaseOrders?.length || 0
-  );
-
-  // ✅ Hàm kiểm tra trạng thái hạn dùng
   const checkStatus = (order) => {
     if (!order.expiryDate) return "valid"; // Nếu không có ngày hết hạn thì coi là còn hạn
 
@@ -26,28 +19,28 @@ export default function PurchaseHistoryManager({ purchaseOrders, onRefresh }) {
     const diffDays = (expiry - now) / (1000 * 60 * 60 * 24);
 
     if (diffDays < 0) return "expired";
-    if (diffDays <= 3) return "near"; // ≤ 3 ngày là gần hết hạn
+    if (diffDays <= 3) return "near";
     return "valid";
   };
 
-  // ✅ Lọc danh sách theo filter
+  //  Lọc danh sách theo filter
   const filteredOrders = useMemo(() => {
     if (filter === "all") return purchaseOrders;
     return purchaseOrders.filter((o) => checkStatus(o) === filter);
   }, [filter, purchaseOrders]);
 
-  // ✅ Sắp xếp giảm dần theo thời gian nhập
+  //  Sắp xếp giảm dần theo thời gian nhập
   const sortedOrders = useMemo(() => {
     return [...filteredOrders].sort(
       (a, b) => new Date(b.time) - new Date(a.time)
     );
   }, [filteredOrders]);
 
-  // ✅ Phân trang
+  //  Phân trang
   const totalPages = Math.ceil(sortedOrders.length / perPage);
   const displayed = sortedOrders.slice((page - 1) * perPage, page * perPage);
 
-  // ✅ Format ngày giờ
+  //  Format ngày giờ
   const formatDate = (dateStr) => {
     if (!dateStr) return "—";
     return new Date(dateStr).toLocaleString("vi-VN", {
@@ -59,7 +52,7 @@ export default function PurchaseHistoryManager({ purchaseOrders, onRefresh }) {
     });
   };
 
-  // ✅ Parse ngày từ Excel (hỗ trợ nhiều format)
+  //  Parse ngày từ Excel (hỗ trợ nhiều format)
   const parseExcelDate = (dateValue) => {
     if (!dateValue) return null;
 
@@ -103,7 +96,7 @@ export default function PurchaseHistoryManager({ purchaseOrders, onRefresh }) {
     return null;
   };
 
-  // ✅ Xử lý upload file Excel
+  // Xử lý upload file Excel
   const handleFileUpload = async (e) => {
     const file = e.target.files?.[0];
     if (!file) return;
@@ -146,35 +139,32 @@ export default function PurchaseHistoryManager({ purchaseOrders, onRefresh }) {
 
       await Promise.all(promises);
 
-      // ✅ Thông báo thành công
-      toast.success(
-        `✅ Nhập thành công ${purchaseOrdersData.length} đơn hàng!`,
-        {
-          position: "top-right",
-          autoClose: 3000,
-        }
-      );
+      // Thông báo thành công
+      toast.success(` Nhập thành công ${purchaseOrdersData.length} đơn hàng!`, {
+        position: "top-right",
+        autoClose: 3000,
+      });
 
       // Reset input trước
       if (fileInputRef.current) {
         fileInputRef.current.value = "";
       }
 
-      // ✅ Delay nhỏ để backend kịp lưu, sau đó refresh
+      //  Delay nhỏ để backend kịp lưu, sau đó refresh
       await new Promise((resolve) => setTimeout(resolve, 500));
 
       if (onRefresh) {
-        console.log("🔄 Calling onRefresh...");
+        console.log(" Calling onRefresh...");
         await onRefresh();
-        console.log("✅ Data refreshed!");
+        console.log(" Data refreshed!");
       }
     } catch (error) {
-      console.error("❌ Lỗi khi import Excel:", error);
+      console.error(" Lỗi khi import Excel:", error);
       const errorMsg = error.message || "Không thể xử lý file Excel";
       setUploadError(errorMsg);
 
       // ✅ Thông báo lỗi
-      toast.error(`❌ ${errorMsg}`, {
+      toast.error(` ${errorMsg}`, {
         position: "top-right",
         autoClose: 5000,
       });
@@ -183,7 +173,7 @@ export default function PurchaseHistoryManager({ purchaseOrders, onRefresh }) {
     }
   };
 
-  // ✅ Tải file Excel mẫu
+  //  Tải file Excel mẫu
   const downloadTemplate = () => {
     const template = [
       {
@@ -211,7 +201,7 @@ export default function PurchaseHistoryManager({ purchaseOrders, onRefresh }) {
         </h2>
 
         <div className="flex items-center space-x-3">
-          {/* ✅ Button Import Excel */}
+          {/*  Button Import Excel */}
           <div className="flex items-center space-x-2">
             <input
               ref={fileInputRef}

@@ -24,7 +24,7 @@ export default function AddMenuModal({
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
 
-  // ✅ Load dữ liệu khi edit
+  // Load dữ liệu khi edit
   useEffect(() => {
     if (isEdit && editMenu) {
       setFormData({
@@ -70,7 +70,7 @@ export default function AddMenuModal({
     });
   };
 
-  // ☁️ Upload lên Cloudinary
+  // Upload lên Cloudinary
   const uploadToCloudinary = async (file) => {
     const sigRes = await kitchenApi.getCloudinarySignature();
     const { signature, timestamp, apiKey, cloudName } = sigRes;
@@ -90,7 +90,7 @@ export default function AddMenuModal({
     return data.secure_url;
   };
 
-  // 🖼️ Chọn ảnh
+  // Chọn ảnh
   const handleFileChange = (e) => {
     const file = e.target.files[0];
     if (file) {
@@ -99,7 +99,7 @@ export default function AddMenuModal({
     }
   };
 
-  // 🧾 Submit
+  // Submit
   const handleSubmit = async (e) => {
     e.preventDefault();
     setError("");
@@ -129,19 +129,19 @@ export default function AddMenuModal({
         setMenus((prev) =>
           prev.map((m) => (m._id === editMenu._id ? { ...m, ...payload } : m))
         );
-        alert("✅ Cập nhật thực đơn thành công!");
+        alert(" Cập nhật thực đơn thành công!");
       }
 
       onClose();
     } catch (err) {
       console.error(err);
-      setError("❌ Lỗi khi lưu thực đơn. Vui lòng thử lại!");
+      setError(" Lỗi khi lưu thực đơn. Vui lòng thử lại!");
     } finally {
       setLoading(false);
     }
   };
 
-  // 🧠 UI
+  // UI
   return (
     <div className="fixed inset-0 bg-black bg-opacity-30 flex justify-center items-center z-50">
       <div className="bg-white rounded-2xl shadow-2xl w-full max-w-3xl p-8 relative animate-fadeIn max-h-[90vh] overflow-y-auto border border-gray-200">

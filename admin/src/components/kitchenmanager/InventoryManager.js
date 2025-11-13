@@ -19,14 +19,14 @@ export default function InventoryManager({ ingredients, onRefresh }) {
   const [message, setMessage] = useState("");
   const [copiedId, setCopiedId] = useState(null);
 
-  // ✅ Copy ID vào clipboard
+  // Copy ID vào clipboard
   const handleCopyId = (id) => {
     navigator.clipboard.writeText(id);
     setCopiedId(id);
     setTimeout(() => setCopiedId(null), 2000);
   };
 
-  // ✅ Hiển thị định dạng tồn kho
+  // Hiển thị định dạng tồn kho
   const displayQuantity = (ing) => {
     if (!ing || ing.stockQuantity == null) return "";
     if (ing.unit === "kg") {
@@ -36,7 +36,7 @@ export default function InventoryManager({ ingredients, onRefresh }) {
     return `${ing.stockQuantity.toLocaleString("vi-VN")} ${ing.unit}`;
   };
 
-  // ✅ Thêm nguyên liệu mới
+  // Thêm nguyên liệu mới
   const handleAddIngredient = async () => {
     if (!newIng.name || !newIng.unit) {
       alert("Vui lòng nhập đầy đủ tên và đơn vị!");
@@ -69,7 +69,6 @@ export default function InventoryManager({ ingredients, onRefresh }) {
     }
   };
 
-  // ✅ Nhập thêm tồn kho
   const handleUpdateStock = async () => {
     if (!selectedIng || addAmount.trim() === "") {
       alert("Chưa chọn nguyên liệu hoặc chưa nhập số lượng!");
@@ -106,14 +105,14 @@ export default function InventoryManager({ ingredients, onRefresh }) {
       });
 
       setMessage(
-        `✅ Đã nhập thêm ${amount.toLocaleString("vi-VN")} ${
+        ` Đã nhập thêm ${amount.toLocaleString("vi-VN")} ${
           selectedIng.unit
         } cho ${selectedIng.name}.`
       );
       if (onRefresh) await onRefresh();
     } catch (err) {
-      console.error("❌ Lỗi khi cập nhật kho:", err);
-      setMessage(err?.response?.data?.message || "❌ Không thể nhập hàng.");
+      console.error(" Lỗi khi cập nhật kho:", err);
+      setMessage(err?.response?.data?.message || " Không thể nhập hàng.");
     } finally {
       setLoading(false);
       setSelectedIng(null);
@@ -121,13 +120,13 @@ export default function InventoryManager({ ingredients, onRefresh }) {
     }
   };
 
-  // ✅ Mở modal sửa
+  //  Mở modal sửa
   const handleEditIngredient = (ing) => {
     setEditIng({ ...ing });
     setShowEditModal(true);
   };
 
-  // ✅ Lưu chỉnh sửa
+  //  Lưu chỉnh sửa
   const handleSaveEdit = async () => {
     if (!editIng.name || !editIng.unit) {
       alert("Tên và đơn vị không được để trống!");
@@ -143,18 +142,17 @@ export default function InventoryManager({ ingredients, onRefresh }) {
         minStock: Number(editIng.minStock) || 0,
       });
 
-      setMessage(`✏️ Đã cập nhật nguyên liệu ${editIng.name}.`);
+      setMessage(` Đã cập nhật nguyên liệu ${editIng.name}.`);
       setShowEditModal(false);
       if (onRefresh) await onRefresh();
     } catch (err) {
       console.error(err);
-      setMessage("❌ Lỗi khi cập nhật nguyên liệu.");
+      setMessage(" Lỗi khi cập nhật nguyên liệu.");
     } finally {
       setLoading(false);
     }
   };
 
-  // ✅ Xóa nguyên liệu
   const handleDeleteIngredient = (ing) => {
     setEditIng(ing);
     setShowDeleteModal(true);
@@ -164,12 +162,12 @@ export default function InventoryManager({ ingredients, onRefresh }) {
     setLoading(true);
     try {
       await kitchenApi.deleteIngredient(editIng._id);
-      setMessage(`🗑️ Đã xóa nguyên liệu ${editIng.name}.`);
+      setMessage(` Đã xóa nguyên liệu ${editIng.name}.`);
       setShowDeleteModal(false);
       if (onRefresh) await onRefresh();
     } catch (err) {
       console.error(err);
-      setMessage("❌ Lỗi khi xóa nguyên liệu.");
+      setMessage(" Lỗi khi xóa nguyên liệu.");
     } finally {
       setLoading(false);
     }
@@ -177,7 +175,6 @@ export default function InventoryManager({ ingredients, onRefresh }) {
 
   return (
     <div className="bg-white p-6 rounded-xl shadow-md">
-      {/* HEADER */}
       <div className="flex justify-between items-center mb-4">
         <h2 className="text-2xl font-bold text-gray-800">
           📦 Quản lý kho nguyên liệu
@@ -190,14 +187,12 @@ export default function InventoryManager({ ingredients, onRefresh }) {
         </button>
       </div>
 
-      {/* THÔNG BÁO */}
       {message && (
         <div className="mb-4 text-center font-medium text-green-700 bg-green-50 border border-green-300 p-2 rounded-lg">
           {message}
         </div>
       )}
 
-      {/* BẢNG KHO */}
       {ingredients.length === 0 ? (
         <p className="text-gray-500 italic text-center py-4">
           Không có nguyên liệu nào trong kho.
@@ -279,7 +274,6 @@ export default function InventoryManager({ ingredients, onRefresh }) {
         </table>
       )}
 
-      {/* ✅ MODAL: Nhập thêm tồn kho */}
       {selectedIng && (
         <Modal>
           <div className="bg-white p-8 rounded-2xl shadow-2xl w-[550px]">
@@ -293,9 +287,7 @@ export default function InventoryManager({ ingredients, onRefresh }) {
               Hiện tại: {displayQuantity(selectedIng)}
             </p>
 
-            {/* FORM NHẬP HÀNG */}
             <div className="space-y-4">
-              {/* Số lượng thêm */}
               <div>
                 <label className="block font-semibold text-gray-700 mb-1">
                   Số lượng thêm
