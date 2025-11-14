@@ -378,22 +378,6 @@ export default function KitchenDashboard() {
             <h1 className="text-2xl font-bold text-gray-900">
               Hệ thống Quản lý Bếp - KDS
             </h1>
-            {/* WebSocket Connection Status */}
-            <div
-              className={`ml-4 px-3 py-1 rounded-full text-xs font-medium ${
-                connectionState === "connected"
-                  ? "bg-green-100 text-green-700"
-                  : connectionState === "connecting" ||
-                    connectionState === "reconnecting"
-                  ? "bg-yellow-100 text-yellow-700"
-                  : "bg-red-100 text-red-700"
-              }`}
-            >
-              {connectionState === "connected" && "🟢 Realtime"}
-              {connectionState === "connecting" && "🟡 Đang kết nối..."}
-              {connectionState === "reconnecting" && "🟡 Đang kết nối lại..."}
-              {connectionState === "disconnected" && "🔴 Mất kết nối"}
-            </div>
           </div>
 
           <div className="flex items-center space-x-4">

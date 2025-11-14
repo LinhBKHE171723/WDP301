@@ -308,7 +308,7 @@ WaiterDashboard có một useEffect lắng nghe lastMessage → xử lý cập n
             <Container className="flex-grow-1 mt-4 pb-4">
                 <div className="d-flex flex-wrap justify-content-between align-items-center mb-3">
                     <h4 className="fw-bold text-dark mb-3 mb-md-0">
-                        🧾 Quản lý đơn hàng
+                        Quản lý đơn hàng
                     </h4>
                 </div>
 

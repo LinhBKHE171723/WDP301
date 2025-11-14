@@ -150,7 +150,7 @@ setAccounts((prev) => [res.data, ...prev]);
 
   return (
     <div className="space-y-4">
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
         <div className="text-2xl font-semibold">Quản lý tài khoản</div>
 
         {/* Thêm tài khoản */}
@@ -261,7 +261,7 @@ setAccounts((prev) => [res.data, ...prev]);
       {/* TABLE */}
       <Card>
         {/* 🔹 Bộ lọc */}
-        <div className="flex items-center gap-3">
+        <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 sm:gap-3 p-4">
           <Input
             placeholder="Tìm theo tên hoặc email..."
             value={search}
@@ -269,6 +269,7 @@ setAccounts((prev) => [res.data, ...prev]);
               setSearch(e.target.value);
               setPage(1);
             }}
+            className="flex-1"
           />
 
           {/* Filter theo trạng thái */}
@@ -278,7 +279,7 @@ setAccounts((prev) => [res.data, ...prev]);
               setFilterStatus(e.target.value);
               setPage(1);
             }}
-            className="border rounded px-3 py-2"
+            className="border rounded px-3 py-2 text-sm sm:text-base"
           >
             <option value="all">Tất cả</option>
             <option value="active">Hoạt động</option>
@@ -292,7 +293,7 @@ setAccounts((prev) => [res.data, ...prev]);
               setFilterRole(e.target.value);
               setPage(1);
             }}
-            className="border rounded px-3 py-2"
+            className="border rounded px-3 py-2 text-sm sm:text-base"
           >
             <option value="all">Tất cả vai trò</option>
             <option value="waiter">Phục vụ</option>
@@ -303,17 +304,17 @@ setAccounts((prev) => [res.data, ...prev]);
         </div>
 
         {/* Bảng danh sách */}
-        <div className="mt-4 overflow-x-auto">
-          <table className="w-full">
+        <div className="mt-4 overflow-x-auto -mx-4 sm:mx-0">
+          <table className="w-full min-w-[700px]">
             <thead>
               <tr className="border-b bg-gray-50 text-left text-sm text-gray-700">
-                <th className="p-3">Người dùng</th>
-                <th className="p-3">Email</th>
-                <th className="p-3">Số điện thoại</th>
-                <th className="p-3">Vai trò</th>
-                <th className="p-3">Trạng thái</th>
-                <th className="p-3">Ngày tạo</th>
-                <th className="p-3 text-right">Thao tác</th>
+                <th className="p-2 sm:p-3">Người dùng</th>
+                <th className="p-2 sm:p-3 hidden md:table-cell">Email</th>
+                <th className="p-2 sm:p-3 hidden lg:table-cell">Số điện thoại</th>
+                <th className="p-2 sm:p-3">Vai trò</th>
+                <th className="p-2 sm:p-3">Trạng thái</th>
+                <th className="p-2 sm:p-3 hidden xl:table-cell">Ngày tạo</th>
+                <th className="p-2 sm:p-3 text-right">Thao tác</th>
               </tr>
             </thead>
             <tbody>
@@ -322,25 +323,25 @@ setAccounts((prev) => [res.data, ...prev]);
                   key={u._id}
                   className="border-b last:border-0 hover:bg-gray-50"
                 >
-                  <td className="p-3 font-medium">{u.name}</td>
-                  <td className="p-3 text-sm text-gray-600">{u.email}</td>
-                  <td className="p-3 text-sm text-gray-600">
+                  <td className="p-2 sm:p-3 font-medium">{u.name}</td>
+                  <td className="p-2 sm:p-3 text-sm text-gray-600 hidden md:table-cell">{u.email}</td>
+                  <td className="p-2 sm:p-3 text-sm text-gray-600 hidden lg:table-cell">
                     {u.phone || "-"}
                   </td>
-                  <td className="p-3">
+                  <td className="p-2 sm:p-3">
                     <Badge>{u.role}</Badge>
                   </td>
-                  <td className="p-3">
+                  <td className="p-2 sm:p-3">
                     <Badge
                       variant={u.status === "active" ? "success" : "default"}
                     >
                       {u.status === "active" ? "Hoạt động" : "Không hoạt động"}
                     </Badge>
                   </td>
-                  <td className="p-3 text-sm text-gray-500">
+                  <td className="p-2 sm:p-3 text-sm text-gray-500 hidden xl:table-cell">
                     {u.createdAt ? formatDate(u.createdAt) : "-"}
                   </td>
-                  <td className="p-3 text-right">
+                  <td className="p-2 sm:p-3 text-right">
                     <DropdownMenu>
                       <DropdownMenuTrigger asChild>
                         <Button

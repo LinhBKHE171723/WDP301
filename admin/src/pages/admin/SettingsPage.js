@@ -391,10 +391,10 @@ export default function SettingsPage() {
       {/* Tabs */}
       <Card>
         <div className="p-4 border-b">
-          <div className="flex gap-4">
+          <div className="flex flex-wrap gap-2 sm:gap-4">
             <button
               onClick={() => setActiveTab("preorder")}
-              className={`px-4 py-2 font-medium ${
+              className={`px-3 sm:px-4 py-2 text-sm sm:text-base font-medium ${
                 activeTab === "preorder"
                   ? "text-blue-600 border-b-2 border-blue-600"
                   : "text-gray-600 hover:text-gray-900"
@@ -404,7 +404,7 @@ export default function SettingsPage() {
             </button>
             <button
               onClick={() => setActiveTab("workshift")}
-              className={`px-4 py-2 font-medium ${
+              className={`px-3 sm:px-4 py-2 text-sm sm:text-base font-medium ${
                 activeTab === "workshift"
                   ? "text-blue-600 border-b-2 border-blue-600"
                   : "text-gray-600 hover:text-gray-900"
@@ -414,7 +414,7 @@ export default function SettingsPage() {
             </button>
             <button
               onClick={() => setActiveTab("loyalty")}
-              className={`px-4 py-2 font-medium ${
+              className={`px-3 sm:px-4 py-2 text-sm sm:text-base font-medium ${
                 activeTab === "loyalty"
                   ? "text-blue-600 border-b-2 border-blue-600"
                   : "text-gray-600 hover:text-gray-900"
@@ -505,28 +505,28 @@ export default function SettingsPage() {
                     Chưa có ca làm việc nào. Nhấn "Thêm ca mới" để tạo ca đầu tiên.
                   </div>
                 ) : (
-                  <div className="overflow-x-auto">
-                    <table className="w-full border-collapse">
+                  <div className="overflow-x-auto -mx-4 sm:mx-0">
+                    <table className="w-full border-collapse min-w-[600px]">
                       <thead>
                         <tr className="border-b bg-gray-50">
-                          <th className="p-3 text-left text-sm font-semibold">Tên ca</th>
-                          <th className="p-3 text-left text-sm font-semibold">Giờ bắt đầu</th>
-                          <th className="p-3 text-left text-sm font-semibold">Giờ kết thúc</th>
-                          <th className="p-3 text-left text-sm font-semibold">Thứ trong tuần</th>
-                          <th className="p-3 text-left text-sm font-semibold">Số nhân viên</th>
-                          <th className="p-3 text-left text-sm font-semibold">Trạng thái</th>
-                          <th className="p-3 text-left text-sm font-semibold">Thao tác</th>
+                          <th className="p-2 sm:p-3 text-left text-xs sm:text-sm font-semibold">Tên ca</th>
+                          <th className="p-2 sm:p-3 text-left text-xs sm:text-sm font-semibold hidden md:table-cell">Giờ bắt đầu</th>
+                          <th className="p-2 sm:p-3 text-left text-xs sm:text-sm font-semibold hidden md:table-cell">Giờ kết thúc</th>
+                          <th className="p-2 sm:p-3 text-left text-xs sm:text-sm font-semibold hidden lg:table-cell">Thứ trong tuần</th>
+                          <th className="p-2 sm:p-3 text-left text-xs sm:text-sm font-semibold hidden sm:table-cell">Số nhân viên</th>
+                          <th className="p-2 sm:p-3 text-left text-xs sm:text-sm font-semibold">Trạng thái</th>
+                          <th className="p-2 sm:p-3 text-left text-xs sm:text-sm font-semibold">Thao tác</th>
                         </tr>
                       </thead>
                       <tbody>
                         {workShifts.map((shift) => (
                           <tr key={shift._id} className="border-b hover:bg-gray-50">
-                            <td className="p-3">{shift.name}</td>
-                            <td className="p-3">{shift.startTime}</td>
-                            <td className="p-3">{shift.endTime}</td>
-                            <td className="p-3 text-sm">{formatDaysOfWeek(shift.daysOfWeek)}</td>
-                            <td className="p-3">{shift.employees?.length || 0}</td>
-                            <td className="p-3">
+                            <td className="p-2 sm:p-3">{shift.name}</td>
+                            <td className="p-2 sm:p-3 hidden md:table-cell">{shift.startTime}</td>
+                            <td className="p-2 sm:p-3 hidden md:table-cell">{shift.endTime}</td>
+                            <td className="p-2 sm:p-3 text-xs sm:text-sm hidden lg:table-cell">{formatDaysOfWeek(shift.daysOfWeek)}</td>
+                            <td className="p-2 sm:p-3 hidden sm:table-cell">{shift.employees?.length || 0}</td>
+                            <td className="p-2 sm:p-3">
                               <span className={`px-2 py-1 rounded text-xs font-medium ${
                                 shift.isActive 
                                   ? "bg-green-100 text-green-800" 
@@ -535,8 +535,8 @@ export default function SettingsPage() {
                                 {shift.isActive ? "✓ Hoạt động" : "✗ Tạm dừng"}
                               </span>
                             </td>
-                            <td className="p-3">
-                              <div className="flex gap-2">
+                            <td className="p-2 sm:p-3">
+                              <div className="flex flex-col sm:flex-row gap-1 sm:gap-2">
                                 <Button
                                   variant="outline"
                                   size="sm"
