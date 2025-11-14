@@ -1,7 +1,7 @@
 import axios from "axios";
 console.log("Base URL:", process.env.REACT_APP_API_URL);
 const Client = axios.create({
-  baseURL: process.env.REACT_APP_API_URL, // URL backend (đặt trong .env)
+  baseURL: process.env.REACT_APP_API_URL || "http://localhost:5000/api", // URL backend (đặt trong .env)
   // headers: cấu hình mặc định cho tất cả request — ở đây là gửi dữ liệu dạng JSON
   headers: {
     "Content-Type": "application/json",

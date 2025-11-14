@@ -1225,6 +1225,67 @@ const splitLargeOrderItems = async (orderId) => {
   }
 };
 
+/**
+ * Cleanup tables when order is cancelled or paid
+ * Removes order from all tables (both tableId and tableIds) and sets status to available if no other orders
+ * @param {Object} order - Order object with tableId and/or tableIds
+ * @param {String} orderId - Order ID to remove from tables
+ * @returns {Promise<void>}
+ */
+const cleanupTablesForOrder = async (order, orderId) => {
+  const Table = require("../models/Table");
+  const mongoose = require("mongoose");
+  
+  // Collect all table IDs to process
+  const tableIdsToProcess = [];
+  
+  // Add tableId if exists
+  if (order.tableId) {
+    tableIdsToProcess.push(order.tableId.toString());
+  }
+  
+  // Add all tableIds if exists
+  if (order.tableIds && Array.isArray(order.tableIds) && order.tableIds.length > 0) {
+    for (const tableId of order.tableIds) {
+      const tableIdStr = tableId.toString ? tableId.toString() : tableId;
+      if (!tableIdsToProcess.includes(tableIdStr)) {
+        tableIdsToProcess.push(tableIdStr);
+      }
+    }
+  }
+  
+  // Remove duplicates
+  const uniqueTableIds = [...new Set(tableIdsToProcess)];
+  
+  // Process each table
+  for (const tableIdStr of uniqueTableIds) {
+    try {
+      const table = await Table.findById(tableIdStr);
+      if (table && table.orderNow) {
+        // Remove this order from table.orderNow
+        const beforeLength = table.orderNow.length;
+        table.orderNow = table.orderNow.filter(oid => oid.toString() !== orderId.toString());
+        const afterLength = table.orderNow.length;
+        
+        // If no more orders, set status to available
+        if (table.orderNow.length === 0) {
+          table.status = "available";
+          console.log(`✅ Bàn ${table.tableNumber} đã được giải phóng (không còn orders)`);
+        }
+        
+        await table.save();
+        
+        if (beforeLength !== afterLength) {
+          console.log(`✅ Đã xóa order ${orderId} khỏi bàn ${table.tableNumber}`);
+        }
+      }
+    } catch (error) {
+      console.error(`❌ Lỗi khi xử lý bàn ${tableIdStr}:`, error);
+      // Continue với các bàn khác
+    }
+  }
+};
+
 module.exports = {
   populateOrderItemDetails,
   validateTableAvailability,
@@ -1237,6 +1298,7 @@ module.exports = {
   returnIngredientsForUnservedItems,
   updateComboStatusBasedOnComboItems,
   createCustomerAccount,
+  cleanupTablesForOrder,
   splitLargeOrderItems,
   groupSplitOrderItemsForCustomer
 };

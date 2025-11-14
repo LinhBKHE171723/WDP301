@@ -228,36 +228,9 @@ exports.completeOrderPayment = async (req, res) => {
       await order.save();
       
       // Cập nhật trạng thái bàn: xóa order khỏi table.orderNow và đổi status về "available" nếu không còn order nào
-      const Table = require("../models/Table");
-      
-      // Xử lý tableId (backward compatibility)
-      if (order.tableId) {
-        const table = await Table.findById(order.tableId);
-        if (table && table.orderNow) {
-          table.orderNow = table.orderNow.filter(oid => oid.toString() !== orderId.toString());
-          if (table.orderNow.length === 0) {
-            table.status = "available";
-            console.log(`✅ [completeOrderPayment] Bàn ${table.tableNumber} chuyển sang trạng thái "available"`);
-          }
-          await table.save();
-        }
-      }
-      
-      // Xử lý tableIds (nhiều bàn)
-      if (order.tableIds && order.tableIds.length > 0) {
-        const tables = await Table.find({ _id: { $in: order.tableIds } });
-        for (const table of tables) {
-          if (table && table.orderNow) {
-            const beforeLength = table.orderNow.length;
-            table.orderNow = table.orderNow.filter(oid => oid.toString() !== orderId.toString());
-            if (table.orderNow.length === 0 && beforeLength > 0) {
-              table.status = "available";
-              console.log(`✅ [completeOrderPayment] Bàn ${table.tableNumber} chuyển sang trạng thái "available"`);
-            }
-            await table.save();
-          }
-        }
-      }
+      // Xử lý cả tableId và tableIds (merged tables)
+      const { cleanupTablesForOrder } = require("../utils/customerHelpers");
+      await cleanupTablesForOrder(order, orderId);
       
       // Tích điểm cho khách hàng khi đơn chuyển sang paid
       if (order.userId) {

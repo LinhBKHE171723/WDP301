@@ -15,14 +15,14 @@ const getTodayRange = () => {
 };
 
 /**
- * Cron job test: chạy mỗi 1 phút (dễ test)
+ * Cron job chạy mỗi ngày lúc 00:00
  * - Tạo shift cho tất cả nhân viên theo ca làm
- *
- * ⚠️ Đã XÓA phần reset status vì hệ thống dùng Shift model để quản lý check-in/out
+ * - CHỈ tạo shift mới nếu chưa có hoặc chưa check-in
+ * - KHÔNG reset shift đã check-in (giữ nguyên startTime, endTime, status)
  */
-cron.schedule("*/1 * * * *", async () => {
+cron.schedule("0 0 * * *", async () => {
   console.log(
-    "⏱ Cron job test: Tạo shift mới cho nhân viên trong WorkShift..."
+    "🌅 Cron job 00:00: Tạo shift mới cho nhân viên trong WorkShift..."
   );
 
   try {
@@ -37,28 +37,59 @@ cron.schedule("*/1 * * * *", async () => {
 
     const { startOfDay, endOfDay } = getTodayRange();
 
+    let createdCount = 0;
+    let skippedCount = 0;
+    let updatedCount = 0;
+
     // Tạo shift cho từng nhân viên trong WorkShift.employees
     for (const ws of workShifts) {
       for (const employee of ws.employees) {
-        await Shift.findOneAndUpdate(
-          { userId: employee._id, date: { $gte: startOfDay, $lt: endOfDay } },
-          {
-            workShiftId: ws._id,
-            status: "pending",
-            startTime: null,
-            endTime: null,
-            date: startOfDay,
-          },
-          { upsert: true, new: true }
-        );
+        try {
+          // ✅ Kiểm tra shift đã tồn tại chưa
+          const existingShift = await Shift.findOne({
+            userId: employee._id,
+            date: { $gte: startOfDay, $lt: endOfDay }
+          });
+
+          if (!existingShift) {
+            // Chưa có shift → tạo mới
+            await Shift.create({
+              userId: employee._id,
+              workShiftId: ws._id,
+              date: startOfDay,
+              status: "pending",
+              startTime: null,
+              endTime: null,
+            });
+            createdCount++;
+            console.log(`✅ Đã tạo shift mới cho ${employee.name || employee._id || employee.email}`);
+          } else if (!existingShift.startTime) {
+            // Có shift nhưng chưa check-in → chỉ update workShiftId nếu khác
+            if (!existingShift.workShiftId || existingShift.workShiftId.toString() !== ws._id.toString()) {
+              existingShift.workShiftId = ws._id;
+              await existingShift.save();
+              updatedCount++;
+              console.log(`✅ Đã cập nhật workShiftId cho shift của ${employee.name || employee._id || employee.email}`);
+            } else {
+              skippedCount++;
+            }
+            // KHÔNG reset status, startTime, endTime vì shift đã tồn tại
+          } else {
+            // Đã check-in → KHÔNG làm gì cả (giữ nguyên shift hiện tại)
+            skippedCount++;
+            console.log(`⏭️ Bỏ qua shift của ${employee.name || employee._id || employee.email} (đã check-in lúc ${existingShift.startTime})`);
+          }
+        } catch (err) {
+          console.error(`❌ Lỗi khi xử lý shift cho ${employee._id}:`, err.message);
+        }
       }
     }
 
     console.log(
-      "✅ Shift hôm nay đã được tạo cho tất cả nhân viên trong WorkShift"
+      `✅ Cron job hoàn thành: Tạo ${createdCount} shift mới, cập nhật ${updatedCount} shift, bỏ qua ${skippedCount} shift đã check-in`
     );
   } catch (err) {
-    console.error("❌ Lỗi cron test:", err.message);
+    console.error("❌ Lỗi cron 00:00:", err.message);
   }
 });
 

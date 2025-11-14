@@ -282,6 +282,7 @@ export default function AppRouter() {
             path="/waiter/orders/history/:orderId"
             element={<ServingHistoryDetail />}
           />
+          <Route path="/waiter/checkin" element={<Attendance />} />
           <Route path="/profile" element={<Profile />} />
           <Route path="/user/attendance" element={<Attendance />} />
         </>

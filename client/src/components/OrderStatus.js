@@ -1185,14 +1185,25 @@ const OrderStatus = React.memo(({ orderId, onBack }) => {
         <div className="order-items">
           <div className="order-items-header">
             <h3>Món đã đặt</h3>
-            {canEditOrder && (
-              <button onClick={() => {
-                setShowAddItemModal(true);
-                fetchMenusAndItems();
-              }} className="add-item-btn">
-                Thêm món vào đơn hàng
-              </button>
-            )}
+            <div className="header-actions">
+              {canEditOrder && (
+                <button onClick={() => {
+                  setShowAddItemModal(true);
+                  fetchMenusAndItems();
+                }} className="add-item-btn">
+                  Thêm món vào đơn hàng
+                </button>
+              )}
+              {order && order.status === 'served' && (
+                <button 
+                  onClick={handleRequestPayment} 
+                  className="request-payment-btn"
+                  disabled={isRefreshing}
+                >
+                  Yêu cầu thanh toán
+                </button>
+              )}
+            </div>
           </div>
           
           <div className="items-list">
@@ -1353,15 +1364,6 @@ const OrderStatus = React.memo(({ orderId, onBack }) => {
                   'Gửi lại đơn hàng cho waiter'
                 )}
             </button>
-            )}
-            {order && order.status === 'served' && (
-              <button 
-                onClick={handleRequestPayment} 
-                className="request-payment-btn"
-                disabled={isRefreshing}
-              >
-                💳 Yêu cầu thanh toán
-              </button>
             )}
             {order && order.status === 'paid' && (
               <button onClick={handleShowFeedback} className="feedback-btn">

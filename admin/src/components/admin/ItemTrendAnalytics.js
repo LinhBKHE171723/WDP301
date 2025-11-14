@@ -8,12 +8,6 @@ import {
 } from "recharts";
 import { Clock, TrendingUp, DollarSign, XCircle } from "lucide-react";
 
-/**
- * ✅ FIX HOÀN CHỈNH – CÁCH 1:
- *  • from = 30 ngày trước, to = hôm nay (tự động).
- *  • Không phụ thuộc useParams/useLocation.
- *  • Giữ nguyên toàn bộ UI + logic xử lý dữ liệu.
- */
 
 const formatCurrency = (amount) => {
   if (typeof amount !== "number" || isNaN(amount)) return "0 ₫";
@@ -40,7 +34,9 @@ export default function ItemTrendAnalytics({ itemId, itemName = "Chi Tiết Món
   // Get API base URL from environment variable
   const API_BASE_URL = process.env.REACT_APP_API_URL 
     ? `${process.env.REACT_APP_API_URL}/admin`
-    : "http://localhost:5000/api/admin";
+    : (process.env.REACT_APP_API_BASE_URL 
+      ? `${process.env.REACT_APP_API_BASE_URL}/admin`
+      : "http://localhost:5000/api/admin");
 
   const safeJsonParse = (text) => {
     let clean = text.replace(/^\uFEFF/, "");
@@ -242,7 +238,7 @@ setTrendData(trend);
   tick={{ fontSize: 10 }}
   tickFormatter={(label, index) => {
     const item = trendData[index];
-    // ✅ Nếu không có label hoặc là bản sao -> không hiển thị
+
     if (!item || item.__isDuplicate || !item.label) return "";
     return item.label;
   }}
@@ -321,7 +317,7 @@ setTrendData(trend);
   tick={{ fontSize: 10 }}
   tickFormatter={(label, index) => {
     const item = trendData[index];
-    // ✅ Nếu không có label hoặc là bản sao -> không hiển thị
+
     if (!item || item.__isDuplicate || !item.label) return "";
     return item.label;
   }}

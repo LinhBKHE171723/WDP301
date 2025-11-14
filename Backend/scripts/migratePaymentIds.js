@@ -14,7 +14,7 @@ const Payment = require("../models/Payment");
 async function migratePaymentIds() {
   try {
     // Kết nối database
-    await mongoose.connect(process.env.MONGODB_URI || "mongodb://localhost:27017/restaurant", {
+    await mongoose.connect(process.env.MONGO_URI || process.env.MONGODB_URI || "mongodb://localhost:27017/restaurant", {
       useNewUrlParser: true,
       useUnifiedTopology: true,
     });
@@ -106,7 +106,7 @@ const Payment = require("../models/Payment");
 async function migratePaymentIds() {
   try {
     // Kết nối database
-    await mongoose.connect(process.env.MONGODB_URI || "mongodb://localhost:27017/restaurant", {
+    await mongoose.connect(process.env.MONGO_URI || process.env.MONGODB_URI || "mongodb://localhost:27017/restaurant", {
       useNewUrlParser: true,
       useUnifiedTopology: true,
     });

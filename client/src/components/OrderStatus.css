@@ -1094,12 +1094,21 @@
   justify-content: space-between;
   align-items: center;
   margin-bottom: 15px;
+  flex-wrap: wrap;
+  gap: 10px;
 }
 
 .order-items-header h3 {
   margin: 0;
   color: #333;
   font-size: 18px;
+}
+
+.header-actions {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  flex-wrap: wrap;
 }
 
 .items-list {
@@ -1209,6 +1218,37 @@
 .add-item-btn:hover {
   background: #45a049;
   transform: translateY(-2px);
+}
+
+.request-payment-btn {
+  background: #ff9800;
+  color: white;
+  border: none;
+  padding: 12px 24px;
+  border-radius: 8px;
+  cursor: pointer;
+  font-weight: 600;
+  font-size: 14px;
+  transition: all 0.3s ease;
+  white-space: nowrap;
+}
+
+.request-payment-btn:hover {
+  background: #f57c00;
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(255, 152, 0, 0.3);
+}
+
+.request-payment-btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+  background: #6c757d !important;
+}
+
+.request-payment-btn:disabled:hover {
+  background: #6c757d !important;
+  transform: none !important;
+  box-shadow: none !important;
 }
 
 .loading {

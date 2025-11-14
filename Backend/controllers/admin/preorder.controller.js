@@ -866,17 +866,9 @@ exports.cancelPreOrder = async (req, res) => {
 
     await order.save();
 
-    // Xử lý bàn nếu có
-    if (order.tableId) {
-      const table = await Table.findById(order.tableId);
-      if (table && table.orderNow) {
-        table.orderNow = table.orderNow.filter(oid => oid.toString() !== orderId);
-        if (table.orderNow.length === 0) {
-          table.status = "available";
-        }
-        await table.save();
-      }
-    }
+    // Xử lý bàn nếu có (xử lý cả tableId và tableIds - merged tables)
+    const { cleanupTablesForOrder } = require("../utils/customerHelpers");
+    await cleanupTablesForOrder(order, orderId);
 
     // Populate để trả về thông tin đầy đủ
     const populatedOrder = await Order.findById(order._id)
@@ -2056,16 +2048,9 @@ exports.bulkActionPreOrders = async (req, res) => {
             });
           }
 
-          if (order.tableId) {
-            const orderTable = await Table.findById(order.tableId);
-            if (orderTable && orderTable.orderNow) {
-              orderTable.orderNow = orderTable.orderNow.filter(oid => oid.toString() !== orderId);
-              if (orderTable.orderNow.length === 0) {
-                orderTable.status = "available";
-              }
-              await orderTable.save();
-            }
-          }
+          // Xử lý bàn (xử lý cả tableId và tableIds - merged tables)
+          const { cleanupTablesForOrder } = require("../utils/customerHelpers");
+          await cleanupTablesForOrder(order, orderId);
         }
 
 
@@ -2681,17 +2666,9 @@ exports.cancelPreOrder = async (req, res) => {
 
     await order.save();
 
-    // Xử lý bàn nếu có
-    if (order.tableId) {
-      const table = await Table.findById(order.tableId);
-      if (table && table.orderNow) {
-        table.orderNow = table.orderNow.filter(oid => oid.toString() !== orderId);
-        if (table.orderNow.length === 0) {
-          table.status = "available";
-        }
-        await table.save();
-      }
-    }
+    // Xử lý bàn nếu có (xử lý cả tableId và tableIds - merged tables)
+    const { cleanupTablesForOrder } = require("../utils/customerHelpers");
+    await cleanupTablesForOrder(order, orderId);
 
     // Populate để trả về thông tin đầy đủ
     const populatedOrder = await Order.findById(order._id)
@@ -3871,16 +3848,9 @@ exports.bulkActionPreOrders = async (req, res) => {
             });
           }
 
-          if (order.tableId) {
-            const orderTable = await Table.findById(order.tableId);
-            if (orderTable && orderTable.orderNow) {
-              orderTable.orderNow = orderTable.orderNow.filter(oid => oid.toString() !== orderId);
-              if (orderTable.orderNow.length === 0) {
-                orderTable.status = "available";
-              }
-              await orderTable.save();
-            }
-          }
+          // Xử lý bàn (xử lý cả tableId và tableIds - merged tables)
+          const { cleanupTablesForOrder } = require("../utils/customerHelpers");
+          await cleanupTablesForOrder(order, orderId);
         }
 
 

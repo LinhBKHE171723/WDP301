@@ -1065,6 +1065,17 @@ exports.addItemsToOrder = async (req, res) => {
       details: 'Customer thêm món vào đơn hàng'
     });
     
+    // 🔍 Xóa tableIds cũ nếu có (khi customer sửa đơn, cần xóa các bàn cũ)
+    // Đảm bảo order không còn giữ các bàn cũ khi được modify
+    if (order.tableIds && order.tableIds.length > 0) {
+      const oldTableIdsCount = order.tableIds.length;
+      // Xóa order khỏi tất cả các bàn cũ trước khi gán lại
+      const { cleanupTablesForOrder } = require("../utils/customerHelpers");
+      await cleanupTablesForOrder(order, orderId);
+      order.tableIds = [];
+      console.log(`🧹 Đã xóa order khỏi ${oldTableIdsCount} bàn cũ khi modify`);
+    }
+
     // 🔍 Tự động gán lại tableId nếu order hiện tại không có tableId
     // (tương tự logic trong createOrder - khi customer sửa đơn và gửi lại)
     if (!order.tableId) {
@@ -1370,15 +1381,10 @@ exports.updateOrderStatus = async (req, res) => {
     }
 
     // Xóa order khỏi table.orderNow khi order chuyển sang paid/cancelled
-    if (['paid', 'cancelled'].includes(status) && order.tableId) {
-      const table = await Table.findById(order.tableId);
-      if (table && table.orderNow) {
-        table.orderNow = table.orderNow.filter(oid => oid.toString() !== orderId);
-        if (table.orderNow.length === 0) {
-          table.status = "available";
-        }
-        await table.save();
-      }
+    // Xử lý cả tableId và tableIds (merged tables)
+    if (['paid', 'cancelled'].includes(status)) {
+      const { cleanupTablesForOrder } = require("../utils/customerHelpers");
+      await cleanupTablesForOrder(order, orderId);
     }
 
     // 🍪 Cleanup cookie khi order hoàn thành
@@ -2243,28 +2249,27 @@ exports.startEditOrder = async (req, res) => {
       });
     }
 
-    let oldTable = null;
-
-    // Nếu order có tableId, giải phóng bàn cũ
+    // Lưu danh sách bàn cũ để broadcast sau
+    const oldTableIds = [];
     if (order.tableId) {
-      oldTable = await Table.findById(order.tableId);
-      
-      if (oldTable) {
-        // Kiểm tra bàn này có đang giữ order này không
-        if (oldTable.orderNow && oldTable.orderNow.some(oid => oid.toString() === orderId)) {
-          // Remove order khỏi mảng
-          oldTable.orderNow = oldTable.orderNow.filter(oid => oid.toString() !== orderId);
-          // Nếu không còn order nào active, set bàn về available
-          if (oldTable.orderNow.length === 0) {
-            oldTable.status = "available";
-          }
-          await oldTable.save();
+      oldTableIds.push(order.tableId.toString());
+    }
+    if (order.tableIds && Array.isArray(order.tableIds) && order.tableIds.length > 0) {
+      for (const tableId of order.tableIds) {
+        const tableIdStr = tableId.toString ? tableId.toString() : tableId;
+        if (!oldTableIds.includes(tableIdStr)) {
+          oldTableIds.push(tableIdStr);
         }
       }
     }
 
-    // Xóa tableId khỏi order
+    // Xóa order khỏi tất cả các bàn (cả tableId và tableIds - merged tables)
+    const { cleanupTablesForOrder } = require("../utils/customerHelpers");
+    await cleanupTablesForOrder(order, orderId);
+
+    // Xóa tableId và tableIds khỏi order
     order.tableId = null;
+    order.tableIds = [];
     
     // Reset waiterResponse về pending - nhưng chỉ khi order chưa được confirmed
     // Nếu order đã được confirmed, giữ nguyên status để không xuất hiện lại trong pending list
@@ -2276,18 +2281,26 @@ exports.startEditOrder = async (req, res) => {
     order.customerConfirmed = false;
     
     // Broadcast cập nhật trạng thái bàn cho waiter (nếu có bàn được giải phóng)
-    if (oldTable && oldTable._id) {
-      // Lưu lại thông tin bàn đã giải phóng để broadcast
-      const tableInfo = {
-        _id: oldTable._id,
-        tableNumber: oldTable.tableNumber,
-        status: oldTable.status, // đã là "available" sau khi save
-        orderNow: []
-      };
-      
+    if (oldTableIds.length > 0) {
+      const Table = require("../models/Table");
       const webSocketService = req.app.get("webSocketService");
-      if (webSocketService) {
-        webSocketService.broadcastTableUpdate(oldTable._id, tableInfo);
+      
+      // Broadcast cho tất cả các bàn đã được giải phóng
+      for (const tableIdStr of oldTableIds) {
+        try {
+          const table = await Table.findById(tableIdStr);
+          if (table && webSocketService) {
+            const tableInfo = {
+              _id: table._id,
+              tableNumber: table.tableNumber,
+              status: table.status,
+              orderNow: table.orderNow || []
+            };
+            webSocketService.broadcastTableUpdate(table._id, tableInfo);
+          }
+        } catch (error) {
+          console.error(`❌ Lỗi khi broadcast table update cho bàn ${tableIdStr}:`, error);
+        }
       }
     }
     
