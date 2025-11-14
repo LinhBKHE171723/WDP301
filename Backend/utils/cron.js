@@ -15,14 +15,14 @@ const getTodayRange = () => {
 };
 
 /**
- * Cron job chạy mỗi ngày lúc 00:00
+ * Cron job chạy mỗi 40 phút
  * - Tạo shift cho tất cả nhân viên theo ca làm
  * - CHỈ tạo shift mới nếu chưa có hoặc chưa check-in
  * - KHÔNG reset shift đã check-in (giữ nguyên startTime, endTime, status)
  */
-cron.schedule("0 0 * * *", async () => {
+cron.schedule("*/40 * * * *", async () => {
   console.log(
-    "🌅 Cron job 00:00: Tạo shift mới cho nhân viên trong WorkShift..."
+    "⏱ Cron job (mỗi 40 phút): Tạo shift mới cho nhân viên trong WorkShift..."
   );
 
   try {
@@ -89,7 +89,7 @@ cron.schedule("0 0 * * *", async () => {
       `✅ Cron job hoàn thành: Tạo ${createdCount} shift mới, cập nhật ${updatedCount} shift, bỏ qua ${skippedCount} shift đã check-in`
     );
   } catch (err) {
-    console.error("❌ Lỗi cron 00:00:", err.message);
+    console.error("❌ Lỗi cron (40 phút):", err.message);
   }
 });
 
