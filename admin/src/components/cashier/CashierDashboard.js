@@ -19,6 +19,7 @@ import { toast } from "react-toastify"
 import "./CashierDashboard.css"
 import UnpaidOrdersList from "./Unpaid-orders-list"
 import TableManagement from "./table-management"
+import OrderPayment from "./order-payment"
 import Client from "../../api/Client"
 import useCashierSocket from "../../hooks/useCashierSocket"
 import adminApi from "../../api/adminApi"
@@ -45,6 +46,7 @@ export default function CashierDashboard({
   // ====== Điều hướng màn con ======
   const [showPaymentHistory, setShowPaymentHistory] = useState(false)
   const [showTableManagement, setShowTableManagement] = useState(false)
+  const [selectedReceiptOrder, setSelectedReceiptOrder] = useState(null) // Order để xem hóa đơn từ lịch sử
 
   // ====== User menu đã được tách ra thành CashierUserBadge component ======
 
@@ -140,6 +142,7 @@ export default function CashierDashboard({
   const handlePaymentCompleteFromUnpaid = (payment) => {
     const newPayment = {
       id: Date.now(),
+      orderId: payment.orderId, // Lưu orderId để có thể fetch lại order
       orderNumber: payment.orderNumber,
       amount: payment.amount,
       method: payment.method, // "Tiền mặt" | "QR Code"
@@ -321,6 +324,18 @@ export default function CashierDashboard({
 
   // ====== Handler Profile + Logout đã được tách ra thành CashierUserBadge component ======
 
+  // ====== Màn xem hóa đơn từ lịch sử ======
+  if (selectedReceiptOrder) {
+    return (
+      <OrderPayment
+        order={selectedReceiptOrder}
+        onBack={() => setSelectedReceiptOrder(null)}
+        onPaymentComplete={null} // Không cho thanh toán lại từ hóa đơn
+        viewOnly={true} // Chỉ xem, không cho thanh toán
+      />
+    )
+  }
+
   // ====== Màn lịch sử thanh toán ======
   if (showPaymentHistory) {
     return (
@@ -377,6 +392,7 @@ export default function CashierDashboard({
                       <th className="history-table-header">Số tiền</th>
                       <th className="history-table-header">Phương thức</th>
                       <th className="history-table-header">Thời gian</th>
+                      <th className="history-table-header">Hành động</th>
                     </tr>
                   </thead>
                   <tbody className="history-table-body">
@@ -399,13 +415,68 @@ export default function CashierDashboard({
                           </span>
                         </td>
                         <td className="history-table-cell history-time">{formatTime(payment.time)}</td>
+                        <td className="history-table-cell">
+                          <button
+                            onClick={async () => {
+                              if (!payment.orderId) {
+                                alert("Không tìm thấy thông tin đơn hàng")
+                                return
+                              }
+                              try {
+                                // Fetch order details từ customer endpoint (cashier có thể dùng)
+                                const res = await Client.get(`/customer/orders/${payment.orderId}`)
+                                const orderData = res.data || res
+                                // Lấy paymentMethod từ paymentIds hoặc paymentId
+                                let paymentMethodFromOrder = "cash" // default
+                                if (orderData.paymentIds && orderData.paymentIds.length > 0) {
+                                  // Tìm payment cuối cùng (thanh toán cuối)
+                                  const lastPayment = orderData.paymentIds
+                                    .filter(p => p.status === "paid" && !p.isDeposit)
+                                    .sort((a, b) => new Date(b.payTime || b.createdAt) - new Date(a.payTime || a.createdAt))[0]
+                                  if (lastPayment) {
+                                    paymentMethodFromOrder = lastPayment.paymentMethod || "cash"
+                                  }
+                                } else if (orderData.paymentId) {
+                                  paymentMethodFromOrder = orderData.paymentId.paymentMethod || "cash"
+                                }
+                                
+                                // Format order để phù hợp với OrderPayment component
+                                const formattedOrder = {
+                                  id: orderData._id || orderData.id,
+                                  orderNumber: orderData.orderNumber || payment.orderNumber,
+                                  tableNumber: orderData.tableId?.tableNumber || orderData.tableNumber || "N/A",
+                                  orderTime: orderData.createdAt || orderData.orderTime || payment.time,
+                                  items: (orderData.orderItems || []).map(item => ({
+                                    id: item._id || item.orderItemId || item.id,
+                                    name: item.itemName || item.name || "N/A",
+                                    quantity: item.quantity || 0,
+                                    price: item.price || 0,
+                                    notes: item.note || item.notes || null
+                                  })),
+                                  remainingAmount: orderData.remainingAmount || payment.amount,
+                                  totalPaid: orderData.totalPaid || 0,
+                                  paymentMethod: paymentMethodFromOrder // Thêm paymentMethod vào order
+                                }
+                                setSelectedReceiptOrder(formattedOrder)
+                              } catch (error) {
+                                console.error("Error fetching order:", error)
+                                alert("Không thể tải thông tin đơn hàng")
+                              }
+                            }}
+                            className="button button-secondary"
+                            style={{ padding: "0.375rem 0.75rem", fontSize: "0.75rem" }}
+                          >
+                            <Printer className="button-icon" style={{ width: "0.875rem", height: "0.875rem" }} />
+                            Xem hóa đơn
+                          </button>
+                        </td>
                       </tr>
                     ))}
                     {pageItems.length === 0 && (
                       <tr>
                         <td
                           className="history-table-cell"
-                          colSpan={4}
+                          colSpan={5}
                           style={{ textAlign: "center", color: "var(--muted-foreground)" }}
                         >
                           Không có dữ liệu

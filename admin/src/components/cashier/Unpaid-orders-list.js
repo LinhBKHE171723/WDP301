@@ -160,19 +160,7 @@ function UnpaidOrdersList({
 
       // Nếu đơn đã có trong danh sách, chỉ cần thông báo
       const existingOrder = unpaidOrders.find((order) => order.id === notificationData.orderId)
-      if (existingOrder) {
-        const tableText = notificationData.tableNumber || "Mang đi"
-        toast.info(`💳 Khách hàng tại ${tableText} yêu cầu thanh toán!`, {
-          position: "top-right",
-        })
-        return
-      }
 
-      // Nếu đơn chưa có, có thể cần fetch lại hoặc thông báo
-      // (Tùy vào logic backend, có thể đơn này chưa ở trạng thái preparing)
-      toast.info(`💳 Có yêu cầu thanh toán từ bàn ${notificationData.tableNumber || "N/A"}`, {
-        position: "top-right",
-      })
 
       // Nếu có fetchOrders, có thể refresh danh sách
       if (fetchOrders) {
@@ -217,6 +205,7 @@ function UnpaidOrdersList({
         // Gọi callback để cập nhật payment history
         if (onPaymentComplete) {
           onPaymentComplete({
+            orderId: orderId, // Thêm orderId để có thể fetch lại order
             orderNumber: paidOrder.orderNumber,
             amount: total,
             method: PAYMENT_METHOD_LABELS[methodToSend] || "Tiền mặt",

@@ -2,9 +2,10 @@ import { useState } from "react"
 import { ArrowLeft, CreditCard, Wallet, Printer, Download, CheckCircle } from "lucide-react"
 import "./order-payment.css"
 
-function OrderPayment({ order, onBack, onPaymentComplete }) {
-  const [paymentMethod, setPaymentMethod] = useState(null) // "cash" | "qr" | null
-  const [showReceipt, setShowReceipt] = useState(false)
+function OrderPayment({ order, onBack, onPaymentComplete, viewOnly = false }) {
+  // Nếu order có paymentMethod (từ lịch sử thanh toán), dùng nó; nếu không thì null
+  const [paymentMethod, setPaymentMethod] = useState(order.paymentMethod || null) // "cash" | "qr" | null
+  const [showReceipt, setShowReceipt] = useState(viewOnly) // Nếu viewOnly thì hiển thị receipt ngay
   const [showPaymentSuccess, setShowPaymentSuccess] = useState(false)
   const [isProcessing, setIsProcessing] = useState(false)
 
@@ -29,15 +30,20 @@ function OrderPayment({ order, onBack, onPaymentComplete }) {
 
   const handlePayment = async () => {
     if (!paymentMethod) return
+    if (viewOnly) return // Không cho thanh toán nếu đang xem hóa đơn
     
     try {
       setIsProcessing(true)
       setShowPaymentSuccess(true)
       
       // Gọi API thanh toán ngay khi bấm "Thanh toán"
-      await onPaymentComplete(order.id, paymentMethod || "cash")
+      const finalPaymentMethod = paymentMethod || "cash"
+      await onPaymentComplete(order.id, finalPaymentMethod)
       
-      // Sau khi thanh toán thành công, hiển thị receipt
+      // Sau khi thanh toán thành công, cập nhật paymentMethod state và order
+      setPaymentMethod(finalPaymentMethod)
+      order.paymentMethod = finalPaymentMethod
+      
       setTimeout(() => {
         setShowPaymentSuccess(false)
         setShowReceipt(true)
