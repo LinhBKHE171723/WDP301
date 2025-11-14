@@ -2366,11 +2366,12 @@ exports.requestPayment = async (req, res) => {
       });
     }
 
-    // Kiểm tra order đã được phục vụ (served) chưa
-    if (order.status !== 'served') {
+    // ✅ Cho phép yêu cầu thanh toán từ khi xác nhận (confirmed) trở đi
+    const allowedStatuses = ['confirmed', 'preparing', 'served'];
+    if (!allowedStatuses.includes(order.status)) {
       return res.status(400).json({
         success: false,
-        message: "Chỉ có thể yêu cầu thanh toán khi đơn hàng đã được phục vụ"
+        message: "Chỉ có thể yêu cầu thanh toán khi đơn hàng đã được xác nhận trở đi"
       });
     }
 

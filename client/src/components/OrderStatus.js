@@ -1197,7 +1197,7 @@ const OrderStatus = React.memo(({ orderId, onBack }) => {
                   Thêm món vào đơn hàng
                 </button>
               )}
-              {order && order.status === 'served' && (
+              {order && ['confirmed', 'preparing', 'served'].includes(order.status) && (
                 <button 
                   onClick={handleRequestPayment} 
                   className="request-payment-btn"
