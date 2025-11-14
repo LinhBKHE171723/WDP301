@@ -33,7 +33,7 @@ exports.getAllMenus = async (req, res) => {
     });
 
     res.status(200).json({
-      message: "✅ Lấy danh sách thực đơn thành công",
+      message: "Lấy danh sách thực đơn thành công",
       data: updatedMenus,
     });
   } catch (error) {

@@ -22,7 +22,7 @@ function Attendance() {
     const handleCheckIn = async () => {
         try {
             await userApi.checkIn();
-            toast.success("✅ Check-in thành công!");
+            toast.success("Check-in thành công!");
             loadShift();
         } catch (err) {
             toast.error(err?.message || "Check-in thất bại!");
@@ -32,7 +32,7 @@ function Attendance() {
     const handleCheckOut = async () => {
         try {
             await userApi.checkOut();
-            toast.success("✅ Check-out thành công!");
+            toast.success("Check-out thành công!");
             loadShift();
         } catch (err) {
             toast.error(err?.message || "Check-out thất bại!");
@@ -69,7 +69,7 @@ function Attendance() {
                         disabled={!canCheckIn}
                         className={`px-4 py-2 rounded text-white ${canCheckIn ? "bg-green-600" : "bg-gray-400 cursor-not-allowed"}`}
                     >
-                        ✅ Check-In
+                        Check-In
                     </button>
 
                     {canCheckOut && (

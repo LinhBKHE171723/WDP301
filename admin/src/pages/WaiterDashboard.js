@@ -97,7 +97,7 @@ export default function WaiterDashboard() {
             setOrders((prev) =>
                 prev.map((o) => (o._id === orderId ? { ...o, status: newStatus } : o))
             );
-            toast.success(`✅ Cập nhật đơn #${orderId.slice(-4)} thành ${newStatus}`);
+            toast.success(`Cập nhật đơn #${orderId.slice(-4)} thành ${newStatus}`);
         } catch (err) {
             toast.error("❌ Lỗi khi cập nhật trạng thái đơn!");
         }
@@ -112,7 +112,7 @@ export default function WaiterDashboard() {
             setPendingOrders((prev) => prev.filter((o) => o._id !== orderId));
 
             if (response === 'approved') {
-                toast.success(`✅ Đã xác nhận đơn hàng #${orderId.slice(-4)}`);
+                toast.success(`Đã xác nhận đơn hàng #${orderId.slice(-4)}`);
                 // 🔄 Refresh cả 3 danh sách
                 fetchOrders();
                 fetchPendingOrders();
@@ -236,7 +236,7 @@ WaiterDashboard có một useEffect lắng nghe lastMessage → xử lý cập n
                 case 'order:confirmed':
                     // Đơn hàng đã được customer xác nhận
                     console.log('✅ Order confirmed by customer:', lastMessage.data);
-                    toast.success(`✅ Đơn hàng từ bàn ${lastMessage.data.tableId?.tableNumber} đã được khách xác nhận!`);
+                    toast.success(`Đơn hàng từ bàn ${lastMessage.data.tableId?.tableNumber} đã được khách xác nhận!`);
 
                     // Refresh both lists
                     fetchOrders();

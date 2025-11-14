@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import { Users, ChefHat, Calendar, BarChart2 } from "lucide-react";
 import { Link } from "react-router-dom";
-import Client from "../../api/Client"; // ✅ dùng Client — không dùng axios nữa
+import Client from "../../api/Client"; // dùng Client — không dùng axios nữa
 
 export default function EmployeePerformanceDashboard() {
   const [selectedRole, setSelectedRole] = useState("waiter");
@@ -24,7 +24,6 @@ export default function EmployeePerformanceDashboard() {
     setLoading(true);
     setError(null);
 
-    // ✅ GIỮ NGUYÊN API CỦA BẠN (vì BE đang dùng cái này!)
     const endpoint =
       selectedRole === "waiter"
         ? "/admin/waiters"
@@ -41,7 +40,6 @@ export default function EmployeePerformanceDashboard() {
     const fromISO = fromDate.toISOString();
     const toISO = toDate.toISOString();
 
-    // ✅ Không build URL thủ công nữa → dùng Client tự xử lý baseURL
     Client.get(endpoint, {
       params: {
         from: fromISO,
@@ -49,7 +47,7 @@ export default function EmployeePerformanceDashboard() {
       },
     })
       .then((res) => {
-        // ✅ Client return res = response.data
+
         const apiData = res.data || []; // BE trả { data: [...] }
         setPerformanceData(Array.isArray(apiData) ? apiData : []);
       })

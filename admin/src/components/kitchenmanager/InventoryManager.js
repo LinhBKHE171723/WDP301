@@ -52,7 +52,7 @@ export default function InventoryManager({ ingredients, onRefresh }) {
     setLoading(true);
     try {
       await kitchenApi.createIngredient(payload);
-      setMessage(`✅ Đã thêm nguyên liệu: ${newIng.name}`);
+      setMessage(`Đã thêm nguyên liệu: ${newIng.name}`);
       setShowAddModal(false);
       setNewIng({
         name: "",
@@ -246,7 +246,7 @@ export default function InventoryManager({ ingredients, onRefresh }) {
                 >
                   {ing.stockQuantity <= ing.minStock
                     ? "⚠️ Cần nhập thêm"
-                    : "✅ Đủ hàng"}
+                    : "Đủ hàng"}
                 </td>
                 <td className="px-4 py-2 text-center space-x-2">
                   <button

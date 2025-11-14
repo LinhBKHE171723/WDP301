@@ -233,7 +233,7 @@ export default function PurchaseHistoryManager({ purchaseOrders, onRefresh }) {
           <div className="flex space-x-2">
             {[
               { key: "all", label: "Tất cả" },
-              { key: "valid", label: "✅ Còn hạn" },
+              { key: "valid", label: "Còn hạn" },
               { key: "near", label: "⚠️ Gần hết hạn" },
               { key: "expired", label: "❌ Hết hạn" },
             ].map((btn) => (

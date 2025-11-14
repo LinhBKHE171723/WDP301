@@ -81,7 +81,7 @@ export default function OrderCard({
       
       const response = await waiterApi.respondToOrder(order._id, true, null, null, finalSelectedTables);
       onWaiterResponse(order._id, "approved");
-      toast.success(`✅ Đã xác nhận đơn hàng và gán ${finalSelectedTables.length} bàn thành công!`);
+      toast.success(`Đã xác nhận đơn hàng và gán ${finalSelectedTables.length} bàn thành công!`);
     } catch (error) {
       console.error('❌ Error details:', error);
       
@@ -300,7 +300,7 @@ export default function OrderCard({
               {/* Hiển thị các bàn đã chọn dưới dạng Badge */}
               {selectedTables.length > 0 && (
                 <div className="mb-3 p-2" style={{backgroundColor: '#f8f9fa', borderRadius: '0.375rem', border: '1px solid #dee2e6'}}>
-                  <div className="small text-muted mb-2">✅ Đã chọn {selectedTables.length} bàn:</div>
+                  <div className="small text-muted mb-2">Đã chọn {selectedTables.length} bàn:</div>
                   <div className="d-flex flex-wrap gap-2">
                     {selectedTables.map((tableIdStr) => {
                       const table = availableTables.find(t => t._id === tableIdStr) || 

@@ -121,7 +121,7 @@ exports.forgotPassword = async (req, res) => {
             `
         });
 
-        res.json({ success: true, message: "✅ Đã gửi link đặt lại mật khẩu vào email!" });
+        res.json({ success: true, message: "Đã gửi link đặt lại mật khẩu vào email!" });
 
     } catch (err) {
         console.error("❌ Forgot Password Error:", err);
@@ -201,7 +201,7 @@ exports.resetPassword = async (req, res) => {
         user.resetPasswordExpires = undefined;
         await user.save();
 
-        res.json({ success: true, message: "✅ Đổi mật khẩu thành công!" });
+        res.json({ success: true, message: "Đổi mật khẩu thành công!" });
 
     } catch (err) {
         console.error("❌ Reset Password Error:", err);
@@ -227,10 +227,24 @@ exports.getTodayShift = async (req, res) => {
         const { startOfDay, endOfDay } = getTodayRange();
 
         // Tìm shift trong ngày hôm nay
-        const shift = await Shift.findOne({
+        // Ưu tiên shift đã check-in (có startTime), nếu không có thì lấy shift pending mới nhất
+        let shift = await Shift.findOne({
             userId,
-            date: { $gte: startOfDay, $lte: endOfDay }
-        }).populate("workShiftId");
+            date: { $gte: startOfDay, $lte: endOfDay },
+            startTime: { $exists: true, $ne: null } // Ưu tiên shift đã check-in
+        })
+        .sort({ createdAt: -1 })
+        .populate("workShiftId");
+
+        // Nếu không có shift đã check-in, lấy shift pending mới nhất
+        if (!shift) {
+            shift = await Shift.findOne({
+                userId,
+                date: { $gte: startOfDay, $lte: endOfDay }
+            })
+            .sort({ createdAt: -1 })
+            .populate("workShiftId");
+        }
 
         res.json({ success: true, shift });
     } catch (err) {
@@ -245,15 +259,30 @@ exports.checkIn = async (req, res) => {
         const userId = req.user.id;
         const { startOfDay, endOfDay } = getTodayRange();
 
-        const shift = await Shift.findOne({
+        // Tìm shift đã check-in trước, nếu không có thì lấy shift pending mới nhất
+        let shift = await Shift.findOne({
             userId,
-            date: { $gte: startOfDay, $lte: endOfDay }
-        }).populate("workShiftId");
+            date: { $gte: startOfDay, $lte: endOfDay },
+            startTime: { $exists: true, $ne: null }
+        })
+        .sort({ createdAt: -1 })
+        .populate("workShiftId");
+
+        if (shift && shift.startTime) {
+            return res.status(400).json({ success: false, message: "Bạn đã check-in rồi." });
+        }
+
+        // Nếu không có shift đã check-in, lấy shift pending mới nhất
+        if (!shift) {
+            shift = await Shift.findOne({
+                userId,
+                date: { $gte: startOfDay, $lte: endOfDay }
+            })
+            .sort({ createdAt: -1 })
+            .populate("workShiftId");
+        }
 
         if (!shift) return res.status(404).json({ success: false, message: "Không có ca làm hôm nay." });
-
-        if (shift.startTime)
-            return res.status(400).json({ success: false, message: "Bạn đã check-in rồi." });
 
         const now = new Date();
 
@@ -270,7 +299,7 @@ exports.checkIn = async (req, res) => {
         // Cập nhật status user → active khi check-in
         await User.findByIdAndUpdate(userId, { status: "active" });
 
-        res.json({ success: true, message: "✅ Check-in thành công!", shift });
+        res.json({ success: true, message: "Check-in thành công!", shift });
     } catch (err) {
         console.error("❌ Lỗi checkIn:", err);
         res.status(500).json({ success: false, message: err.message });
@@ -283,10 +312,14 @@ exports.checkOut = async (req, res) => {
         const userId = req.user.id;
         const { startOfDay, endOfDay } = getTodayRange();
 
+        // Tìm shift đã check-in (có startTime)
         const shift = await Shift.findOne({
             userId,
-            date: { $gte: startOfDay, $lte: endOfDay }
-        }).populate("workShiftId");
+            date: { $gte: startOfDay, $lte: endOfDay },
+            startTime: { $exists: true, $ne: null }
+        })
+        .sort({ createdAt: -1 })
+        .populate("workShiftId");
 
         if (!shift || !shift.startTime)
             return res.status(400).json({ success: false, message: "Bạn chưa check-in." });
@@ -309,7 +342,7 @@ exports.checkOut = async (req, res) => {
         // Cập nhật status user → inactive sau check-out
         await User.findByIdAndUpdate(userId, { status: "inactive" });
 
-        res.json({ success: true, message: "✅ Check-out thành công!", shift });
+        res.json({ success: true, message: "Check-out thành công!", shift });
     } catch (err) {
         console.error("❌ Lỗi checkOut:", err);
         res.status(500).json({ success: false, message: err.message });

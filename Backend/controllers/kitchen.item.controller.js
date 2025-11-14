@@ -161,7 +161,7 @@ exports.markItemUnavailable = async (req, res) => {
     await item.save();
 
     res.status(200).json({
-      message: `✅ Món '${item.name}' đã được đánh dấu là HẾT HÀNG.`,
+      message: `Món '${item.name}' đã được đánh dấu là HẾT HÀNG.`,
       data: item,
     });
   } catch (error) {
@@ -188,7 +188,7 @@ exports.markItemAvailable = async (req, res) => {
       return res.status(404).json({ message: "Không tìm thấy món ăn." });
 
     res.status(200).json({
-      message: `✅ Món '${item.name}' đã được cung cấp lại.`,
+      message: `Món '${item.name}' đã được cung cấp lại.`,
       data: item,
     });
   } catch (error) {

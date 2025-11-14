@@ -402,7 +402,7 @@ export function PreOrderTable() {
     // Handle preorder:approved - Khi approve, order sẽ chuyển sang "confirmed" nên cần remove ngay
     else if (messageType === 'preorder:approved') {
       const customerName = orderData.preorderName || orderData.userId?.name || "Khách hàng";
-      toast.success(`✅ Đơn đặt trước từ ${customerName} đã được duyệt`, {
+      toast.success(`Đơn đặt trước từ ${customerName} đã được duyệt`, {
         position: "top-right",
         autoClose: 3000,
       });
@@ -1267,7 +1267,7 @@ export function PreOrderTable() {
                                               <td className="p-2 text-center">
                                                 {ing.isSufficient ? (
                                                   <span className="inline-flex items-center px-2 py-1 rounded text-xs font-medium bg-green-100 text-green-700">
-                                                    ✅ Đủ
+                                                    Đủ
                                                   </span>
                                                 ) : (
                                                   <span className="inline-flex items-center px-2 py-1 rounded text-xs font-medium bg-red-100 text-red-700">
@@ -1654,7 +1654,7 @@ export function PreOrderTable() {
               {/* Hiển thị các bàn đã chọn dưới dạng Badge */}
               {approveForm.tableIds.length > 0 && (
                 <div className="mb-3 p-2 bg-gray-50 rounded-md border border-gray-200">
-                  <div className="text-xs text-gray-600 mb-2">✅ Đã chọn {approveForm.tableIds.length} bàn:</div>
+                  <div className="text-xs text-gray-600 mb-2">Đã chọn {approveForm.tableIds.length} bàn:</div>
                   <div className="flex flex-wrap gap-2">
                     {approveForm.tableIds.map((tableIdStr) => {
                       const table = allTables.find(t => t._id === tableIdStr);
@@ -2484,7 +2484,7 @@ export function PreOrderTable() {
               {/* Hiển thị các bàn đã chọn dưới dạng Badge */}
               {updateForm.tableIds.length > 0 && (
                 <div className="mb-3 p-2 bg-gray-50 rounded-md border border-gray-200">
-                  <div className="text-xs text-gray-600 mb-2">✅ Đã chọn {updateForm.tableIds.length} bàn:</div>
+                  <div className="text-xs text-gray-600 mb-2">Đã chọn {updateForm.tableIds.length} bàn:</div>
                   <div className="flex flex-wrap gap-2">
                     {updateForm.tableIds.map((tableIdStr) => {
                       const table = allTables.find(t => t._id === tableIdStr);

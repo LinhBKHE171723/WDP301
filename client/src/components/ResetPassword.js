@@ -73,7 +73,7 @@ const ResetPassword = () => {
       const data = await res.json();
 
       if (res.ok && data.success) {
-        setSuccess("✅ Đổi mật khẩu thành công! Đang chuyển đến trang đăng nhập...");
+        setSuccess("Đổi mật khẩu thành công! Đang chuyển đến trang đăng nhập...");
         setTimeout(() => {
           navigate('/reservation');
         }, 2000);

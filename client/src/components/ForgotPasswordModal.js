@@ -32,7 +32,7 @@ const ForgotPasswordModal = ({ isOpen, onClose, onSwitchToLogin }) => {
       const data = await res.json();
 
       if (res.ok && data.success) {
-        setSuccess(data.message || "✅ Đã gửi link đặt lại mật khẩu vào email!");
+        setSuccess(data.message || "Đã gửi link đặt lại mật khẩu vào email!");
         setEmail("");
       } else {
         setError(data.message || "Email không tồn tại!");

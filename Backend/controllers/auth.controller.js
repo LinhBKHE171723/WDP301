@@ -348,7 +348,7 @@ exports.forgotPassword = async (req, res) => {
 
     res.json({ 
       success: true, 
-      message: "✅ Đã gửi link đặt lại mật khẩu vào email!" 
+      message: "Đã gửi link đặt lại mật khẩu vào email!" 
     });
 
   } catch (err) {
@@ -475,7 +475,7 @@ exports.resetPassword = async (req, res) => {
 
     res.json({ 
       success: true, 
-      message: "✅ Đổi mật khẩu thành công!" 
+      message: "Đổi mật khẩu thành công!" 
     });
 
   } catch (err) {

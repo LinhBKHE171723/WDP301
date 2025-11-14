@@ -772,7 +772,7 @@ const OrderStatus = React.memo(({ orderId, onBack }) => {
       const data = await response.json();
 
       if (data.success) {
-        alert('✅ ' + data.message);
+        alert(data.message);
         // Refresh order status
         fetchOrderStatus();
       } else {
@@ -1427,7 +1427,7 @@ const OrderStatus = React.memo(({ orderId, onBack }) => {
                           {/* Hiển thị trạng thái đã chọn */}
                           {isSelected && (
                             <div className="selected-indicator">
-                              ✅ Đã chọn
+                              Đã chọn
                             </div>
                           )}
                       </div>
@@ -1464,7 +1464,7 @@ const OrderStatus = React.memo(({ orderId, onBack }) => {
                           {/* Hiển thị trạng thái đã chọn */}
                           {isSelected && (
                             <div className="selected-indicator">
-                              ✅ Đã chọn
+                              Đã chọn
                             </div>
                           )}
                       </div>
@@ -1529,7 +1529,7 @@ const OrderStatus = React.memo(({ orderId, onBack }) => {
               </button>
               {selectedItems.length > 0 && (
                 <button onClick={handleAddSelectedItemsToOrder} className="confirm-btn">
-                  ✅ Thêm {selectedItems.length} món vào đơn hàng
+                  Thêm {selectedItems.length} món vào đơn hàng
               </button>
               )}
             </div>
@@ -1568,7 +1568,7 @@ const OrderStatus = React.memo(({ orderId, onBack }) => {
               {waiterResponseData.type === 'rejected' ? (
                 <h3>❌ Đơn hàng bị từ chối</h3>
               ) : (
-                <h3>✅ Nhân viên đã xác nhận đơn hàng</h3>
+                <h3>Nhân viên đã xác nhận đơn hàng</h3>
               )}
               <button 
                 onClick={() => setShowWaiterResponseModal(false)} 

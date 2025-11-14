@@ -324,7 +324,7 @@ export default function OrderDetails({
 
                       {normalizedItem.status === "ready" && (
                         <span className="text-green-700 font-medium text-sm px-3 py-1 bg-green-100 rounded-full">
-                          ✅ Sẵn sàng
+                          Sẵn sàng
                         </span>
                       )}
                     </div>
@@ -357,7 +357,7 @@ export default function OrderDetails({
                               }`}
                             >
                               {comboItem.status === "ready"
-                                ? "✅ Sẵn sàng"
+                                ? "Sẵn sàng"
                                 : comboItem.status === "preparing"
                                 ? "🔄 Đang làm"
                                 : "⏳ Chờ"}

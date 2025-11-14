@@ -46,7 +46,7 @@ exports.createPurchaseOrder = async (req, res) => {
     // ✅ stockQuantity được cập nhật tự động trong PurchaseOrder.post("save")
 
     res.status(201).json({
-      message: "✅ Nhập hàng thành công!",
+      message: "Nhập hàng thành công!",
       order,
     });
   } catch (err) {

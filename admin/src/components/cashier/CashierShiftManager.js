@@ -1,4 +1,4 @@
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import {
   Clock,
   DollarSign,
@@ -6,14 +6,13 @@ import {
   LogOut,
   User,
   Calendar,
-  FileText,
-  Plus,
-  Minus,
   Printer,
   ChevronDown,
 } from "lucide-react"
 import { useAuth } from "../../context/AuthContext"
 import { useNavigate } from "react-router-dom"
+import { toast } from "react-toastify"
+import userApi from "../../api/userApi"
 import "./CashierShiftManager.css"
 import CashierDashboard from "./CashierDashboard"
 
@@ -25,6 +24,11 @@ export default function CashierShiftManager() {
   const displayName =
     user?.fullName || user?.name || user?.username || user?.email || "Thu Ngân"
 
+  // Shift từ API (điểm danh)
+  const [shift, setShift] = useState(null)
+  const [loadingShift, setLoadingShift] = useState(true)
+
+  // Dữ liệu tiền và giao dịch
   const [shiftData, setShiftData] = useState({
     startTime: null,
     endTime: null,
@@ -34,23 +38,7 @@ export default function CashierShiftManager() {
     pettyCashTransactions: [],
   })
 
-  const [openingAmount, setOpeningAmount] = useState("")
-  const [closingAmount, setClosingAmount] = useState("")
-  const [showCloseShiftForm, setShowCloseShiftForm] = useState(false)
-  const [showBlindCount, setShowBlindCount] = useState(false)
   const [showZReport, setShowZReport] = useState(false)
-
-  const [denominations, setDenominations] = useState([
-    { denomination: 500000, count: 0 },
-    { denomination: 200000, count: 0 },
-    { denomination: 100000, count: 0 },
-    { denomination: 50000, count: 0 },
-    { denomination: 20000, count: 0 },
-    { denomination: 10000, count: 0 },
-    { denomination: 5000, count: 0 },
-    { denomination: 2000, count: 0 },
-    { denomination: 1000, count: 0 },
-  ])
 
   const formatCurrency = (amount) => {
     return new Intl.NumberFormat("vi-VN", {
@@ -60,6 +48,7 @@ export default function CashierShiftManager() {
   }
 
   const formatDateTime = (dateString) => {
+    if (!dateString) return "Chưa có"
     return new Intl.DateTimeFormat("vi-VN", {
       day: "2-digit",
       month: "2-digit",
@@ -70,53 +59,88 @@ export default function CashierShiftManager() {
     }).format(new Date(dateString))
   }
 
-  const handleOpenShift = () => {
-    const amount = Number.parseFloat(openingAmount)
-    if (isNaN(amount) || amount < 0) {
-      alert("Vui lòng nhập số tiền hợp lệ")
-      return
+  const formatTime = (time) => {
+    if (!time) return "Chưa"
+    return new Date(time).toLocaleTimeString("vi-VN", {
+      hour: "2-digit",
+      minute: "2-digit",
+    })
+  }
+
+  // Load shift từ API
+  const loadShift = async () => {
+    try {
+      setLoadingShift(true)
+      const res = await userApi.getTodayShift()
+      setShift(res.shift)
+      
+      // Cập nhật shiftData từ shift
+      if (res.shift) {
+        setShiftData((prev) => ({
+          ...prev,
+          startTime: res.shift.startTime || null,
+          endTime: res.shift.endTime || null,
+          isShiftOpen: !!res.shift.startTime && !res.shift.endTime,
+        }))
+      }
+    } catch (err) {
+      console.error("Error loading shift:", err)
+      toast.error(err?.message || "Lỗi khi lấy ca làm hôm nay")
+    } finally {
+      setLoadingShift(false)
     }
-
-    const now = new Date().toISOString()
-    setShiftData((prev) => ({
-      ...prev,
-      startTime: now,
-      openingCash: amount,
-      isShiftOpen: true,
-    }))
-    setOpeningAmount("")
   }
 
-  const calculateBlindCountTotal = () => {
-    return denominations.reduce(
-      (total, item) => total + item.denomination * item.count,
-      0
-    )
+  useEffect(() => {
+    loadShift()
+  }, [])
+
+  // Check-in (đơn giản, không cần nhập tiền)
+  const handleCheckIn = async () => {
+    try {
+      await userApi.checkIn()
+      toast.success("Check-in thành công!")
+      
+      // Cập nhật shiftData
+      const now = new Date().toISOString()
+      setShiftData((prev) => ({
+        ...prev,
+        startTime: now,
+        isShiftOpen: true,
+      }))
+      
+      // Reload shift để lấy dữ liệu mới nhất
+      await loadShift()
+      
+      // Tự động chuyển vào dashboard sau khi check-in
+      navigate("/admin/cashier/dashboard")
+    } catch (err) {
+      toast.error(err?.message || "Check-in thất bại!")
+    }
   }
 
-  const handleDenominationChange = (denomination, count) => {
-    setDenominations((prev) =>
-      prev.map((item) =>
-        item.denomination === denomination
-          ? { ...item, count: Math.max(0, count) }
-          : item
-      )
-    )
+  // Check-out (đơn giản, không cần nhập tiền)
+  const handleCheckOut = async () => {
+    try {
+      await userApi.checkOut()
+      toast.success("✅ Check-out thành công!")
+      
+      // Cập nhật shiftData
+      const now = new Date().toISOString()
+      setShiftData((prev) => ({
+        ...prev,
+        endTime: now,
+        isShiftOpen: false,
+      }))
+      
+      // Reload shift để lấy dữ liệu mới nhất
+      await loadShift()
+    } catch (err) {
+      toast.error(err?.message || "Check-out thất bại!")
+    }
   }
 
-  const handleCompleteBlindCount = () => {
-    const total = calculateBlindCountTotal()
-    const now = new Date().toISOString()
-    setShiftData((prev) => ({
-      ...prev,
-      endTime: now,
-      closingCash: total,
-      isShiftOpen: false,
-    }))
-    setShowBlindCount(false)
-    setShowCloseShiftForm(false)
-    setShowZReport(true)
-  }
+
 
   const calculateDifference = () => {
     if (shiftData.openingCash !== null && shiftData.closingCash !== null) {
@@ -174,7 +198,7 @@ export default function CashierShiftManager() {
         .reduce((s, t) => s + t.amount, 0),
       expectedCash,
       difference,
-      denominationBreakdown: denominations.filter((d) => d.count > 0),
+      denominationBreakdown: [],
     }
   }
 
@@ -184,20 +208,62 @@ export default function CashierShiftManager() {
     alert(`${reportType}-Report đã được tạo! (Xem console để kiểm tra dữ liệu)`)
   }
 
-  const handleCloseShift = () => {
-    const amount = Number.parseFloat(closingAmount)
-    if (!isNaN(amount) && amount >= 0) {
-      const now = new Date().toISOString()
-      setShiftData((prev) => ({
-        ...prev,
-        endTime: now,
-        closingCash: amount,
-        isShiftOpen: false,
-      }))
-      setShowCloseShiftForm(false)
-      setShowZReport(true)
-    }
+
+  if (loadingShift) {
+    return (
+      <div className="shift-manager-container">
+        <div className="shift-manager-content">
+          <p>Đang tải thông tin ca làm hôm nay...</p>
+        </div>
+      </div>
+    )
   }
+
+  if (!shift) {
+    return (
+      <div className="shift-manager-container">
+        <div className="shift-manager-content">
+          <div className="shift-manager-header">
+            <div className="header-title-section">
+              <h1 className="header-title">Quản Lý Ca Làm Việc</h1>
+              <p className="header-subtitle">Hệ thống thu ngân nhà hàng</p>
+            </div>
+          </div>
+          <div className="card">
+            <div className="card-header">
+              <h2 className="card-title">Không có ca làm việc hôm nay</h2>
+            </div>
+            <div className="card-content">
+              <div style={{ padding: "1rem 0" }}>
+                <p style={{ marginBottom: "1rem", color: "var(--muted-foreground)" }}>
+                  Bạn chưa có ca làm việc được gán cho hôm nay. Có thể do:
+                </p>
+                <ul style={{ marginLeft: "1.5rem", marginBottom: "1rem", color: "var(--muted-foreground)" }}>
+                  <li>Bạn chưa được gán vào ca làm việc nào trong hệ thống</li>
+                  <li>Ca làm việc của bạn chưa được kích hoạt (isActive = false)</li>
+                  <li>Hệ thống chưa tạo shift cho bạn (cron job có thể chưa chạy)</li>
+                </ul>
+                <p style={{ marginTop: "1rem", padding: "0.75rem", backgroundColor: "var(--muted)", borderRadius: "0.5rem", color: "var(--muted-foreground)" }}>
+                  <strong>Giải pháp:</strong> Vui lòng liên hệ quản trị viên để được gán vào ca làm việc trong phần <strong>Settings → Quản lý ca làm việc</strong>.
+                </p>
+                <button
+                  onClick={loadShift}
+                  className="button button-full"
+                  style={{ marginTop: "1rem" }}
+                >
+                  🔄 Tải lại
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    )
+  }
+
+  const { workShiftId, status, startTime, endTime } = shift
+  const canCheckIn = status === "pending"
+  const canCheckOut = (status === "checked_in" || status === "late") && !endTime
 
   if (showZReport) {
     const zReport = generateZReport()
@@ -314,9 +380,6 @@ export default function CashierShiftManager() {
           <button
             onClick={() => {
               setShowZReport(false)
-              setDenominations((prev) =>
-                prev.map((d) => ({ ...d, count: 0 }))
-              )
             }}
             className="button button-full"
           >
@@ -327,121 +390,18 @@ export default function CashierShiftManager() {
     )
   }
 
-  if (showBlindCount) {
-    const total = calculateBlindCountTotal()
-    return (
-      <div className="shift-manager-container">
-        <div className="shift-manager-content">
-          <div className="shift-manager-header">
-            <div className="header-title-section">
-              <h1 className="header-title">Đếm Tiền Cuối Ca</h1>
-              <p className="header-subtitle">
-                Nhập số lượng từng mệnh giá tiền trong két
-              </p>
-            </div>
-          </div>
 
-          <div className="card">
-            <div className="card-header">
-              <h2 className="card-title">
-                Blind Count - Đếm Tiền Không Nhìn Số Dự Kiến
-              </h2>
-              <p className="card-description">
-                Đếm số lượng từng loại tiền trong két
-              </p>
-            </div>
-            <div className="card-content">
-              <div className="denomination-grid">
-                {denominations.map((item) => (
-                  <div key={item.denomination} className="denomination-row">
-                    <div className="denomination-label">
-                      {formatCurrency(item.denomination)}
-                    </div>
-                    <div className="denomination-controls">
-                      <button
-                        onClick={() =>
-                          handleDenominationChange(
-                            item.denomination,
-                            item.count - 1
-                          )
-                        }
-                        className="button button-icon-only"
-                      >
-                        <Minus className="icon-sm" />
-                      </button>
-                      <input
-                        type="number"
-                        min="0"
-                        value={item.count}
-                        onChange={(e) =>
-                          handleDenominationChange(
-                            item.denomination,
-                            Number.parseInt(e.target.value) || 0
-                          )
-                        }
-                        className="denomination-input"
-                      />
-                      <button
-                        onClick={() =>
-                          handleDenominationChange(
-                            item.denomination,
-                            item.count + 1
-                          )
-                        }
-                        className="button button-icon-only"
-                      >
-                        <Plus className="icon-sm" />
-                      </button>
-                    </div>
-                    <div className="denomination-total">
-                      {formatCurrency(item.denomination * item.count)}
-                    </div>
-                  </div>
-                ))}
-              </div>
-
-              <div className="blind-count-total">
-                <span>Tổng tiền đếm được</span>
-                <span className="blind-count-amount">
-                  {formatCurrency(total)}
-                </span>
-              </div>
-
-              <div style={{ display: "flex", gap: "0.75rem" }}>
-                <button
-                  onClick={() => setShowBlindCount(false)}
-                  className="button button-full"
-                  style={{
-                    backgroundColor: "var(--secondary)",
-                    color: "var(--secondary-foreground)",
-                  }}
-                >
-                  Hủy
-                </button>
-                <button
-                  onClick={handleCompleteBlindCount}
-                  className="button button-full button-success"
-                >
-                  Hoàn Tất Đếm Tiền
-                </button>
-              </div>
-            </div>
-          </div>
-        </div>
-      </div>
-    )
-  }
-
-  if (shiftData.isShiftOpen && !showCloseShiftForm) {
+  // Chỉ hiển thị CashierDashboard khi đã check-in và chưa check-out
+  if (shiftData.isShiftOpen && !showZReport) {
     return (
       <CashierDashboard
         shiftInfo={{
           // fallback nhỏ để tránh null trong JSX
-          startTime: shiftData.startTime || new Date().toISOString(),
+          startTime: shiftData.startTime || shift?.startTime || new Date().toISOString(),
           openingCash: shiftData.openingCash ?? 0,
         }}
         shiftData={shiftData}
-        onCloseShift={() => setShowCloseShiftForm(true)}
+        onCloseShift={handleCheckOut}
         onAddPettyCash={(transaction) => {
           setShiftData((prev) => ({
             ...prev,
@@ -453,102 +413,6 @@ export default function CashierShiftManager() {
         }}
         onPrintXReport={() => handlePrintReport("X")}
       />
-    )
-  }
-
-  if (showCloseShiftForm) {
-    return (
-      <div className="shift-manager-container">
-        <div className="shift-manager-content">
-          <div className="shift-manager-header">
-            <div className="header-title-section">
-              <h1 className="header-title">Đóng Ca Làm Việc</h1>
-              <p className="header-subtitle">
-                Chọn phương thức đếm tiền để kết thúc ca
-              </p>
-            </div>
-          </div>
-
-          <div className="grid-lg-2-cols">
-            <div
-              className="card card-clickable"
-              onClick={() => setShowBlindCount(true)}
-            >
-              <div className="card-header">
-                <div className="card-header-with-icon">
-                  <div className="icon-wrapper icon-wrapper-success">
-                    <FileText className="icon-success" />
-                  </div>
-                  <h2 className="card-title">Blind Count</h2>
-                </div>
-                <p className="card-description">
-                  Đếm tiền theo mệnh giá (Khuyến nghị)
-                </p>
-              </div>
-              <div className="card-content">
-                <p className="card-info">
-                  Đếm số lượng từng loại tiền mà không thấy số tiền dự kiến,
-                  giúp giảm gian lận
-                </p>
-              </div>
-            </div>
-
-            <div className="card">
-              <div className="card-header">
-                <div className="card-header-with-icon">
-                  <div className="icon-wrapper icon-wrapper-destructive">
-                    <DollarSign className="icon-destructive" />
-                  </div>
-                  <h2 className="card-title">Nhập Tổng Tiền</h2>
-                </div>
-                <p className="card-description">
-                  Nhập trực tiếp tổng số tiền
-                </p>
-              </div>
-              <div className="card-content">
-                <div className="input-group">
-                  <label htmlFor="closing-cash" className="input-label">
-                    Tiền cuối ca (VNĐ)
-                  </label>
-                  <div className="input-wrapper">
-                    <DollarSign className="input-icon" />
-                    <input
-                      id="closing-cash"
-                      type="number"
-                      step="1000"
-                      placeholder="0"
-                      value={closingAmount}
-                      onChange={(e) => setClosingAmount(e.target.value)}
-                      className="input input-with-icon"
-                    />
-                  </div>
-                </div>
-              </div>
-            </div>
-          </div>
-
-          <button
-            onClick={() => setShowCloseShiftForm(false)}
-            className="button button-full"
-            style={{
-              backgroundColor: "var(--secondary)",
-              color: "var(--secondary-foreground)",
-            }}
-          >
-            Hủy
-          </button>
-
-          <div style={{ height: ".75rem" }} />
-
-          <button
-            onClick={handleCloseShift}
-            className="button button-full button-destructive"
-          >
-            <LogOut className="button-icon" />
-            Xác nhận đóng ca bằng tổng tiền
-          </button>
-        </div>
-      </div>
     )
   }
 
@@ -611,7 +475,7 @@ export default function CashierShiftManager() {
               <div>
                 <h2 className="card-title">Trạng Thái Ca Làm Việc</h2>
                 <p className="card-description">
-                  {shiftData.isShiftOpen ? "Ca đang mở" : "Ca đã đóng hoặc chưa mở"}
+                  {workShiftId?.name || "N/A"} - {workShiftId?.startTime || ""} → {workShiftId?.endTime || ""}
                 </p>
               </div>
               <div
@@ -621,31 +485,52 @@ export default function CashierShiftManager() {
                     : "status-badge-closed"
                 }`}
               >
-                {shiftData.isShiftOpen ? "ĐANG MỞ" : "ĐÃ ĐÓNG"}
+                {shiftData.isShiftOpen ? "ĐANG LÀM VIỆC" : status === "checked_out" ? "ĐÃ KẾT THÚC" : "CHƯA BẮT ĐẦU"}
               </div>
             </div>
           </div>
           <div className="card-content">
             <div className="grid-2-cols">
-              {shiftData.startTime && (
-                <div className="info-box">
-                  <div className="info-box-header">
-                    <Calendar className="info-box-icon" />
-                    <span className="info-box-label">Thời gian bắt đầu</span>
-                  </div>
-                  <p className="info-box-value">
-                    {formatDateTime(shiftData.startTime)}
-                  </p>
+              <div className="info-box">
+                <div className="info-box-header">
+                  <Calendar className="info-box-icon" />
+                  <span className="info-box-label">Check-in</span>
                 </div>
-              )}
-              {shiftData.endTime && (
+                <p className="info-box-value">
+                  {formatTime(startTime)}
+                </p>
+              </div>
+              <div className="info-box">
+                <div className="info-box-header">
+                  <Calendar className="info-box-icon" />
+                  <span className="info-box-label">Check-out</span>
+                </div>
+                <p className="info-box-value">
+                  {formatTime(endTime)}
+                </p>
+              </div>
+            </div>
+            <div className="grid-2-cols" style={{ marginTop: "1rem" }}>
+              <div className="info-box">
+                <div className="info-box-header">
+                  <span className="info-box-label">Trạng thái</span>
+                </div>
+                <p className="info-box-value">
+                  {status === "pending" ? "Chưa bắt đầu" : 
+                   status === "checked_in" ? "Đã check-in" :
+                   status === "late" ? "Đi trễ" :
+                   status === "checked_out" ? "Đã check-out" :
+                   status === "early_leave" ? "Về sớm" :
+                   status === "absent" ? "Vắng mặt" : status}
+                </p>
+              </div>
+              {shift.lateMinutes > 0 && (
                 <div className="info-box">
                   <div className="info-box-header">
-                    <Calendar className="info-box-icon" />
-                    <span className="info-box-label">Thời gian kết thúc</span>
+                    <span className="info-box-label">Đi trễ</span>
                   </div>
-                  <p className="info-box-value">
-                    {formatDateTime(shiftData.endTime)}
+                  <p className="info-box-value" style={{ color: "var(--destructive)" }}>
+                    {shift.lateMinutes} phút
                   </p>
                 </div>
               )}
@@ -653,122 +538,32 @@ export default function CashierShiftManager() {
           </div>
         </div>
 
-        <div className="grid-lg-2-cols">
-          {/* Open Shift Card */}
+        {/* Check-in Card - chỉ hiển thị khi chưa check-in */}
+        {canCheckIn && (
           <div className="card">
             <div className="card-header">
               <div className="card-header-with-icon">
                 <div className="icon-wrapper icon-wrapper-success">
                   <LogIn className="icon-success" />
                 </div>
-                <h2 className="card-title">Mở Ca Làm Việc</h2>
+                <h2 className="card-title">Check-in</h2>
               </div>
               <p className="card-description">
-                Nhập số tiền đầu ca để bắt đầu làm việc
+                Bắt đầu ca làm việc
               </p>
             </div>
             <div className="card-content">
-              <div className="input-group shift-input-group">
-                <label htmlFor="opening-cash" className="input-label">
-                  Tiền đầu ca (VNĐ)
-                </label>
-                <div className="input-wrapper">
-                  <DollarSign className="input-icon" />
-                  <input
-                    id="opening-cash"
-                    type="number"
-                    step="0.01"
-                    placeholder="0.00"
-                    value={openingAmount}
-                    onChange={(e) => setOpeningAmount(e.target.value)}
-                    disabled={shiftData.isShiftOpen}
-                    className="input input-with-icon"
-                  />
-                </div>
-              </div>
-
-              {shiftData.openingCash !== null && (
-                <div className="amount-display amount-display-success">
-                  <p className="amount-label">Tiền đầu ca đã ghi nhận</p>
-                  <p className="amount-value amount-value-success">
-                    {formatCurrency(shiftData.openingCash)}
-                  </p>
-                </div>
-              )}
-
               <button
-                onClick={handleOpenShift}
-                disabled={shiftData.isShiftOpen}
+                onClick={handleCheckIn}
                 className="button button-full button-success"
+                style={{ fontSize: "1.1rem", padding: "1rem" }}
               >
                 <LogIn className="button-icon" />
-                Mở Ca
+                Check-In
               </button>
             </div>
           </div>
-
-          {/* Close Shift Card */}
-          <div className="card">
-            <div className="card-header">
-              <div className="card-header-with-icon">
-                <div className="icon-wrapper icon-wrapper-destructive">
-                  <LogOut className="icon-destructive" />
-                </div>
-                <h2 className="card-title">Đóng Ca Làm Việc</h2>
-              </div>
-              <p className="card-description">
-                Nhập số tiền đếm được để kết thúc ca làm việc
-              </p>
-            </div>
-            <div className="card-content">
-              <div className="input-group shift-input-group">
-                <label htmlFor="closing-cash" className="input-label">
-                  Tiền cuối ca (VNĐ)
-                </label>
-                <div className="input-wrapper">
-                  <DollarSign className="input-icon" />
-                  <input
-                    id="closing-cash"
-                    type="number"
-                    step="0.01"
-                    placeholder="0.00"
-                    value={closingAmount}
-                    onChange={(e) => setClosingAmount(e.target.value)}
-                    disabled={!shiftData.isShiftOpen}
-                    className="input input-with-icon"
-                  />
-                </div>
-              </div>
-
-              {shiftData.closingCash !== null && (
-                <div className="amount-display amount-display-destructive">
-                  <p className="amount-label">Tiền cuối ca đã ghi nhận</p>
-                  <p className="amount-value amount-value-destructive">
-                    {formatCurrency(shiftData.closingCash)}
-                  </p>
-                </div>
-              )}
-
-              <div style={{ display: "flex", gap: ".75rem" }}>
-                <button
-                  onClick={() => setShowCloseShiftForm(true)}
-                  disabled={!shiftData.isShiftOpen}
-                  className="button button-full"
-                >
-                  Chọn phương thức đếm tiền
-                </button>
-                <button
-                  onClick={handleCloseShift}
-                  disabled={!shiftData.isShiftOpen}
-                  className="button button-full button-destructive"
-                >
-                  <LogOut className="button-icon" />
-                  Đóng Ca
-                </button>
-              </div>
-            </div>
-          </div>
-        </div>
+        )}
 
         {/* Summary Card */}
         {shiftData.closingCash !== null &&
