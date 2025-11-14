@@ -235,6 +235,26 @@ exports.getPreOrders = async (req, res) => {
     for (const order of orders) {
       if (order.orderItems && order.orderItems.length > 0) {
         await fillItemNameForOrderItems(order.orderItems);
+        
+        // ✅ Tính lại totalAmount từ orderItems nếu totalAmount không có hoặc bằng 0
+        if (!order.totalAmount || order.totalAmount <= 0 || isNaN(order.totalAmount)) {
+          const calculatedTotal = order.orderItems.reduce((sum, item) => {
+            const price = item.price || 0;
+            const quantity = item.quantity || 0;
+            return sum + (price * quantity);
+          }, 0);
+          
+          if (calculatedTotal > 0) {
+            order.totalAmount = calculatedTotal;
+            // Cập nhật vào database để lần sau không phải tính lại
+            try {
+              await Order.findByIdAndUpdate(order._id, { totalAmount: calculatedTotal }, { new: true });
+              console.log(`✅ [getPreOrders] Đã tính lại và cập nhật totalAmount=${calculatedTotal} cho order ${order._id}`);
+            } catch (err) {
+              console.error(`❌ [getPreOrders] Lỗi khi cập nhật totalAmount cho order ${order._id}:`, err);
+            }
+          }
+        }
       }
       // Tính tổng tiền đã thanh toán từ paymentIds
       if (order.paymentIds && Array.isArray(order.paymentIds) && order.paymentIds.length > 0) {
@@ -329,6 +349,26 @@ exports.getCustomerInfo = async (req, res) => {
     for (const order of orders) {
       if (order.orderItems && order.orderItems.length > 0) {
         await fillItemNameForOrderItems(order.orderItems);
+        
+        // ✅ Tính lại totalAmount từ orderItems nếu totalAmount không có hoặc bằng 0
+        if (!order.totalAmount || order.totalAmount <= 0 || isNaN(order.totalAmount)) {
+          const calculatedTotal = order.orderItems.reduce((sum, item) => {
+            const price = item.price || 0;
+            const quantity = item.quantity || 0;
+            return sum + (price * quantity);
+          }, 0);
+          
+          if (calculatedTotal > 0) {
+            order.totalAmount = calculatedTotal;
+            // Cập nhật vào database để lần sau không phải tính lại
+            try {
+              await Order.findByIdAndUpdate(order._id, { totalAmount: calculatedTotal }, { new: true });
+              console.log(`✅ [getCustomerInfo] Đã tính lại và cập nhật totalAmount=${calculatedTotal} cho order ${order._id}`);
+            } catch (err) {
+              console.error(`❌ [getCustomerInfo] Lỗi khi cập nhật totalAmount cho order ${order._id}:`, err);
+            }
+          }
+        }
       }
       // Tính tổng tiền đã thanh toán từ paymentIds
       if (order.paymentIds && Array.isArray(order.paymentIds) && order.paymentIds.length > 0) {
@@ -2129,6 +2169,26 @@ exports.getCustomerInfo = async (req, res) => {
     for (const order of orders) {
       if (order.orderItems && order.orderItems.length > 0) {
         await fillItemNameForOrderItems(order.orderItems);
+        
+        // ✅ Tính lại totalAmount từ orderItems nếu totalAmount không có hoặc bằng 0
+        if (!order.totalAmount || order.totalAmount <= 0 || isNaN(order.totalAmount)) {
+          const calculatedTotal = order.orderItems.reduce((sum, item) => {
+            const price = item.price || 0;
+            const quantity = item.quantity || 0;
+            return sum + (price * quantity);
+          }, 0);
+          
+          if (calculatedTotal > 0) {
+            order.totalAmount = calculatedTotal;
+            // Cập nhật vào database để lần sau không phải tính lại
+            try {
+              await Order.findByIdAndUpdate(order._id, { totalAmount: calculatedTotal }, { new: true });
+              console.log(`✅ [getCustomerInfo] Đã tính lại và cập nhật totalAmount=${calculatedTotal} cho order ${order._id}`);
+            } catch (err) {
+              console.error(`❌ [getCustomerInfo] Lỗi khi cập nhật totalAmount cho order ${order._id}:`, err);
+            }
+          }
+        }
       }
       // Tính tổng tiền đã thanh toán từ paymentIds
       if (order.paymentIds && Array.isArray(order.paymentIds) && order.paymentIds.length > 0) {
