@@ -1,6 +1,5 @@
 const Order = require("../models/Order");
 const Payment = require("../models/Payment");
-const webSocketService = require("../services/websocket.service");
 const { groupSplitOrderItemsForCustomer, populateOrderItemDetails } = require("../utils/customerHelpers");
 
 function calculateWaitTime(createdAt) {
@@ -175,10 +174,13 @@ exports.completeOrderPayment = async (req, res) => {
   const { paymentMethod = "cash" } = req.body || {};
 
   try {
-    const order = await Order.findById(orderId).populate({
-      path: "orderItems",
-      select: "price quantity",
-    });
+    const order = await Order.findById(orderId)
+      .populate({
+        path: "orderItems",
+        select: "price quantity",
+      })
+      .populate("tableId") // Populate tableId để có thể cập nhật trạng thái bàn
+      .populate("tableIds"); // Populate tableIds để hỗ trợ nhiều bàn
 
     if (!order) {
       return res.status(404).json({ message: "Không tìm thấy đơn hàng" });
@@ -225,6 +227,38 @@ exports.completeOrderPayment = async (req, res) => {
       order.status = "paid";
       await order.save();
       
+      // Cập nhật trạng thái bàn: xóa order khỏi table.orderNow và đổi status về "available" nếu không còn order nào
+      const Table = require("../models/Table");
+      
+      // Xử lý tableId (backward compatibility)
+      if (order.tableId) {
+        const table = await Table.findById(order.tableId);
+        if (table && table.orderNow) {
+          table.orderNow = table.orderNow.filter(oid => oid.toString() !== orderId.toString());
+          if (table.orderNow.length === 0) {
+            table.status = "available";
+            console.log(`✅ [completeOrderPayment] Bàn ${table.tableNumber} chuyển sang trạng thái "available"`);
+          }
+          await table.save();
+        }
+      }
+      
+      // Xử lý tableIds (nhiều bàn)
+      if (order.tableIds && order.tableIds.length > 0) {
+        const tables = await Table.find({ _id: { $in: order.tableIds } });
+        for (const table of tables) {
+          if (table && table.orderNow) {
+            const beforeLength = table.orderNow.length;
+            table.orderNow = table.orderNow.filter(oid => oid.toString() !== orderId.toString());
+            if (table.orderNow.length === 0 && beforeLength > 0) {
+              table.status = "available";
+              console.log(`✅ [completeOrderPayment] Bàn ${table.tableNumber} chuyển sang trạng thái "available"`);
+            }
+            await table.save();
+          }
+        }
+      }
+      
       // Tích điểm cho khách hàng khi đơn chuyển sang paid
       if (order.userId) {
         try {
@@ -266,10 +300,56 @@ exports.completeOrderPayment = async (req, res) => {
       populatedOrder.orderItems = groupSplitOrderItemsForCustomer(populatedOrder.orderItems);
     }
 
+    // Lấy webSocketService từ app
+    const webSocketService = req.app.get("webSocketService");
+
+    // Broadcast cho cashiers
     if (webSocketService?.broadcastToAllCashiers) {
       const payload = formatOrder(populatedOrder);
       if (payload) {
         webSocketService.broadcastToAllCashiers("cashier.orders.paid", payload);
+        console.log(`✅ [completeOrderPayment] Broadcasted cashier.orders.paid for order ${orderId}`);
+      }
+    }
+
+    // Broadcast cho customer khi order chuyển sang paid
+    if (webSocketService && order.status === "paid") {
+      try {
+        // Populate thêm paymentId để customer có thông tin thanh toán đầy đủ
+        const customerOrder = await Order.findById(orderId)
+          .populate({
+            path: "orderItems",
+            populate: {
+              path: "assignedChef",
+              select: "name username"
+            }
+          })
+          .populate("tableId")
+          .populate("paymentId")
+          .populate("paymentIds");
+
+        // Populate orderItemDetails cho customer
+        if (customerOrder.orderItems && customerOrder.orderItems.length > 0) {
+          await populateOrderItemDetails(customerOrder.orderItems);
+          customerOrder.orderItems = groupSplitOrderItemsForCustomer(customerOrder.orderItems);
+        }
+
+        // Convert sang plain object trước khi broadcast
+        const orderToBroadcast = customerOrder.toObject ? customerOrder.toObject({ getters: true, flattenMaps: true }) : { ...customerOrder };
+        
+        // Broadcast order:updated cho customer
+        webSocketService.broadcastToOrder(orderId, "order:updated", orderToBroadcast);
+        console.log(`✅ [completeOrderPayment] Broadcasted order:updated to customer for order ${orderId} (status: paid)`);
+      } catch (error) {
+        console.error(`❌ [completeOrderPayment] Error broadcasting to customer:`, error);
+        // Fallback: broadcast populatedOrder nếu có lỗi
+        try {
+          const orderToBroadcast = populatedOrder.toObject ? populatedOrder.toObject({ getters: true, flattenMaps: true }) : { ...populatedOrder };
+          webSocketService.broadcastToOrder(orderId, "order:updated", orderToBroadcast);
+          console.log(`✅ [completeOrderPayment] Fallback broadcast sent for order ${orderId}`);
+        } catch (fallbackError) {
+          console.error(`❌ [completeOrderPayment] Fallback broadcast also failed:`, fallbackError);
+        }
       }
     }
 

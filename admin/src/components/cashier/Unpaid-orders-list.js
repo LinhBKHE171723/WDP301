@@ -199,33 +199,42 @@ function UnpaidOrdersList({
 
       try {
         const methodToSend = paymentMethod || "cash"
-        await Client.post(`/cashier/orders/${orderId}/pay`, {
+        console.log(`💳 [handlePaymentComplete] Processing payment for order ${orderId} with method ${methodToSend}`)
+        
+        const response = await Client.post(`/cashier/orders/${orderId}/pay`, {
           paymentMethod: methodToSend,
         })
 
+        console.log(`✅ [handlePaymentComplete] Payment successful:`, response.data)
+
+        // Cập nhật danh sách đơn chờ thanh toán (xóa đơn đã thanh toán)
         setUnpaidOrders((prev) => {
           const updated = prev.filter((order) => order.id !== orderId)
           onOrdersUpdate?.(updated)
           return updated
         })
 
-      if (onPaymentComplete) {
-        onPaymentComplete({
-          orderNumber: paidOrder.orderNumber,
-          amount: total,
+        // Gọi callback để cập nhật payment history
+        if (onPaymentComplete) {
+          onPaymentComplete({
+            orderNumber: paidOrder.orderNumber,
+            amount: total,
             method: PAYMENT_METHOD_LABELS[methodToSend] || "Tiền mặt",
-          time: new Date().toISOString(),
-        })
+            time: new Date().toISOString(),
+          })
         }
+        
+        // Không đóng màn chi tiết ngay - để OrderPayment component tự quản lý (hiển thị receipt)
+        // setSelectedOrder(null) sẽ được gọi từ OrderPayment khi bấm "Đóng"
       } catch (err) {
-        console.error("Hoàn tất thanh toán thất bại", err)
+        console.error("❌ [handlePaymentComplete] Payment failed:", err)
         setError("Thanh toán không thành công. Vui lòng thử lại.")
-        return
+        // Throw error để OrderPayment component có thể catch và hiển thị lỗi
+        throw err
       }
+    } else {
+      throw new Error("Không tìm thấy đơn hàng")
     }
-
-    // Thoát màn chi tiết và quay lại list (đơn đã biến mất)
-    setSelectedOrder(null)
   }
 
   if (selectedOrder) {

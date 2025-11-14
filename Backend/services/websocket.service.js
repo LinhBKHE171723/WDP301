@@ -89,10 +89,22 @@ class WebSocketService {
         break;
 
       case 'auth':
-        // client gửi role (vd: waiter, customer, kitchen_manager)
+        // client gửi role (vd: waiter, customer, kitchen_manager, cashier)
         ws.userRole = message.role;
         ws.userId = message.userId; // Lưu userId để có thể broadcast cho user cụ thể
-        console.log(`🔐 WebSocket authenticated as: ${message.role} (userId: ${message.userId})`);
+        console.log(`🔐 [WebSocket] Authenticated as: ${message.role} (userId: ${message.userId || 'N/A'})`);
+        
+        // Log số lượng cashier connections hiện tại
+        if (message.role === 'cashier') {
+          let cashierCount = 0;
+          this.wss.clients.forEach(client => {
+            if (client.userRole === 'cashier' && client.readyState === WebSocket.OPEN) {
+              cashierCount++;
+            }
+          });
+          console.log(`💰 [WebSocket] Total cashier connections: ${cashierCount}`);
+        }
+        
         ws.send(JSON.stringify({
           type: 'auth_success',
           role: message.role,
@@ -330,13 +342,39 @@ class WebSocketService {
     };
 
     let sentCount = 0;
+    let totalCashiers = 0;
     this.wss.clients.forEach(ws => {
-      if (ws.readyState === WebSocket.OPEN && ws.userRole === 'cashier') {
-        ws.send(JSON.stringify(message));
-        sentCount++;
+      if (ws.readyState === WebSocket.OPEN) {
+        if (ws.userRole === 'cashier') {
+          try {
+            ws.send(JSON.stringify(message));
+            sentCount++;
+            console.log(`✅ [broadcastToAllCashiers] Sent ${eventType} to cashier (userId: ${ws.userId || 'N/A'})`);
+          } catch (error) {
+            console.error(`❌ [broadcastToAllCashiers] Error sending to cashier:`, error);
+          }
+        }
+        if (ws.userRole === 'cashier') {
+          totalCashiers++;
+        }
       }
     });
-    console.log(`📡 Broadcasted ${eventType} to ${sentCount} cashier(s)`, data);
+    console.log(`📡 [broadcastToAllCashiers] Broadcasted ${eventType} to ${sentCount}/${totalCashiers} cashier(s)`, {
+      eventType,
+      dataKeys: Object.keys(data || {}),
+      orderId: data?.orderId || data?.order?._id || 'N/A'
+    });
+    
+    if (sentCount === 0 && totalCashiers === 0) {
+      console.warn(`⚠️ [broadcastToAllCashiers] No cashier connections found! Total clients: ${this.wss.clients.size}`);
+      // Log all connected clients for debugging
+      let clientRoles = {};
+      this.wss.clients.forEach(ws => {
+        const role = ws.userRole || 'unknown';
+        clientRoles[role] = (clientRoles[role] || 0) + 1;
+      });
+      console.log(`📊 [broadcastToAllCashiers] Connected clients by role:`, clientRoles);
+    }
   }
 
   // ==================================================
