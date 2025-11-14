@@ -95,16 +95,44 @@ export default function CashierDashboard({
   const [pageSize, setPageSize] = useState(5)
 
   // ====== Formatter ======
-  const formatCurrency = (amount) =>
-    new Intl.NumberFormat("vi-VN", { style: "currency", currency: "VND" }).format(amount)
+  const formatCurrency = (amount) => {
+    if (amount === undefined || amount === null || isNaN(amount)) {
+      return "0 ₫"
+    }
+    return new Intl.NumberFormat("vi-VN", { style: "currency", currency: "VND" }).format(amount)
+  }
 
-  const formatTime = (dateString) =>
-    new Intl.DateTimeFormat("vi-VN", { hour: "2-digit", minute: "2-digit" }).format(new Date(dateString))
+  const formatTime = (dateString) => {
+    if (!dateString) {
+      return "--:--"
+    }
+    try {
+      const date = new Date(dateString)
+      if (isNaN(date.getTime())) {
+        return "--:--"
+      }
+      return new Intl.DateTimeFormat("vi-VN", { hour: "2-digit", minute: "2-digit" }).format(date)
+    } catch (error) {
+      console.error("Error formatting time:", error)
+      return "--:--"
+    }
+  }
 
-  const formatDate = (dateString) =>
-    new Intl.DateTimeFormat("vi-VN", { day: "2-digit", month: "2-digit", year: "numeric" }).format(
-      new Date(dateString)
-    )
+  const formatDate = (dateString) => {
+    if (!dateString) {
+      return "--/--/----"
+    }
+    try {
+      const date = new Date(dateString)
+      if (isNaN(date.getTime())) {
+        return "--/--/----"
+      }
+      return new Intl.DateTimeFormat("vi-VN", { day: "2-digit", month: "2-digit", year: "numeric" }).format(date)
+    } catch (error) {
+      console.error("Error formatting date:", error)
+      return "--/--/----"
+    }
+  }
 
   // ====== Thông tin thu ngân đã được tách ra thành CashierUserBadge component ======
 
@@ -224,8 +252,8 @@ export default function CashierDashboard({
   const handlePaymentRequested = useCallback((data) => {
     console.log("💳 Payment requested:", data)
     const tableNumber = data.tableNumber || "N/A"
-    const totalAmount = data.totalAmount?.toLocaleString("vi-VN") || "0"
-    toast.warning(`💳 Khách hàng tại bàn ${tableNumber} yêu cầu thanh toán! Tổng tiền: ${totalAmount}đ`, {
+    const totalAmount = data.totalAmount ? formatCurrency(data.totalAmount) : "0 ₫"
+    toast.warning(`💳 Khách hàng tại bàn ${tableNumber} yêu cầu thanh toán! Tổng tiền: ${totalAmount}`, {
       autoClose: 8000,
       position: "top-right",
     })

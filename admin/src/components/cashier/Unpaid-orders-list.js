@@ -1,8 +1,10 @@
 import { ArrowLeft, Clock, Users, Search } from "lucide-react"
 import "./unpaid-orders-list.css"
-import { useEffect, useState, useMemo } from "react"
+import { useEffect, useState, useMemo, useCallback } from "react"
 import OrderPayment from "./order-payment"
 import Client from "../../api/Client"
+import useCashierSocket from "../../hooks/useCashierSocket"
+import { toast } from "react-toastify"
 
 const PAYMENT_METHOD_LABELS = {
   cash: "Tiền mặt",
@@ -69,11 +71,28 @@ function UnpaidOrdersList({
     }
   }, [fetchOrders, onOrdersUpdate])
 
-  const formatCurrency = (amount) =>
-    new Intl.NumberFormat("vi-VN", { style: "currency", currency: "VND" }).format(amount)
+  const formatCurrency = (amount) => {
+    if (amount === undefined || amount === null || isNaN(amount)) {
+      return "0 ₫"
+    }
+    return new Intl.NumberFormat("vi-VN", { style: "currency", currency: "VND" }).format(amount)
+  }
 
-  const formatTime = (dateString) =>
-    new Intl.DateTimeFormat("vi-VN", { hour: "2-digit", minute: "2-digit" }).format(new Date(dateString))
+  const formatTime = (dateString) => {
+    if (!dateString) {
+      return "--:--"
+    }
+    try {
+      const date = new Date(dateString)
+      if (isNaN(date.getTime())) {
+        return "--:--"
+      }
+      return new Intl.DateTimeFormat("vi-VN", { hour: "2-digit", minute: "2-digit" }).format(date)
+    } catch (error) {
+      console.error("Error formatting time:", error)
+      return "--:--"
+    }
+  }
 
   // Filter orders by table number
   const filteredOrders = useMemo(() => {
@@ -87,10 +106,96 @@ function UnpaidOrdersList({
     })
   }, [unpaidOrders, tableFilter])
 
+  // ====== WebSocket: Xử lý đơn mới chuyển sang preparing ======
+  const handleOrderPreparing = useCallback(
+    (order) => {
+      if (!order?.id) return
+
+      setUnpaidOrders((prev) => {
+        // Kiểm tra xem đơn đã có trong danh sách chưa
+        const existingIndex = prev.findIndex((item) => item.id === order.id)
+        if (existingIndex !== -1) {
+          // Đơn đã có, cập nhật thông tin
+          const updated = [...prev]
+          updated[existingIndex] = { ...updated[existingIndex], ...order }
+          onOrdersUpdate?.(updated)
+          return updated
+        } else {
+          // Đơn mới, thêm vào danh sách
+          const tableText = order.tableNumber || "Mang đi"
+          const message = `🆕 Có đơn hàng mới ${order.orderNumber || ""} từ ${tableText} cần thanh toán!`
+          toast.info(message, { position: "top-right" })
+          const updated = [...prev, order]
+          onOrdersUpdate?.(updated)
+          return updated
+        }
+      })
+    },
+    [onOrdersUpdate]
+  )
+
+  // ====== WebSocket: Xử lý đơn đã thanh toán ======
+  const handleOrderPaid = useCallback(
+    (order) => {
+      if (!order?.id) return
+
+      setUnpaidOrders((prev) => {
+        const updated = prev.filter((item) => item.id !== order.id)
+        onOrdersUpdate?.(updated)
+        return updated
+      })
+
+      // Nếu đang xem chi tiết đơn này, quay lại danh sách
+      if (selectedOrder?.id === order.id) {
+        setSelectedOrder(null)
+      }
+    },
+    [onOrdersUpdate, selectedOrder]
+  )
+
+  // ====== WebSocket: Xử lý yêu cầu thanh toán từ khách ======
+  const handlePaymentRequested = useCallback(
+    (notificationData) => {
+      if (!notificationData?.orderId) return
+
+      // Nếu đơn đã có trong danh sách, chỉ cần thông báo
+      const existingOrder = unpaidOrders.find((order) => order.id === notificationData.orderId)
+      if (existingOrder) {
+        const tableText = notificationData.tableNumber || "Mang đi"
+        toast.info(`💳 Khách hàng tại ${tableText} yêu cầu thanh toán!`, {
+          position: "top-right",
+        })
+        return
+      }
+
+      // Nếu đơn chưa có, có thể cần fetch lại hoặc thông báo
+      // (Tùy vào logic backend, có thể đơn này chưa ở trạng thái preparing)
+      toast.info(`💳 Có yêu cầu thanh toán từ bàn ${notificationData.tableNumber || "N/A"}`, {
+        position: "top-right",
+      })
+
+      // Nếu có fetchOrders, có thể refresh danh sách
+      if (fetchOrders) {
+        fetchOrders().then((orders) => {
+          setUnpaidOrders(orders)
+          onOrdersUpdate?.(orders)
+        })
+      }
+    },
+    [unpaidOrders, fetchOrders, onOrdersUpdate]
+  )
+
+  // ====== Kết nối WebSocket ======
+  useCashierSocket({
+    onOrderPreparing: handleOrderPreparing,
+    onOrderPaid: handleOrderPaid,
+    onPaymentRequested: handlePaymentRequested,
+  })
+
   const handlePaymentComplete = async (orderId, paymentMethod) => {
     const paidOrder = unpaidOrders.find((order) => order.id === orderId)
     if (paidOrder) {
-      const total = paidOrder.items.reduce((sum, item) => sum + item.price * item.quantity, 0)
+      const total = (paidOrder.items || []).reduce((sum, item) => sum + (item.price || 0) * (item.quantity || 0), 0)
 
       try {
         const methodToSend = paymentMethod || "cash"
@@ -221,7 +326,11 @@ function UnpaidOrdersList({
 
       {/* Orders List */}
       <div className="orders-list">
-        {filteredOrders.map((order) => (
+        {filteredOrders.map((order) => {
+          // Validate order data để tránh lỗi
+          if (!order || !order.id) return null
+          
+          return (
           <div
             key={order.id}
             className="order-card"
@@ -231,11 +340,11 @@ function UnpaidOrdersList({
             {/* Order Header */}
             <div className="order-card-header">
               <div className="order-info">
-                <h3 className="order-number">{order.orderNumber}</h3>
+                <h3 className="order-number">{order.orderNumber || "N/A"}</h3>
                 <div className="order-meta">
                   <div className="meta-item">
                     <Users className="meta-icon" />
-                    <span className="meta-text">{order.tableNumber}</span>
+                    <span className="meta-text">{order.tableNumber || "Mang đi"}</span>
                   </div>
                   <div className="meta-divider"></div>
                   <div className="meta-item">
@@ -272,14 +381,14 @@ function UnpaidOrdersList({
                   </tr>
                 </thead>
                 <tbody className="items-table-body">
-                  {order.items.map((item) => (
-                    <tr key={item.id} className="items-table-row">
-                      <td className="items-table-cell item-name">{item.name}</td>
-                      <td className="items-table-cell item-qty">{item.quantity}</td>
+                  {order.items?.map((item, idx) => (
+                    <tr key={item.id || idx} className="items-table-row">
+                      <td className="items-table-cell item-name">{item.name || "Món ăn"}</td>
+                      <td className="items-table-cell item-qty">{item.quantity || 0}</td>
                       <td className="items-table-cell item-price">{formatCurrency(item.price)}</td>
-                      <td className="items-table-cell item-total">{formatCurrency(item.price * item.quantity)}</td>
+                      <td className="items-table-cell item-total">{formatCurrency((item.price || 0) * (item.quantity || 0))}</td>
                     </tr>
-                  ))}
+                  )) || []}
                 </tbody>
               </table>
             </div>
@@ -288,11 +397,12 @@ function UnpaidOrdersList({
             <div className="order-card-footer">
               <div className="footer-total">
                 <span className="footer-total-label">Tổng cộng:</span>
-                <span className="footer-total-amount">{formatCurrency(order.totalAmount)}</span>
+                <span className="footer-total-amount">{formatCurrency(order.totalAmount || 0)}</span>
               </div>
             </div>
           </div>
-        ))}
+          )
+        })}
       </div>
 
       {/* Empty State */}
