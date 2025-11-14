@@ -290,6 +290,22 @@ const seedDatabase = async () => {
     
     console.log(`✅ Đã tạo 2 WorkShift: ${morningWorkShift.name} và ${afternoonWorkShift.name}`);
     
+    // ✅ Gán tất cả nhân viên active vào WorkShift để cron job có thể tạo shift
+    console.log("👥 Gán nhân viên vào WorkShift...");
+    const allActiveEmployees = [
+      ...waiters.filter(w => w.status === "active"),
+      ...chefs.filter(c => c.status === "active"),
+      ...kitchenManagers.filter(m => m.status === "active"),
+      ...cashiers.filter(c => c.status === "active")
+    ];
+    
+    // Gán tất cả nhân viên active vào cả 2 ca (có thể điều chỉnh logic sau)
+    morningWorkShift.employees = allActiveEmployees.map(e => e._id);
+    afternoonWorkShift.employees = allActiveEmployees.map(e => e._id);
+    await morningWorkShift.save();
+    await afternoonWorkShift.save();
+    console.log(`✅ Đã gán ${allActiveEmployees.length} nhân viên active vào cả 2 WorkShift`);
+    
     const shifts = [];
     const shiftOneMonthAgo = new Date();
     shiftOneMonthAgo.setMonth(shiftOneMonthAgo.getMonth() - 1);
