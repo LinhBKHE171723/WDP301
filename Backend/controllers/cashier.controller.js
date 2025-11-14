@@ -517,3 +517,86 @@ exports.completeOrderPayment = async (req, res) => {
     });
   }
 };
+
+// ✅ Lấy lịch sử thanh toán của cashier hiện tại
+exports.getPaymentHistory = async (req, res) => {
+  try {
+    const cashierId = req.user.id; // Lấy từ auth middleware
+    const { fromDate, toDate } = req.query;
+    
+    console.log(`🔍 [getPaymentHistory] Fetching payments cho cashierId: ${cashierId}, fromDate: ${fromDate}, toDate: ${toDate}`);
+    
+    // Build filter
+    const filter = {
+      cashierId: cashierId,
+      status: "paid",
+      isDeposit: false, // Chỉ lấy thanh toán cuối, không phải cọc
+    };
+    
+    // Filter theo date range nếu có
+    // ✅ Nếu không có fromDate/toDate, vẫn trả về tất cả payments (không filter date)
+    if (fromDate || toDate) {
+      filter.payTime = {};
+      if (fromDate) {
+        const fromDateObj = new Date(fromDate);
+        if (!isNaN(fromDateObj.getTime())) {
+          filter.payTime.$gte = fromDateObj;
+        }
+      }
+      if (toDate) {
+        const toDateObj = new Date(toDate);
+        if (!isNaN(toDateObj.getTime())) {
+          const toDateEnd = new Date(toDateObj);
+          toDateEnd.setHours(23, 59, 59, 999);
+          filter.payTime.$lte = toDateEnd;
+        }
+      }
+    }
+    
+    console.log(`🔍 [getPaymentHistory] Filter:`, JSON.stringify(filter, null, 2));
+    
+    // Fetch payments
+    const payments = await Payment.find(filter)
+      .populate({
+        path: "orderId",
+        select: "orderNumber code totalAmount createdAt updatedAt",
+      })
+      .sort({ payTime: -1, createdAt: -1 });
+    
+    console.log(`✅ [getPaymentHistory] Tìm thấy ${payments.length} payments cho cashierId: ${cashierId}`);
+    
+    // Convert sang format cho frontend
+    const history = payments.map(payment => {
+      const order = payment.orderId;
+      const methodMap = {
+        cash: "Tiền mặt",
+        card: "Thẻ",
+        momo: "QR Code",
+        zaloPay: "QR Code",
+        qr: "QR Code",
+      };
+      
+      return {
+        id: payment._id.toString(),
+        orderId: order?._id?.toString() || payment.orderId?.toString() || payment.orderId,
+        orderNumber: order?.orderNumber || order?.code || `ĐH-${order?._id || payment.orderId}`,
+        amount: payment.amountPaid || 0,
+        method: methodMap[payment.paymentMethod] || "Tiền mặt",
+        time: payment.payTime || payment.createdAt || new Date().toISOString(),
+      };
+    });
+    
+    return res.status(200).json({
+      success: true,
+      message: "Lấy lịch sử thanh toán thành công",
+      data: history,
+    });
+  } catch (error) {
+    console.error("[cashier] getPaymentHistory error:", error);
+    return res.status(500).json({
+      success: false,
+      message: "Lỗi server khi lấy lịch sử thanh toán",
+      error: error.message,
+    });
+  }
+};

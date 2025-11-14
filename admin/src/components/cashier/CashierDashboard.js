@@ -2,7 +2,6 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import {
   ArrowLeft,
   Clock,
-  DollarSign,
   ShoppingCart,
   CreditCard,
   Banknote,
@@ -82,6 +81,74 @@ export default function CashierDashboard({
   const [unpaidOrdersData, setUnpaidOrdersData] = useState([])
   const [pendingOrdersCount, setPendingOrdersCount] = useState(0)
   const pendingOrdersRef = useRef(null)
+  
+  // ✅ Fetch payment history từ API khi component mount hoặc shift thay đổi
+  const fetchPaymentHistory = useCallback(async () => {
+    try {
+      // ✅ Nếu không có shift info, vẫn fetch nhưng không filter date (lấy tất cả)
+      const params = {};
+      if (shiftInfo?.startTime) {
+        const startTime = new Date(shiftInfo.startTime);
+        const endTime = new Date();
+        params.fromDate = startTime.toISOString();
+        params.toDate = endTime.toISOString();
+        console.log(`🔍 [CashierDashboard] Fetching payment history từ ${startTime.toISOString()} đến ${endTime.toISOString()}`);
+      } else {
+        console.log("⚠️ [CashierDashboard] Chưa có shift info, fetch tất cả payments (không filter date)");
+      }
+      
+      // ✅ Fetch trực tiếp từ payments endpoint với filter cashierId
+      const response = await Client.get("/cashier/payments/history", {
+        params: params
+      });
+      
+      // Client interceptor trả về res.data, nên response = { success: true, data: [...] }
+      let history = [];
+      if (response?.data && Array.isArray(response.data)) {
+        history = response.data;
+      } else if (response?.success && response?.data && Array.isArray(response.data)) {
+        history = response.data;
+      } else if (Array.isArray(response)) {
+        history = response;
+      } else {
+        console.warn("⚠️ [CashierDashboard] Response format không đúng:", response);
+      }
+      
+      console.log(`✅ [CashierDashboard] Đã fetch ${history.length} payments từ API /cashier/payments/history`, {
+        responseKeys: Object.keys(response || {}),
+        historyLength: history.length,
+        firstPayment: history[0] || null
+      });
+      
+      // Sắp xếp theo thời gian mới nhất trước (nếu chưa được sort)
+      history.sort((a, b) => new Date(b.time) - new Date(a.time));
+      
+      setPaymentHistory(history);
+      console.log(`✅ [CashierDashboard] Đã set ${history.length} payments vào state`);
+    } catch (error) {
+      console.error("❌ [CashierDashboard] Lỗi khi fetch payment history:", error);
+      console.error("❌ [CashierDashboard] Error details:", {
+        message: error.message,
+        stack: error.stack,
+        response: error.response?.data
+      });
+      // ✅ Nếu có lỗi, vẫn set empty array để tránh hiển thị data cũ không chính xác
+      // Nhưng chỉ khi không có data trong state (tránh mất data khi đang xem)
+      setPaymentHistory((prev) => {
+        if (prev.length === 0) {
+          return [];
+        }
+        // Giữ lại data cũ nếu đã có (tránh mất data khi refresh)
+        console.warn("⚠️ [CashierDashboard] Giữ lại payment history cũ do lỗi fetch");
+        return prev;
+      });
+    }
+  }, [shiftInfo?.startTime])
+  
+  // ✅ Fetch payment history khi component mount hoặc shift thay đổi
+  useEffect(() => {
+    fetchPaymentHistory();
+  }, [fetchPaymentHistory])
 
   const updateOrders = useCallback((updater) => {
     setUnpaidOrdersData((prev) => {
@@ -150,6 +217,13 @@ export default function CashierDashboard({
     }
     setPaymentHistory((prev) => [newPayment, ...prev])
     setPendingOrdersCount((c) => Math.max(0, c - 1))
+    
+    // ✅ Tự động fetch lại payment history sau 1 giây để đồng bộ với server
+    // Điều này đảm bảo khi F5, data vẫn còn vì đã được lưu vào DB
+    setTimeout(() => {
+      console.log("🔄 [CashierDashboard] Tự động fetch lại payment history sau khi thanh toán");
+      fetchPaymentHistory();
+    }, 1000);
   }
 
   const handleOrdersUpdate = useCallback(
@@ -268,12 +342,7 @@ export default function CashierDashboard({
     onPaymentRequested: handlePaymentRequested,
   })
 
-  // ====== Doanh thu trong ca ======
-  const cashRevenue = paymentHistory.filter((p) => p.method === "Tiền mặt").reduce((s, p) => s + p.amount, 0)
-  const cardRevenue = paymentHistory
-    .filter((p) => p.method === "Thẻ" || p.method === "QR Code")
-    .reduce((s, p) => s + p.amount, 0)
-  const totalRevenue = cashRevenue + cardRevenue
+  // ====== Số đơn đã thanh toán ======
   const completedOrdersCount = paymentHistory.length
 
   const currentShiftDuration = Math.floor((Date.now() - new Date(shiftInfo.startTime).getTime()) / (1000 * 60))
@@ -594,49 +663,6 @@ export default function CashierDashboard({
 
       {/* Revenue Cards */}
       <div className="revenue-grid">
-        <div className="revenue-card revenue-card-total">
-          <div className="revenue-card-header">
-            <div className="revenue-icon-wrapper revenue-icon-total">
-              <DollarSign className="revenue-icon" />
-            </div>
-            <span className="revenue-label">Tổng Doanh Thu</span>
-          </div>
-          <div className="revenue-amount revenue-amount-total">{formatCurrency(totalRevenue)}</div>
-          <div className="revenue-footer">
-            <span className="revenue-count">{completedOrdersCount} đơn hoàn thành</span>
-          </div>
-        </div>
-
-        <div className="revenue-card revenue-card-cash">
-          <div className="revenue-card-header">
-            <div className="revenue-icon-wrapper revenue-icon-cash">
-              <Banknote className="revenue-icon" />
-            </div>
-            <span className="revenue-label">Tiền Mặt</span>
-          </div>
-          <div className="revenue-amount revenue-amount-cash">{formatCurrency(cashRevenue)}</div>
-          <div className="revenue-footer">
-            <span className="revenue-percentage">
-              {totalRevenue > 0 ? ((cashRevenue / totalRevenue) * 100).toFixed(0) : 0}% tổng doanh thu
-            </span>
-          </div>
-        </div>
-
-        <div className="revenue-card revenue-card-card">
-          <div className="revenue-card-header">
-            <div className="revenue-icon-wrapper revenue-icon-card">
-              <CreditCard className="revenue-icon" />
-            </div>
-            <span className="revenue-label">Thẻ</span>
-          </div>
-          <div className="revenue-amount revenue-amount-card">{formatCurrency(cardRevenue)}</div>
-          <div className="revenue-footer">
-            <span className="revenue-percentage">
-              {totalRevenue > 0 ? ((cardRevenue / totalRevenue) * 100).toFixed(0) : 0}% tổng doanh thu
-            </span>
-          </div>
-        </div>
-
         <div className="revenue-card revenue-card-pending">
           <div className="revenue-card-header">
             <div className="revenue-icon-wrapper revenue-icon-pending">

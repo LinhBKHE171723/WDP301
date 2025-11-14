@@ -16,6 +16,13 @@ router.post(
   cashierCtrl.completeOrderPayment
 );
 
+router.get(
+  "/payments/history",
+  authRequired,
+  roleRequired("cashier", "admin"),
+  cashierCtrl.getPaymentHistory
+);
+
 module.exports = router;
 
 
