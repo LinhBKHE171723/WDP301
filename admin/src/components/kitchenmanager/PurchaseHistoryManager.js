@@ -219,7 +219,7 @@ export default function PurchaseHistoryManager({ purchaseOrders, onRefresh }) {
                   : "bg-green-600 text-white hover:bg-green-700"
               }`}
             >
-              {uploading ? "⏳ Đang xử lý..." : "📤 Import Excel"}
+              {uploading ? "Đang xử lý..." : "Import Excel"}
             </label>
             <button
               onClick={downloadTemplate}
@@ -234,8 +234,8 @@ export default function PurchaseHistoryManager({ purchaseOrders, onRefresh }) {
             {[
               { key: "all", label: "Tất cả" },
               { key: "valid", label: "Còn hạn" },
-              { key: "near", label: "⚠️ Gần hết hạn" },
-              { key: "expired", label: "❌ Hết hạn" },
+              { key: "near", label: "Gần hết hạn" },
+              { key: "expired", label: "Hết hạn" },
             ].map((btn) => (
               <button
                 key={btn.key}

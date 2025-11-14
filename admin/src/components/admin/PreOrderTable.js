@@ -384,7 +384,7 @@ export function PreOrderTable() {
     else if (messageType === 'preorder:cancelled') {
       // Show toast notification
       const customerName = orderData.preorderName || orderData.userId?.name || "Khách hàng";
-      toast.warning(`❌ Đơn đặt trước từ ${customerName} đã bị hủy`, {
+      toast.warning(`Đơn đặt trước từ ${customerName} đã bị hủy`, {
         position: "top-right",
         autoClose: 3000,
       });
@@ -1219,7 +1219,7 @@ export function PreOrderTable() {
                                     {ingredientsInfo.hasInsufficient && (
                                       <div className="bg-red-50 border-2 border-red-500 rounded-lg p-3 mb-3">
                                         <p className="text-red-700 font-semibold text-sm">
-                                          ⚠️ Cảnh báo: Thiếu nguyên liệu!
+                                          Cảnh báo: Thiếu nguyên liệu!
                                         </p>
                                         <p className="text-red-600 text-xs mt-1">
                                           Một số nguyên liệu không đủ để thực hiện đơn này. Vui lòng nhập thêm trước khi xác nhận.
@@ -1713,7 +1713,7 @@ export function PreOrderTable() {
               
               {approveForm.tableIds.length === 0 && (
                 <p className="text-xs text-amber-600 mt-1">
-                  ⚠️ Vui lòng chọn ít nhất 1 bàn trước khi xác nhận
+                  Vui lòng chọn ít nhất 1 bàn trước khi xác nhận
                 </p>
               )}
             </div>
@@ -1800,7 +1800,7 @@ export function PreOrderTable() {
             {/* Cảnh báo overlap */}
             {overlapWarning && overlapWarning.overlappingOrders.length > 0 && !overlapWarning.showConfirm && (
               <div className="bg-red-50 border-2 border-red-500 rounded-lg p-4">
-                <h4 className="font-semibold text-red-700 mb-2">⚠️ Cảnh báo: Bị trùng lấn thời gian</h4>
+                <h4 className="font-semibold text-red-700 mb-2">Cảnh báo: Bị trùng lấn thời gian</h4>
                 <p className="text-sm text-red-600 mb-3">
                   Khoảng thời gian bạn chọn bị trùng với {overlapWarning.overlappingOrders.length} đơn khác ở các bàn đã chọn:
                 </p>
@@ -2546,7 +2546,7 @@ export function PreOrderTable() {
             {/* Hiển thị cảnh báo overlap cho update */}
             {updateOverlapWarning && updateOverlapWarning.overlappingOrders.length > 0 && !updateOverlapWarning.showConfirm && (
               <div className="bg-red-50 border-2 border-red-500 rounded-lg p-4">
-                <h4 className="font-semibold text-red-700 mb-2">⚠️ Cảnh báo: Bị trùng lấn thời gian</h4>
+                <h4 className="font-semibold text-red-700 mb-2">Cảnh báo: Bị trùng lấn thời gian</h4>
                 <p className="text-sm text-red-600 mb-3">
                   Khoảng thời gian bạn chọn bị trùng với {updateOverlapWarning.overlappingOrders.length} đơn khác ở các bàn đã chọn:
                 </p>

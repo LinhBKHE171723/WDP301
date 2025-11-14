@@ -359,8 +359,8 @@ export default function OrderDetails({
                               {comboItem.status === "ready"
                                 ? "Sẵn sàng"
                                 : comboItem.status === "preparing"
-                                ? "🔄 Đang làm"
-                                : "⏳ Chờ"}
+                                ? "Đang làm"
+                                : "Chờ"}
                             </span>
                             {/* Hiển thị chef đã được gán cho món này */}
                             {comboItem.assignedChef && (

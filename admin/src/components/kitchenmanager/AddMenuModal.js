@@ -107,7 +107,7 @@ export default function AddMenuModal({
 
     try {
       if (!formData.name) {
-        setError("⚠️ Vui lòng nhập tên thực đơn.");
+        setError("Vui lòng nhập tên thực đơn.");
         setLoading(false);
         return;
       }

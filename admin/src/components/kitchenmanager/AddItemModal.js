@@ -157,7 +157,7 @@ export default function AddItemModal({ show, onClose, setItems, editItem }) {
 
     try {
       if (!formData.name || !formData.price) {
-        setError("⚠️ Vui lòng nhập tên và giá món ăn.");
+        setError("Vui lòng nhập tên và giá món ăn.");
         setLoading(false);
         return;
       }

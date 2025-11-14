@@ -96,7 +96,7 @@ export default function MenusManager({ menus, items = [], setMenus }) {
 
       {loading && (
         <p className="text-orange-600 mb-2 text-sm animate-pulse">
-          ⏳ Đang xử lý...
+          Đang xử lý...
         </p>
       )}
 

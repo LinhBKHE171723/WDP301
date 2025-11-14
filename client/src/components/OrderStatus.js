@@ -535,7 +535,7 @@ const OrderStatus = React.memo(({ orderId, onBack }) => {
           setCanEditOrder(false); // Also disable edit mode
           // Show cancellation notification only once
           if (!hasShownCancellationAlertRef.current) {
-            alert('❌ Đơn hàng đã bị hủy!');
+            alert('Đơn hàng đã bị hủy!');
             hasShownCancellationAlertRef.current = true;
           }
         }
@@ -776,7 +776,7 @@ const OrderStatus = React.memo(({ orderId, onBack }) => {
         // Refresh order status
         fetchOrderStatus();
       } else {
-        alert(`❌ ${data.message || 'Không thể gửi yêu cầu thanh toán'}`);
+        alert(`${data.message || 'Không thể gửi yêu cầu thanh toán'}`);
       }
     } catch (error) {
       console.error('Error requesting payment:', error);
@@ -1566,7 +1566,7 @@ const OrderStatus = React.memo(({ orderId, onBack }) => {
           <div className="waiter-response-modal">
             <div className="modal-header">
               {waiterResponseData.type === 'rejected' ? (
-                <h3>❌ Đơn hàng bị từ chối</h3>
+                <h3>Đơn hàng bị từ chối</h3>
               ) : (
                 <h3>Nhân viên đã xác nhận đơn hàng</h3>
               )}

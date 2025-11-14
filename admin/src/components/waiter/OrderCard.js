@@ -65,7 +65,7 @@ export default function OrderCard({
       } else if (tableId) {
         // Sử dụng tableId cũ
       } else {
-        toast.warning("⚠️ Vui lòng chọn ít nhất 1 bàn trước khi xác nhận!");
+        toast.warning("Vui lòng chọn ít nhất 1 bàn trước khi xác nhận!");
         return;
       }
     }
@@ -86,9 +86,9 @@ export default function OrderCard({
       console.error('❌ Error details:', error);
       
       if (error.response?.status === 409) {
-        toast.error("❌ Một hoặc nhiều bàn đã được chọn bởi waiter khác!");
+        toast.error("Một hoặc nhiều bàn đã được chọn bởi waiter khác!");
       } else {
-        toast.error("❌ Lỗi khi xác nhận đơn hàng!");
+        toast.error("Lỗi khi xác nhận đơn hàng!");
       }
     } finally {
       setLoading(false);
@@ -98,7 +98,7 @@ export default function OrderCard({
   // ❌ Từ chối đơn hàng
   const handleReject = async () => {
     if (!rejectReason.trim()) {
-      toast.warning("⚠️ Vui lòng nhập lý do từ chối");
+      toast.warning("Vui lòng nhập lý do từ chối");
       return;
     }
 
@@ -111,7 +111,7 @@ export default function OrderCard({
       toast.info("Đã từ chối đơn hàng!");
     } catch (error) {
       console.error(error);
-      toast.error("❌ Lỗi khi từ chối đơn hàng!");
+      toast.error("Lỗi khi từ chối đơn hàng!");
     } finally {
       setLoading(false);
     }
@@ -395,7 +395,7 @@ export default function OrderCard({
               {/* Thông báo nếu chưa chọn bàn nào */}
               {selectedTables.length === 0 && (
                 <Form.Text className="text-warning small d-block">
-                  ⚠️ Vui lòng chọn ít nhất 1 bàn trước khi xác nhận
+                  Vui lòng chọn ít nhất 1 bàn trước khi xác nhận
                 </Form.Text>
               )}
             </Form.Group>

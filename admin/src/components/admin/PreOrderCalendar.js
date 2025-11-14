@@ -365,7 +365,7 @@ export default function PreOrderCalendar({ preorders, onSelectEvent }) {
               {/* Cảnh báo overlap */}
               {events.find(e => e.id === selectedOrder._id)?.resource.hasOverlap && (
                 <div className="bg-red-50 border-2 border-red-500 rounded-lg p-3">
-                  <h4 className="font-semibold text-red-700 mb-2">⚠️ Cảnh báo: Bị trùng lấn</h4>
+                  <h4 className="font-semibold text-red-700 mb-2">Cảnh báo: Bị trùng lấn</h4>
                   <p className="text-sm text-red-600">
                     Đơn này có thời gian trùng với đơn khác ở cùng bàn. Vui lòng kiểm tra và điều chỉnh.
                   </p>

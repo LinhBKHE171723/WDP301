@@ -287,7 +287,7 @@ export default function EmployeePerformanceDashboard() {
                               className="px-2 py-1 text-xs font-medium bg-red-500 text-white rounded-full"
                               title={warnings.join(", ")}
                             >
-                              ⚠️
+                              !
                             </span>
                           )}
                         </div>

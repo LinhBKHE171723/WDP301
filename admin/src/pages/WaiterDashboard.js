@@ -99,7 +99,7 @@ export default function WaiterDashboard() {
             );
             toast.success(`Cập nhật đơn #${orderId.slice(-4)} thành ${newStatus}`);
         } catch (err) {
-            toast.error("❌ Lỗi khi cập nhật trạng thái đơn!");
+            toast.error("Lỗi khi cập nhật trạng thái đơn!");
         }
     };
 
@@ -118,14 +118,14 @@ export default function WaiterDashboard() {
                 fetchPendingOrders();
                 fetchAvailableTables(); // 🆕 Cập nhật lại danh sách bàn trống ngay
             } else if (response === 'rejected') {
-                toast.warning(`❌ Đã từ chối đơn hàng #${orderId.slice(-4)}`);
+                toast.warning(`Đã từ chối đơn hàng #${orderId.slice(-4)}`);
             }
 
             // Refresh both lists
             fetchOrders();
             fetchPendingOrders();
         } catch (err) {
-            toast.error("❌ Lỗi khi xử lý phản hồi đơn hàng!");
+            toast.error("Lỗi khi xử lý phản hồi đơn hàng!");
         }
     };
 
@@ -251,7 +251,7 @@ WaiterDashboard có một useEffect lắng nghe lastMessage → xử lý cập n
                 case 'order:cancelled':
                     // Đơn hàng bị customer hủy
                     console.log('❌ Order cancelled by customer:', lastMessage.data);
-                    toast.warning(`❌ Đơn hàng từ bàn ${lastMessage.data.tableId?.tableNumber} đã bị khách hủy!`);
+                    toast.warning(`Đơn hàng từ bàn ${lastMessage.data.tableId?.tableNumber} đã bị khách hủy!`);
 
                     // Refresh both lists
                     fetchOrders();

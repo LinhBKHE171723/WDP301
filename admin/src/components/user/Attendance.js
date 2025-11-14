@@ -77,7 +77,7 @@ function Attendance() {
                             onClick={handleCheckOut}
                             className="px-4 py-2 rounded bg-red-600 text-white"
                         >
-                            🚪 Check-Out
+                            Check-Out
                         </button>
                     )}
 
@@ -87,7 +87,7 @@ function Attendance() {
                 </div>
 
                 {status === "absent" && (
-                    <p className="text-red-500 mt-2 font-bold">❌ Bạn đã bị đánh dấu vắng hôm nay</p>
+                    <p className="text-red-500 mt-2 font-bold">Bạn đã bị đánh dấu vắng hôm nay</p>
                 )}
             </div>
         </div>

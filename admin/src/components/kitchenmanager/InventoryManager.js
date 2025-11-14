@@ -63,7 +63,7 @@ export default function InventoryManager({ ingredients, onRefresh }) {
       if (onRefresh) await onRefresh();
     } catch (err) {
       console.error(err);
-      setMessage("❌ Lỗi khi thêm nguyên liệu.");
+      setMessage("Lỗi khi thêm nguyên liệu.");
     } finally {
       setLoading(false);
     }
@@ -245,7 +245,7 @@ export default function InventoryManager({ ingredients, onRefresh }) {
                   }`}
                 >
                   {ing.stockQuantity <= ing.minStock
-                    ? "⚠️ Cần nhập thêm"
+                    ? "Cần nhập thêm"
                     : "Đủ hàng"}
                 </td>
                 <td className="px-4 py-2 text-center space-x-2">
@@ -354,8 +354,8 @@ export default function InventoryManager({ ingredients, onRefresh }) {
                   }
                   className="w-full border rounded-lg px-4 py-2 focus:ring-2 focus:ring-blue-400 outline-none"
                 >
-                  <option value="valid">✅ Còn hạn (valid)</option>
-                  <option value="expired">⚠️ Hết hạn (expired)</option>
+                  <option value="valid">Còn hạn (valid)</option>
+                  <option value="expired">Hết hạn (expired)</option>
                 </select>
               </div>
 
