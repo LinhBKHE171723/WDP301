@@ -249,7 +249,7 @@ exports.startPreparingOrder = async (req, res) => {
     const updatedOrder = await Order.findById(orderId)
       .populate({
         path: "orderItems",
-        select: "itemName itemType comboItems quantity note status assignedChef", // Đảm bảo có itemName
+            select: "itemName itemType comboItems quantity note status assignedChef price", // Đảm bảo có itemName và price
         populate: [
           { path: "itemId", select: "name" },
           { path: "assignedChef", select: "name username" }
@@ -334,11 +334,11 @@ exports.assignChefToItem = async (req, res) => {
         const fullOrder = await Order.findById(orderItem.orderId)
           .populate({
             path: "orderItems",
-            select: "itemName itemType comboItems quantity note status assignedChef", // Đảm bảo có itemName
+            select: "itemName itemType comboItems quantity note status assignedChef price", // Đảm bảo có itemName và price
             populate: [
               {
                 path: "itemId",  // ✅ THÊM populate itemId để frontend có thể lấy tên món
-                select: "name"
+                select: "name price"
               },
               {
                 path: "assignedChef",
@@ -356,15 +356,54 @@ exports.assignChefToItem = async (req, res) => {
         
         if (fullOrder) {
           try {
-            // Format order cho kitchen để đảm bảo assignedChef được populate đầy đủ
-            const formattedOrder = exports.formatOrderForKitchen(fullOrder);
-            if (formattedOrder) {
-              webSocketService.broadcastToOrder(orderItem.orderId, "order:updated", formattedOrder);
+            // Debug: log orderItems trước khi xử lý
+            console.log(`📦 [assignChefToItem] Before format - orderItems count:`, fullOrder.orderItems?.length || 0);
+            if (fullOrder.orderItems && fullOrder.orderItems.length > 0) {
+              console.log(`📦 [assignChefToItem] First orderItem sample:`, {
+                _id: fullOrder.orderItems[0]._id,
+                itemName: fullOrder.orderItems[0].itemName,
+                quantity: fullOrder.orderItems[0].quantity,
+                price: fullOrder.orderItems[0].price,
+                itemId: fullOrder.orderItems[0].itemId,
+                hasToObject: typeof fullOrder.orderItems[0].toObject === 'function',
+                keys: Object.keys(fullOrder.orderItems[0])
+              });
             }
+            
+            // Populate thông tin item trong orderItems cho customer
+            const { populateOrderItemDetails } = require("../utils/customerHelpers");
+            await populateOrderItemDetails(fullOrder.orderItems);
+            
+            // Debug: log sau populate
+            console.log(`📦 [assignChefToItem] After populate - orderItems count:`, fullOrder.orderItems?.length || 0);
+            
+            // Gộp các OrderItem đã bị tách lại thành 1 dòng khi gửi cho customer qua WebSocket
+            const { groupSplitOrderItemsForCustomer } = require("../utils/customerHelpers");
+            const groupedOrderItems = groupSplitOrderItemsForCustomer(fullOrder.orderItems);
+            
+            // Debug: log sau group
+            console.log(`📦 [assignChefToItem] After group - groupedOrderItems count:`, groupedOrderItems?.length || 0);
+            if (groupedOrderItems && groupedOrderItems.length > 0) {
+              console.log(`📦 [assignChefToItem] First grouped item sample:`, {
+                _id: groupedOrderItems[0]._id,
+                itemName: groupedOrderItems[0].itemName,
+                quantity: groupedOrderItems[0].quantity,
+                price: groupedOrderItems[0].price
+              });
+            }
+            
+            // Convert fullOrder sang plain object trước khi broadcast
+            const orderToBroadcast = fullOrder.toObject ? fullOrder.toObject({ getters: true, flattenMaps: true }) : { ...fullOrder };
+            orderToBroadcast.orderItems = groupedOrderItems;
+            
+            // Broadcast order với format đúng cho customer
+            webSocketService.broadcastToOrder(orderItem.orderId, "order:updated", orderToBroadcast);
           } catch (formatError) {
-            console.error("Lỗi khi format order cho WebSocket:", formatError);
+            console.error("❌ [assignChefToItem] Lỗi khi format order cho WebSocket:", formatError);
+            console.error("❌ [assignChefToItem] Error stack:", formatError.stack);
             // Fallback: broadcast order gốc nếu format thất bại
-            webSocketService.broadcastToOrder(orderItem.orderId, "order:updated", fullOrder);
+            const orderToBroadcast = fullOrder.toObject ? fullOrder.toObject({ getters: true, flattenMaps: true }) : { ...fullOrder };
+            webSocketService.broadcastToOrder(orderItem.orderId, "order:updated", orderToBroadcast);
           }
         }
       } catch (wsError) {
@@ -581,11 +620,11 @@ exports.markItemReady = async (req, res) => {
       const fullOrder = await Order.findById(orderItem.orderId)
         .populate({
           path: "orderItems",
-          select: "itemName itemType comboItems quantity note status assignedChef servedBy", // Đảm bảo có itemName và servedBy
+            select: "itemName itemType comboItems quantity note status assignedChef servedBy price", // Đảm bảo có itemName, servedBy và price
           populate: [
             {
               path: "itemId",  // ✅ THÊM populate itemId để frontend có thể lấy tên món
-              select: "name"
+              select: "name price"
             },
             {
               path: "assignedChef",
@@ -601,7 +640,56 @@ exports.markItemReady = async (req, res) => {
         .populate("paymentId");
       
       if (fullOrder) {
-        webSocketService.broadcastToOrder(orderItem.orderId, "order:updated", fullOrder);
+        try {
+          // Debug: log orderItems trước khi xử lý
+          console.log(`📦 [markItemReady] Before format - orderItems count:`, fullOrder.orderItems?.length || 0);
+          if (fullOrder.orderItems && fullOrder.orderItems.length > 0) {
+            console.log(`📦 [markItemReady] First orderItem sample:`, {
+              _id: fullOrder.orderItems[0]._id,
+              itemName: fullOrder.orderItems[0].itemName,
+              quantity: fullOrder.orderItems[0].quantity,
+              price: fullOrder.orderItems[0].price,
+              itemId: fullOrder.orderItems[0].itemId,
+              hasToObject: typeof fullOrder.orderItems[0].toObject === 'function',
+              keys: Object.keys(fullOrder.orderItems[0])
+            });
+          }
+          
+          // Populate thông tin item trong orderItems cho customer
+          const { populateOrderItemDetails } = require("../utils/customerHelpers");
+          await populateOrderItemDetails(fullOrder.orderItems);
+          
+          // Debug: log sau populate
+          console.log(`📦 [markItemReady] After populate - orderItems count:`, fullOrder.orderItems?.length || 0);
+          
+          // Gộp các OrderItem đã bị tách lại thành 1 dòng khi gửi cho customer qua WebSocket
+          const { groupSplitOrderItemsForCustomer } = require("../utils/customerHelpers");
+          const groupedOrderItems = groupSplitOrderItemsForCustomer(fullOrder.orderItems);
+          
+          // Debug: log sau group
+          console.log(`📦 [markItemReady] After group - groupedOrderItems count:`, groupedOrderItems?.length || 0);
+          if (groupedOrderItems && groupedOrderItems.length > 0) {
+            console.log(`📦 [markItemReady] First grouped item sample:`, {
+              _id: groupedOrderItems[0]._id,
+              itemName: groupedOrderItems[0].itemName,
+              quantity: groupedOrderItems[0].quantity,
+              price: groupedOrderItems[0].price
+            });
+          }
+          
+          // Convert fullOrder sang plain object trước khi broadcast
+          const orderToBroadcast = fullOrder.toObject ? fullOrder.toObject({ getters: true, flattenMaps: true }) : { ...fullOrder };
+          orderToBroadcast.orderItems = groupedOrderItems;
+          
+          // Broadcast order với format đúng cho customer
+          webSocketService.broadcastToOrder(orderItem.orderId, "order:updated", orderToBroadcast);
+        } catch (formatError) {
+          console.error("❌ [markItemReady] Lỗi khi format order cho WebSocket:", formatError);
+          console.error("❌ [markItemReady] Error stack:", formatError.stack);
+          // Fallback: broadcast order gốc nếu format thất bại
+          const orderToBroadcast = fullOrder.toObject ? fullOrder.toObject({ getters: true, flattenMaps: true }) : { ...fullOrder };
+          webSocketService.broadcastToOrder(orderItem.orderId, "order:updated", orderToBroadcast);
+        }
         
         // Thông báo cho waiter được gán món (orderItem.servedBy) khi món ready
         const currentOrderItem = await OrderItem.findById(orderItemId).populate("servedBy", "name username email");
@@ -709,13 +797,25 @@ exports.updateComboItemStatus = async (req, res) => {
     // Check and update order status
     const order = await Order.findById(orderItem.orderId).populate("orderItems");
 
-    const allItemsReadyOrServed = order.orderItems.every(
-      (item) => item.status === "ready" || item.status === "served"
-    );
+    // Helper function để check một item (bao gồm comboItems) đã ready/served chưa
+    const isItemReadyOrServed = (item) => {
+      // Nếu là combo, phải check tất cả comboItems
+      if (item.itemType === "menu" && item.comboItems && item.comboItems.length > 0) {
+        // Tất cả comboItems phải ready hoặc served
+        return item.comboItems.every(
+          (ci) => ci.status === "ready" || ci.status === "served"
+        );
+      }
+      // Nếu là item thường, check status của chính nó
+      return item.status === "ready" || item.status === "served";
+    };
+
+    const allItemsReadyOrServed = order.orderItems.every((item) => isItemReadyOrServed(item));
 
     if (allItemsReadyOrServed && order.status === "preparing") {
       order.status = "ready";
       await order.save();
+      console.log(`✅ Order ${order._id} status updated to 'ready' - all items/comboItems are ready/served`);
     }
 
     // Emit WebSocket event với full order data
@@ -724,11 +824,11 @@ exports.updateComboItemStatus = async (req, res) => {
       const fullOrder = await Order.findById(orderItem.orderId)
         .populate({
           path: "orderItems",
-          select: "itemName itemType comboItems quantity note status assignedChef servedBy", // Đảm bảo có itemName và servedBy
+            select: "itemName itemType comboItems quantity note status assignedChef servedBy price", // Đảm bảo có itemName, servedBy và price
           populate: [
             {
               path: "itemId",  // ✅ THÊM populate itemId để frontend có thể lấy tên món
-              select: "name"
+              select: "name price"
             },
             {
               path: "assignedChef",
@@ -763,15 +863,63 @@ exports.updateComboItemStatus = async (req, res) => {
       
       if (fullOrder) {
         try {
-          // Format order cho kitchen để đảm bảo assignedChef được populate đầy đủ
-          const formattedOrder = exports.formatOrderForKitchen(fullOrder);
-          if (formattedOrder) {
-            webSocketService.broadcastToOrder(orderItem.orderId, "order:updated", formattedOrder);
+          // Debug: log trước khi format
+          console.log(`📦 [updateComboItemStatus] Before format - orderItems count:`, fullOrder.orderItems?.length || 0);
+          if (fullOrder.orderItems && fullOrder.orderItems.length > 0) {
+            fullOrder.orderItems.forEach((oi, idx) => {
+              if (oi.comboItems && oi.comboItems.length > 0) {
+                console.log(`📦 [updateComboItemStatus] OrderItem ${idx} comboItems:`, oi.comboItems.map(ci => ({
+                  itemName: ci.itemName,
+                  status: ci.status
+                })));
+              }
+            });
           }
+          
+          // Populate thông tin item trong orderItems cho customer
+          const { populateOrderItemDetails } = require("../utils/customerHelpers");
+          await populateOrderItemDetails(fullOrder.orderItems);
+          
+          // Debug: log sau populate
+          console.log(`📦 [updateComboItemStatus] After populate - orderItems count:`, fullOrder.orderItems?.length || 0);
+          
+          // Gộp các OrderItem đã bị tách lại thành 1 dòng khi gửi cho customer qua WebSocket
+          const { groupSplitOrderItemsForCustomer } = require("../utils/customerHelpers");
+          const groupedOrderItems = groupSplitOrderItemsForCustomer(fullOrder.orderItems);
+          
+          // Debug: log sau group
+          console.log(`📦 [updateComboItemStatus] After group - groupedOrderItems count:`, groupedOrderItems?.length || 0);
+          if (groupedOrderItems && groupedOrderItems.length > 0) {
+            groupedOrderItems.forEach((oi, idx) => {
+              if (oi.comboItems && oi.comboItems.length > 0) {
+                console.log(`📦 [updateComboItemStatus] Grouped OrderItem ${idx} comboItems:`, oi.comboItems.map(ci => ({
+                  itemName: ci.itemName,
+                  status: ci.status
+                })));
+              }
+            });
+          }
+          
+          // Convert fullOrder sang plain object trước khi broadcast
+          const orderToBroadcast = fullOrder.toObject ? fullOrder.toObject({ getters: true, flattenMaps: true }) : { ...fullOrder };
+          orderToBroadcast.orderItems = groupedOrderItems;
+          
+          // Debug: log trước khi broadcast
+          console.log(`📦 [updateComboItemStatus] Broadcasting order:`, {
+            orderId: orderToBroadcast._id,
+            status: orderToBroadcast.status,
+            orderItemsCount: orderToBroadcast.orderItems?.length || 0
+          });
+          
+          // Broadcast order với format đúng cho customer
+          webSocketService.broadcastToOrder(orderItem.orderId, "order:updated", orderToBroadcast);
+          console.log(`✅ [updateComboItemStatus] WebSocket broadcast sent for order ${orderItem.orderId}`);
         } catch (formatError) {
-          console.error("Lỗi khi format order cho WebSocket:", formatError);
+          console.error("❌ [updateComboItemStatus] Lỗi khi format order cho WebSocket:", formatError);
+          console.error("❌ [updateComboItemStatus] Error stack:", formatError.stack);
           // Fallback: broadcast order gốc nếu format thất bại
-          webSocketService.broadcastToOrder(orderItem.orderId, "order:updated", fullOrder);
+          const orderToBroadcast = fullOrder.toObject ? fullOrder.toObject({ getters: true, flattenMaps: true }) : { ...fullOrder };
+          webSocketService.broadcastToOrder(orderItem.orderId, "order:updated", orderToBroadcast);
         }
         
         // Thông báo cho waiter được gán comboItem (comboItem.servedBy) khi combo item ready
@@ -892,11 +1040,11 @@ exports.assignChefToComboItem = async (req, res) => {
         const fullOrder = await Order.findById(orderItem.orderId)
           .populate({
             path: "orderItems",
-            select: "itemName itemType comboItems quantity note status assignedChef",
+            select: "itemName itemType comboItems quantity note status assignedChef price",
             populate: [
               {
                 path: "itemId",  // ✅ THÊM populate itemId để frontend có thể lấy tên món
-                select: "name"
+                select: "name price"
               },
               {
                 path: "assignedChef",
@@ -914,15 +1062,54 @@ exports.assignChefToComboItem = async (req, res) => {
         
         if (fullOrder) {
           try {
-            // Format order cho kitchen để đảm bảo assignedChef được populate đầy đủ
-            const formattedOrder = exports.formatOrderForKitchen(fullOrder);
-            if (formattedOrder) {
-              webSocketService.broadcastToOrder(orderItem.orderId, "order:updated", formattedOrder);
+            // Debug: log orderItems trước khi xử lý
+            console.log(`📦 [assignChefToComboItem] Before format - orderItems count:`, fullOrder.orderItems?.length || 0);
+            if (fullOrder.orderItems && fullOrder.orderItems.length > 0) {
+              console.log(`📦 [assignChefToComboItem] First orderItem sample:`, {
+                _id: fullOrder.orderItems[0]._id,
+                itemName: fullOrder.orderItems[0].itemName,
+                quantity: fullOrder.orderItems[0].quantity,
+                price: fullOrder.orderItems[0].price,
+                itemId: fullOrder.orderItems[0].itemId,
+                hasToObject: typeof fullOrder.orderItems[0].toObject === 'function',
+                keys: Object.keys(fullOrder.orderItems[0])
+              });
             }
+            
+            // Populate thông tin item trong orderItems cho customer
+            const { populateOrderItemDetails } = require("../utils/customerHelpers");
+            await populateOrderItemDetails(fullOrder.orderItems);
+            
+            // Debug: log sau populate
+            console.log(`📦 [assignChefToComboItem] After populate - orderItems count:`, fullOrder.orderItems?.length || 0);
+            
+            // Gộp các OrderItem đã bị tách lại thành 1 dòng khi gửi cho customer qua WebSocket
+            const { groupSplitOrderItemsForCustomer } = require("../utils/customerHelpers");
+            const groupedOrderItems = groupSplitOrderItemsForCustomer(fullOrder.orderItems);
+            
+            // Debug: log sau group
+            console.log(`📦 [assignChefToComboItem] After group - groupedOrderItems count:`, groupedOrderItems?.length || 0);
+            if (groupedOrderItems && groupedOrderItems.length > 0) {
+              console.log(`📦 [assignChefToComboItem] First grouped item sample:`, {
+                _id: groupedOrderItems[0]._id,
+                itemName: groupedOrderItems[0].itemName,
+                quantity: groupedOrderItems[0].quantity,
+                price: groupedOrderItems[0].price
+              });
+            }
+            
+            // Convert fullOrder sang plain object trước khi broadcast
+            const orderToBroadcast = fullOrder.toObject ? fullOrder.toObject({ getters: true, flattenMaps: true }) : { ...fullOrder };
+            orderToBroadcast.orderItems = groupedOrderItems;
+            
+            // Broadcast order với format đúng cho customer
+            webSocketService.broadcastToOrder(orderItem.orderId, "order:updated", orderToBroadcast);
           } catch (formatError) {
-            console.error("Lỗi khi format order cho WebSocket:", formatError);
+            console.error("❌ [assignChefToComboItem] Lỗi khi format order cho WebSocket:", formatError);
+            console.error("❌ [assignChefToComboItem] Error stack:", formatError.stack);
             // Fallback: broadcast order gốc nếu format thất bại
-            webSocketService.broadcastToOrder(orderItem.orderId, "order:updated", fullOrder);
+            const orderToBroadcast = fullOrder.toObject ? fullOrder.toObject({ getters: true, flattenMaps: true }) : { ...fullOrder };
+            webSocketService.broadcastToOrder(orderItem.orderId, "order:updated", orderToBroadcast);
           }
         }
       } catch (wsError) {

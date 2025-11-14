@@ -354,7 +354,171 @@ const OrderStatus = React.memo(({ orderId, onBack }) => {
     }
     
     if (lastMessage && lastMessage.type === 'order:updated' && lastMessage.orderId === orderId) {
-      setOrder(lastMessage.data);
+      // Validate và đảm bảo orderItems có đầy đủ dữ liệu
+      const orderData = lastMessage.data;
+      console.log('📦 [Customer] Received order update:', {
+        orderId: orderData?._id,
+        status: orderData?.status,
+        orderItemsCount: orderData?.orderItems?.length || 0,
+        hasOrderItems: !!orderData?.orderItems
+      });
+      
+      if (orderData && orderData.orderItems) {
+        // Filter và validate orderItems
+        const validatedOrderItems = orderData.orderItems.filter((item) => {
+          if (!item) return false;
+          // Phải có ít nhất _id hoặc itemName để xác định là OrderItem hợp lệ
+          return item._id || item.itemName || (item.itemId && (typeof item.itemId === 'object' ? item.itemId.name : true));
+        }).map((item) => {
+          // Đảm bảo itemName luôn có giá trị
+          if (!item.itemName && item.itemId) {
+            if (typeof item.itemId === 'object' && item.itemId !== null) {
+              item.itemName = item.itemId.name || item.itemName || '';
+            }
+          }
+          // Đảm bảo price luôn có giá trị
+          if (!item.price && item.itemId) {
+            if (typeof item.itemId === 'object' && item.itemId !== null) {
+              item.price = item.itemId.price || item.price || 0;
+            }
+          }
+          // Đảm bảo comboItems luôn là array và có đầy đủ thông tin
+          if (item.itemType === 'menu' && item.comboItems) {
+            item.comboItems = item.comboItems.map((ci) => ({
+              ...ci, // Giữ nguyên tất cả fields
+              itemName: ci.itemName || (ci.itemId && typeof ci.itemId === 'object' ? ci.itemId.name : null) || 'Món đã xóa',
+              status: ci.status !== undefined && ci.status !== null ? ci.status : 'pending',
+            }));
+          }
+          return item;
+        });
+        
+        console.log('📦 [Customer] Validated orderItems:', {
+          count: validatedOrderItems.length,
+          items: validatedOrderItems.map(item => ({
+            itemName: item.itemName,
+            itemType: item.itemType,
+            comboItemsCount: item.comboItems?.length || 0
+          }))
+        });
+        
+        // Merge với order hiện tại để giữ lại comboItems không bị mất
+        setOrder((prevOrder) => {
+          if (!prevOrder) {
+            return { ...orderData, orderItems: validatedOrderItems };
+          }
+          
+          // Nếu order đã tồn tại, merge orderItems để giữ lại comboItems
+          if (prevOrder.orderItems && prevOrder.orderItems.length > 0) {
+            console.log('🔄 [Customer] Merging with existing order:', {
+              existingItemsCount: prevOrder.orderItems.length,
+              newItemsCount: validatedOrderItems.length
+            });
+            
+            const mergedOrderItems = validatedOrderItems.map((newItem) => {
+              const existingItem = prevOrder.orderItems.find(
+                (ei) => (ei._id || ei.orderItemId) === (newItem._id || newItem.orderItemId)
+              );
+              
+              // Nếu tìm thấy existing item và có comboItems, merge comboItems
+              if (existingItem && existingItem.comboItems && newItem.comboItems) {
+                console.log('🔄 [Customer] Merging comboItems for item:', {
+                  itemName: newItem.itemName,
+                  existingComboItemsCount: existingItem.comboItems.length,
+                  newComboItemsCount: newItem.comboItems.length
+                });
+                
+                // Merge comboItems: giữ status mới nhất từ newItem, nhưng giữ các field khác nếu thiếu
+                const mergedComboItems = newItem.comboItems.map((newCi, ciIdx) => {
+                  const existingCi = existingItem.comboItems[ciIdx];
+                  if (existingCi) {
+                    // Merge: ưu tiên data mới, nhưng giữ các field khác nếu thiếu
+                    return {
+                      ...existingCi, // Giữ tất cả fields cũ
+                      ...newCi, // Override với data mới
+                    };
+                  }
+                  return newCi;
+                });
+                
+                // Nếu newItem có ít comboItems hơn existingItem, giữ lại các comboItems cũ
+                if (mergedComboItems.length < existingItem.comboItems.length) {
+                  console.warn('⚠️ [Customer] WARNING: New item has fewer comboItems than existing!', {
+                    itemName: newItem.itemName,
+                    existingCount: existingItem.comboItems.length,
+                    newCount: mergedComboItems.length
+                  });
+                  // Giữ lại các comboItems cũ không có trong newItem
+                  const missingComboItems = existingItem.comboItems.slice(mergedComboItems.length);
+                  mergedComboItems.push(...missingComboItems);
+                }
+                
+                return {
+                  ...newItem,
+                  comboItems: mergedComboItems,
+                };
+              }
+              
+              // Nếu existingItem có comboItems nhưng newItem không có, giữ lại comboItems từ existing
+              if (existingItem && existingItem.comboItems && existingItem.comboItems.length > 0 && (!newItem.comboItems || newItem.comboItems.length === 0)) {
+                console.warn('⚠️ [Customer] WARNING: New item missing comboItems, keeping from existing!', {
+                  itemName: newItem.itemName,
+                  existingComboItemsCount: existingItem.comboItems.length
+                });
+                return {
+                  ...newItem,
+                  comboItems: existingItem.comboItems, // Giữ lại comboItems từ existing
+                };
+              }
+              
+              return newItem;
+            });
+            
+            // Nếu newOrder có ít items hơn existingOrder, giữ lại các items cũ
+            if (mergedOrderItems.length < prevOrder.orderItems.length) {
+              console.warn('⚠️ [Customer] WARNING: New order has fewer items than existing!', {
+                existingCount: prevOrder.orderItems.length,
+                newCount: mergedOrderItems.length
+              });
+              const missingItems = prevOrder.orderItems.filter(
+                (ei) => !mergedOrderItems.some(
+                  (mi) => (mi._id || mi.orderItemId) === (ei._id || ei.orderItemId)
+                )
+              );
+              mergedOrderItems.push(...missingItems);
+            }
+            
+            console.log('✅ [Customer] Merged order:', {
+              itemsCount: mergedOrderItems.length,
+              items: mergedOrderItems.map(item => ({
+                itemName: item.itemName,
+                comboItemsCount: item.comboItems?.length || 0
+              }))
+            });
+            
+            return {
+              ...orderData,
+              orderItems: mergedOrderItems,
+            };
+          }
+          
+          // Nếu không có existing orderItems, dùng validatedOrderItems
+          return { ...orderData, orderItems: validatedOrderItems };
+        });
+      } else {
+        // Nếu không có orderItems trong update, giữ lại orderItems từ order hiện tại
+        console.warn('⚠️ [Customer] WARNING: Order update has no orderItems, keeping existing!');
+        setOrder((prevOrder) => {
+          if (prevOrder && prevOrder.orderItems) {
+            return {
+              ...orderData,
+              orderItems: prevOrder.orderItems, // Giữ lại orderItems từ order hiện tại
+            };
+          }
+          return orderData;
+        });
+      }
+      
       setHasNewUpdate(true);
       setTimeout(() => setHasNewUpdate(false), 2000);
       
@@ -967,17 +1131,17 @@ const OrderStatus = React.memo(({ orderId, onBack }) => {
                 <>
                   <div className="info-row">
                     <span className="label">Tổng tiền gốc:</span>
-                    <span className="value">{totalBeforeDiscount.toLocaleString('vi-VN')} VNĐ</span>
+                    <span className="value">{(totalBeforeDiscount || 0).toLocaleString('vi-VN')} VNĐ</span>
                   </div>
                   <div className="info-row" style={{ color: '#28a745', fontWeight: 'bold' }}>
                     <span className="label">
                       Giảm giá {rankLabel ? `(hạng ${rankLabel.toLowerCase()})` : '(tự động)'}:
                     </span>
-                    <span className="value">-{discount.toLocaleString('vi-VN')} VNĐ</span>
+                    <span className="value">-{(discount || 0).toLocaleString('vi-VN')} VNĐ</span>
                   </div>
                   <div className="info-row">
                     <span className="label">Tổng tiền:</span>
-                    <span className="value price">{finalTotal.toLocaleString('vi-VN')} VNĐ</span>
+                    <span className="value price">{(finalTotal || 0).toLocaleString('vi-VN')} VNĐ</span>
                   </div>
                 </>
               );
@@ -985,7 +1149,7 @@ const OrderStatus = React.memo(({ orderId, onBack }) => {
               return (
                 <div className="info-row">
                   <span className="label">Tổng tiền:</span>
-                  <span className="value price">{finalTotal.toLocaleString('vi-VN')} VNĐ</span>
+                  <span className="value price">{(finalTotal || 0).toLocaleString('vi-VN')} VNĐ</span>
                 </div>
               );
             }
@@ -995,12 +1159,12 @@ const OrderStatus = React.memo(({ orderId, onBack }) => {
             <>
               <div className="info-row" style={{ color: '#007bff', fontWeight: 'bold' }}>
                 <span className="label">Tiền đã cọc:</span>
-                <span className="value">{order.totalDeposit.toLocaleString('vi-VN')} VNĐ</span>
+                <span className="value">{(order.totalDeposit || 0).toLocaleString('vi-VN')} VNĐ</span>
               </div>
               {order.remainingAmount !== undefined && order.remainingAmount > 0 && (
                 <div className="info-row" style={{ color: '#ff6b00', fontWeight: 'bold' }}>
                   <span className="label">Còn lại phải trả:</span>
-                  <span className="value">{order.remainingAmount.toLocaleString('vi-VN')} VNĐ</span>
+                  <span className="value">{(order.remainingAmount || 0).toLocaleString('vi-VN')} VNĐ</span>
                 </div>
               )}
             </>
@@ -1040,7 +1204,7 @@ const OrderStatus = React.memo(({ orderId, onBack }) => {
                     {orderItem.isTemporary && <span className="temp-indicator"> (Mới)</span>}
                   </span>
                   <span className="item-price">
-                    {orderItem.price?.toLocaleString('vi-VN')} VNĐ
+                    {(orderItem.price || 0).toLocaleString('vi-VN')} VNĐ
                   </span>
                 </div>
                 <div className="item-quantity">
@@ -1158,15 +1322,6 @@ const OrderStatus = React.memo(({ orderId, onBack }) => {
         </div>
 
         <div className="actions">
-          <div className="connection-status">
-            <div className={`status-indicator ${connectionState}`}>
-              {connectionState === 'connected' && '🟢 Đang kết nối realtime'}
-              {connectionState === 'connecting' && '🟡 Đang kết nối...'}
-              {connectionState === 'reconnecting' && '🟡 Đang kết nối lại...'}
-              {connectionState === 'disconnected' && '🔴 Mất kết nối - hãy kiểm tra mạng'}
-            </div>
-            {hasNewUpdate && <span className="new-update-indicator"> ✨ Có cập nhật mới!</span>}
-          </div>
           <div className="action-buttons">
             {/* Chỉ hiển thị nút khi có pending changes, waiter đã từ chối, hoặc đang trong editing mode */}
             {order?.status === 'pending' && (pendingChanges.itemsToAdd.length > 0 || pendingChanges.itemsToRemove.length > 0 || order?.waiterResponse?.status === 'rejected' || canEditOrder) && (
@@ -1266,7 +1421,7 @@ const OrderStatus = React.memo(({ orderId, onBack }) => {
                         <div className="menu-content">
                           <h5>{menu.name}</h5>
                           <p className="menu-description">{menu.description}</p>
-                          <div className="menu-price">{menu.price.toLocaleString('vi-VN')} VNĐ</div>
+                          <div className="menu-price">{(menu.price || 0).toLocaleString('vi-VN')} VNĐ</div>
                         </div>
                           
                           {/* Hiển thị trạng thái đã chọn */}
@@ -1303,7 +1458,7 @@ const OrderStatus = React.memo(({ orderId, onBack }) => {
                         <div className="item-content">
                           <h5>{item.name}</h5>
                           <p className="item-description">{item.description}</p>
-                          <div className="item-price">{item.price.toLocaleString('vi-VN')} VNĐ</div>
+                          <div className="item-price">{(item.price || 0).toLocaleString('vi-VN')} VNĐ</div>
                         </div>
                           
                           {/* Hiển thị trạng thái đã chọn */}
@@ -1329,7 +1484,7 @@ const OrderStatus = React.memo(({ orderId, onBack }) => {
                         <img src={selected.item.image || '/api/placeholder/60/60'} alt={selected.item.name} />
                       <div className="selected-item-details">
                           <h6>{selected.item.name}</h6>
-                          <p>{selected.item.price.toLocaleString('vi-VN')} VNĐ</p>
+                          <p>{(selected.item.price || 0).toLocaleString('vi-VN')} VNĐ</p>
                           <div className="selected-item-note-section">
                             <label>Ghi chú:</label>
                             <textarea
@@ -1361,7 +1516,7 @@ const OrderStatus = React.memo(({ orderId, onBack }) => {
                     ))}
                   </div>
                   <div className="selected-items-total">
-                    <strong>Tổng: {selectedItems.reduce((sum, selected) => sum + (selected.item.price * selected.quantity), 0).toLocaleString('vi-VN')} VNĐ</strong>
+                    <strong>Tổng: {selectedItems.reduce((sum, selected) => sum + ((selected.item.price || 0) * (selected.quantity || 0)), 0).toLocaleString('vi-VN')} VNĐ</strong>
               </div>
             </div>
               )}
@@ -1447,7 +1602,7 @@ const OrderStatus = React.memo(({ orderId, onBack }) => {
                         <div key={orderItem._id} className="review-item">
                           <div className="item-info">
                             <span className="item-name">{orderItem.itemName}</span>
-                            <span className="item-price">{orderItem.price?.toLocaleString('vi-VN')} VNĐ</span>
+                            <span className="item-price">{(orderItem.price || 0).toLocaleString('vi-VN')} VNĐ</span>
                           </div>
                           <div className="item-details">
                             <span className="item-quantity">Số lượng: {orderItem.quantity}</span>
@@ -1460,7 +1615,7 @@ const OrderStatus = React.memo(({ orderId, onBack }) => {
                       ))}
                     </div>
                     <div className="order-total-review">
-                      <strong>Tổng tiền: {(calculatedTotalAmount || order?.totalAmount)?.toLocaleString('vi-VN')} VNĐ</strong>
+                      <strong>Tổng tiền: {((calculatedTotalAmount || order?.totalAmount) || 0).toLocaleString('vi-VN')} VNĐ</strong>
                     </div>
                   </div>
                 </div>

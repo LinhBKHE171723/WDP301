@@ -6,7 +6,7 @@ const paymentSchema = new Schema({
   payTime: Date,
   paymentMethod: {
     type: String,
-    enum: ["cash", "card", "momo", "zaloPay"],
+    enum: ["cash", "card", "momo", "zaloPay", "qr"],
     default: "cash",
   },
   status: { type: String, enum: ["paid", "unpaid"], default: "unpaid" },

@@ -136,9 +136,23 @@ export default function OrderDetails({
   // Kiểm tra xem tất cả các món đã sẵn sàng chưa
   // Handle cả items (từ API format) và orderItems (từ WebSocket raw data)
   const orderItems = selectedOrder.items || selectedOrder.orderItems || [];
+  
+  // Helper function để check một item (bao gồm comboItems) đã ready chưa
+  const isItemReady = (item) => {
+    // Nếu là combo, phải check tất cả comboItems
+    if (item.itemType === "menu" && item.comboItems && item.comboItems.length > 0) {
+      // Tất cả comboItems phải ready hoặc served
+      return item.comboItems.every(
+        (ci) => ci.status === "ready" || ci.status === "served"
+      );
+    }
+    // Nếu là item thường, check status của chính nó
+    return item.status === "ready" || item.status === "served";
+  };
+  
   const isAllItemsReady =
     orderItems.length > 0 &&
-    orderItems.every((item) => item.status === "ready");
+    orderItems.every((item) => isItemReady(item));
 
   return (
     <div className="col-span-7 bg-white rounded-xl shadow-lg p-6">

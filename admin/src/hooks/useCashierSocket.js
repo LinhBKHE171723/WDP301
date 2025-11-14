@@ -77,6 +77,7 @@ export default function useCashierSocket({ onOrderPreparing, onOrderPaid, onPaym
       socket = new WebSocket(wsUrl)
 
       socket.onopen = () => {
+        console.log("🔌 [useCashierSocket] WebSocket connected, sending auth...")
         if (token) {
           socket?.send(
             JSON.stringify({
@@ -85,31 +86,42 @@ export default function useCashierSocket({ onOrderPreparing, onOrderPaid, onPaym
               token,
             })
           )
+          console.log("✅ [useCashierSocket] Auth message sent with token")
         } else {
           socket?.send(JSON.stringify({ type: "auth", role: "cashier" }))
+          console.log("✅ [useCashierSocket] Auth message sent without token")
         }
       }
 
       socket.onmessage = (event) => {
         try {
           const message = JSON.parse(event.data)
+          console.log("📨 [useCashierSocket] Received message:", message.type)
+          
           const { onOrderPreparing, onOrderPaid, onPaymentRequested } = callbacksRef.current
 
           switch (message.type) {
+            case "auth_success":
+              console.log("✅ [useCashierSocket] Authenticated as cashier")
+              break
             case "cashier.orders.preparing":
+              console.log("📦 [useCashierSocket] Order preparing:", message.data)
               onOrderPreparing?.(message.data)
               break
             case "cashier.orders.paid":
+              console.log("💰 [useCashierSocket] Order paid:", message.data)
               onOrderPaid?.(message.data)
               break
             case "payment:requested":
+              console.log("💳 [useCashierSocket] Payment requested:", message.data)
               onPaymentRequested?.(message.data)
               break
             default:
+              console.log("❓ [useCashierSocket] Unknown message type:", message.type)
               break
           }
         } catch (error) {
-          console.error("Không thể phân tích dữ liệu WebSocket từ cashier", error)
+          console.error("❌ [useCashierSocket] Error parsing message:", error, event.data)
         }
       }
 

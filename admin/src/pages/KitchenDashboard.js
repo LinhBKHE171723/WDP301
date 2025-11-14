@@ -132,47 +132,121 @@ export default function KitchenDashboard() {
 
   //  Format order từ WebSocket để match với format từ API
   const formatOrderFromWebSocket = (rawOrder) => {
+    // Debug: Log raw order để kiểm tra
+    console.log("📦 [formatOrderFromWebSocket] Raw order:", {
+      _id: rawOrder._id,
+      status: rawOrder.status,
+      hasItems: !!rawOrder.items,
+      itemsLength: rawOrder.items?.length || 0,
+      hasOrderItems: !!rawOrder.orderItems,
+      orderItemsLength: rawOrder.orderItems?.length || 0
+    });
+    
     // Nếu order đã được format (có items), đảm bảo items có đầy đủ thông tin
-    if (rawOrder.items && Array.isArray(rawOrder.items)) {
+    if (rawOrder.items && Array.isArray(rawOrder.items) && rawOrder.items.length > 0) {
       // Đảm bảo mỗi item có itemType và comboItems với status đầy đủ
-      const normalizedItems = rawOrder.items.map((item) => ({
-        ...item,
-        itemType: item.itemType || (item.itemId?.type ? "menu" : "item"),
-        // Đảm bảo comboItems có status đầy đủ từ WebSocket message (không chỉ spread)
-        // Quan trọng: Phải giữ nguyên status từ WebSocket, không fallback về "pending"
-        comboItems: (item.comboItems || []).map((ci) => ({
+      const normalizedItems = rawOrder.items.map((item) => {
+        // Đảm bảo comboItems được giữ nguyên và có đầy đủ thông tin
+        const normalizedComboItems = (item.comboItems || []).map((ci) => ({
+          ...ci, // Giữ nguyên tất cả fields từ WebSocket
           itemId: ci.itemId || null,
-          itemName: ci.itemName || "Món đã xóa",
+          itemName: ci.itemName || (ci.itemId && typeof ci.itemId === 'object' ? ci.itemId.name : null) || "Món đã xóa",
+          // Quan trọng: Phải giữ nguyên status từ WebSocket, không fallback về "pending"
           status:
             ci.status !== undefined && ci.status !== null
               ? ci.status
-              : "pending", // Giữ nguyên status từ WebSocket
+              : "pending",
           assignedChef: ci.assignedChef || null,
           servedBy: ci.servedBy || null,
           readyAt: ci.readyAt || null,
-        })),
-      }));
+        }));
+        
+        return {
+          ...item, // Giữ nguyên tất cả fields từ WebSocket
+          itemType: item.itemType || (item.itemId?.type ? "menu" : "item"),
+          comboItems: normalizedComboItems, // Đảm bảo comboItems luôn là array
+        };
+      });
+      
+      // Tính lại itemsRemaining từ normalizedItems
+      const pendingItems = normalizedItems.reduce((count, item) => {
+        // Nếu là combo, đếm số comboItems chưa ready
+        if (item.itemType === "menu" && item.comboItems && item.comboItems.length > 0) {
+          const pendingComboItems = item.comboItems.filter(
+            (ci) => ci.status !== "ready" && ci.status !== "served"
+          ).length;
+          return count + pendingComboItems;
+        }
+        // Nếu là item thường, check status của chính nó
+        if (item.status === "pending" || item.status === "preparing") {
+          return count + 1;
+        }
+        return count;
+      }, 0);
+      
+      console.log("📦 [formatOrderFromWebSocket] Using items array, normalized count:", normalizedItems.length);
+      console.log("📦 [formatOrderFromWebSocket] Calculated itemsRemaining:", pendingItems);
+      
       return {
         ...rawOrder,
         items: normalizedItems,
+        totalItems: normalizedItems.length,
+        itemsRemaining: pendingItems, // Đảm bảo tính lại itemsRemaining
       };
     }
 
     // Nếu là raw order từ WebSocket (có orderItems), format lại
     const orderItems = rawOrder.orderItems || [];
-    const pendingItems = orderItems.filter(
-      (oi) => oi.status === "pending" || oi.status === "preparing"
-    ).length;
+    console.log("📦 [formatOrderFromWebSocket] Using orderItems array, count:", orderItems.length);
+    
+    // Filter bỏ các items không hợp lệ (null, undefined, hoặc thiếu thông tin cơ bản)
+    const validOrderItems = orderItems.filter((oi) => {
+      if (!oi) return false;
+      // Phải có ít nhất _id hoặc itemName để xác định là OrderItem hợp lệ
+      return oi._id || oi.itemName || (oi.itemId && (typeof oi.itemId === 'object' ? oi.itemId.name : true));
+    });
+    
+    if (validOrderItems.length === 0 && orderItems.length > 0) {
+      console.warn("⚠️ [formatOrderFromWebSocket] WARNING: All orderItems were filtered out!", {
+        originalCount: orderItems.length,
+        sample: orderItems[0]
+      });
+    }
+    
+    // Tính số món còn lại - phải tính cả comboItems
+    const pendingItems = validOrderItems.reduce((count, oi) => {
+      // Nếu là combo, đếm số comboItems chưa ready
+      if (oi.itemType === "menu" && oi.comboItems && oi.comboItems.length > 0) {
+        const pendingComboItems = oi.comboItems.filter(
+          (ci) => ci.status !== "ready" && ci.status !== "served"
+        ).length;
+        return count + pendingComboItems;
+      }
+      // Nếu là item thường, check status của chính nó
+      if (oi.status === "pending" || oi.status === "preparing") {
+        return count + 1;
+      }
+      return count;
+    }, 0);
 
-    return {
+    // Đảm bảo validOrderItems không rỗng - nếu rỗng nhưng orderItems có data, log warning
+    if (validOrderItems.length === 0 && orderItems.length > 0) {
+      console.error("❌ [formatOrderFromWebSocket] CRITICAL: validOrderItems is empty but orderItems has data!", {
+        orderItemsCount: orderItems.length,
+        orderItemsSample: orderItems[0],
+        rawOrderKeys: Object.keys(rawOrder)
+      });
+    }
+    
+    const formattedResult = {
       _id: rawOrder._id,
       tableNumber:
         rawOrder.tableId?.tableNumber || rawOrder.tableId?.number || "N/A",
       createdAt: rawOrder.createdAt,
       status: rawOrder.status,
-      totalItems: orderItems.length,
+      totalItems: validOrderItems.length,
       itemsRemaining: pendingItems,
-      items: orderItems.map((orderItem) => {
+      items: validOrderItems.map((orderItem) => {
         // Handle assignedChef - có thể là object (populated) hoặc ObjectId string
         let chefName = null;
         if (orderItem.assignedChef) {
@@ -188,16 +262,22 @@ export default function KitchenDashboard() {
           }
         }
 
+        // Đảm bảo itemName luôn có giá trị
+        const itemName = orderItem.itemName || 
+                        (orderItem.itemId && typeof orderItem.itemId === 'object' ? orderItem.itemId.name : null) ||
+                        "Món đã xóa";
+        
         return {
           orderItemId: orderItem._id,
-          itemName:
-            orderItem.itemName || orderItem.itemId?.name || "Món đã xóa",
-          quantity: orderItem.quantity,
-          note: orderItem.note,
-          status: orderItem.status,
-          itemType: orderItem.itemType, // 'item' hoặc 'menu'
+          itemName: itemName,
+          quantity: orderItem.quantity || 0,
+          note: orderItem.note || "",
+          status: orderItem.status || "pending",
+          itemType: orderItem.itemType || "item", // 'item' hoặc 'menu'
           comboItems: (orderItem.comboItems || []).map((ci) => ({
             ...ci,
+            // Đảm bảo comboItem có itemName
+            itemName: ci.itemName || (ci.itemId && typeof ci.itemId === 'object' ? ci.itemId.name : null) || "Món đã xóa",
             // Xử lý assignedChef cho comboItem - có thể là object hoặc ObjectId
             assignedChef:
               ci.assignedChef &&
@@ -210,6 +290,16 @@ export default function KitchenDashboard() {
         };
       }),
     };
+    
+    console.log("📦 [formatOrderFromWebSocket] Final formatted result:", {
+      _id: formattedResult._id,
+      status: formattedResult.status,
+      totalItems: formattedResult.totalItems,
+      itemsRemaining: formattedResult.itemsRemaining,
+      itemsCount: formattedResult.items?.length || 0
+    });
+    
+    return formattedResult;
   };
 
   // Handle WebSocket messages for real-time updates
@@ -220,28 +310,146 @@ export default function KitchenDashboard() {
       switch (lastMessage.type) {
         case "order:updated":
           if (lastMessage.data && activeTab === "kds") {
+            // Cập nhật order cho cả confirmed, preparing, và ready (để hiển thị order đã hoàn thành)
             if (
               lastMessage.data.status === "confirmed" ||
-              lastMessage.data.status === "preparing"
+              lastMessage.data.status === "preparing" ||
+              lastMessage.data.status === "ready"
             ) {
               const formattedOrder = formatOrderFromWebSocket(lastMessage.data);
-              console.log(" Formatted order with comboItems:", formattedOrder);
-              // Debug: Log comboItems status để kiểm tra
-              if (formattedOrder.items) {
+              console.log("📦 Formatted order with comboItems:", formattedOrder);
+              // Debug: Log để kiểm tra orderItems có bị mất không
+              console.log("📦 Formatted order items count:", formattedOrder.items?.length || 0);
+              if (formattedOrder.items && formattedOrder.items.length > 0) {
                 formattedOrder.items.forEach((item, idx) => {
-                  if (item.comboItems && item.comboItems.length > 0) {
-                    console.log(
-                      ` Item ${idx} comboItems status:`,
-                      item.comboItems.map((ci) => ({
-                        itemName: ci.itemName,
-                        status: ci.status,
-                      }))
-                    );
-                  }
+                  console.log(`📦 Item ${idx}:`, {
+                    itemName: item.itemName,
+                    status: item.status,
+                    itemType: item.itemType,
+                    comboItemsCount: item.comboItems?.length || 0,
+                    comboItems: item.comboItems?.map((ci) => ({
+                      itemName: ci.itemName,
+                      status: ci.status,
+                    })) || []
+                  });
                 });
+              } else {
+                console.warn("⚠️ WARNING: Formatted order has no items!", formattedOrder);
               }
               setOrders((prevOrders) => {
                 if (!Array.isArray(prevOrders)) return [formattedOrder];
+                
+                // Tìm order hiện tại để merge comboItems nếu cần
+                const existingOrder = prevOrders.find((o) => o._id === formattedOrder._id);
+                
+                // Nếu order đã tồn tại và có items, đảm bảo merge comboItems đúng cách
+                if (existingOrder && existingOrder.items && formattedOrder.items) {
+                  console.log("🔄 [WebSocket] Merging order items:", {
+                    existingItemsCount: existingOrder.items.length,
+                    newItemsCount: formattedOrder.items.length,
+                    existingItemsRemaining: existingOrder.itemsRemaining,
+                    newItemsRemaining: formattedOrder.itemsRemaining
+                  });
+                  
+                  // Merge items để giữ comboItems từ cả hai nguồn
+                  const mergedItems = formattedOrder.items.map((newItem) => {
+                    const existingItem = existingOrder.items.find(
+                      (ei) => (ei.orderItemId || ei._id) === (newItem.orderItemId || newItem._id)
+                    );
+                    
+                    // Nếu tìm thấy existing item và có comboItems, merge comboItems
+                    if (existingItem && existingItem.comboItems && newItem.comboItems) {
+                      console.log("🔄 [WebSocket] Merging comboItems for item:", {
+                        itemName: newItem.itemName,
+                        existingComboItemsCount: existingItem.comboItems.length,
+                        newComboItemsCount: newItem.comboItems.length
+                      });
+                      
+                      // Merge comboItems: giữ status mới nhất từ newItem, nhưng giữ các field khác nếu thiếu
+                      const mergedComboItems = newItem.comboItems.map((newCi, ciIdx) => {
+                        const existingCi = existingItem.comboItems[ciIdx];
+                        if (existingCi) {
+                          // Merge: ưu tiên data mới, nhưng giữ các field khác nếu thiếu
+                          return {
+                            ...existingCi, // Giữ tất cả fields cũ
+                            ...newCi, // Override với data mới
+                          };
+                        }
+                        return newCi;
+                      });
+                      
+                      // Nếu newItem có ít comboItems hơn existingItem, giữ lại các comboItems cũ
+                      if (mergedComboItems.length < existingItem.comboItems.length) {
+                        console.warn("⚠️ [WebSocket] WARNING: New item has fewer comboItems than existing!", {
+                          itemName: newItem.itemName,
+                          existingCount: existingItem.comboItems.length,
+                          newCount: mergedComboItems.length
+                        });
+                        // Giữ lại các comboItems cũ không có trong newItem
+                        const missingComboItems = existingItem.comboItems.slice(mergedComboItems.length);
+                        mergedComboItems.push(...missingComboItems);
+                      }
+                      
+                      return {
+                        ...newItem,
+                        comboItems: mergedComboItems,
+                      };
+                    }
+                    
+                    // Nếu existingItem có comboItems nhưng newItem không có, giữ lại comboItems từ existing
+                    if (existingItem && existingItem.comboItems && existingItem.comboItems.length > 0 && (!newItem.comboItems || newItem.comboItems.length === 0)) {
+                      console.warn("⚠️ [WebSocket] WARNING: New item missing comboItems, keeping from existing!", {
+                        itemName: newItem.itemName,
+                        existingComboItemsCount: existingItem.comboItems.length
+                      });
+                      return {
+                        ...newItem,
+                        comboItems: existingItem.comboItems, // Giữ lại comboItems từ existing
+                      };
+                    }
+                    
+                    return newItem;
+                  });
+                  
+                  // Nếu newOrder có ít items hơn existingOrder, giữ lại các items cũ
+                  if (mergedItems.length < existingOrder.items.length) {
+                    console.warn("⚠️ [WebSocket] WARNING: New order has fewer items than existing!", {
+                      existingCount: existingOrder.items.length,
+                      newCount: mergedItems.length
+                    });
+                    const missingItems = existingOrder.items.filter(
+                      (ei) => !mergedItems.some(
+                        (mi) => (mi.orderItemId || mi._id) === (ei.orderItemId || ei._id)
+                      )
+                    );
+                    mergedItems.push(...missingItems);
+                  }
+                  
+                  formattedOrder.items = mergedItems;
+                  
+                  // Tính lại itemsRemaining sau khi merge
+                  const recalculatedItemsRemaining = mergedItems.reduce((count, item) => {
+                    if (item.itemType === "menu" && item.comboItems && item.comboItems.length > 0) {
+                      const pendingComboItems = item.comboItems.filter(
+                        (ci) => ci.status !== "ready" && ci.status !== "served"
+                      ).length;
+                      return count + pendingComboItems;
+                    }
+                    if (item.status === "pending" || item.status === "preparing") {
+                      return count + 1;
+                    }
+                    return count;
+                  }, 0);
+                  
+                  formattedOrder.itemsRemaining = recalculatedItemsRemaining;
+                  formattedOrder.totalItems = mergedItems.length;
+                  
+                  console.log("✅ [WebSocket] Merged order:", {
+                    itemsCount: mergedItems.length,
+                    itemsRemaining: recalculatedItemsRemaining
+                  });
+                }
+                
                 const updated = prevOrders.map((order) =>
                   order._id === formattedOrder._id ? formattedOrder : order
                 );
@@ -254,15 +462,15 @@ export default function KitchenDashboard() {
                 }
                 return updated;
               });
-              console.log(" Updated order in queue:", formattedOrder._id);
+              console.log("✅ Updated order in queue:", formattedOrder._id);
             } else {
-              // Nếu order không còn confirmed/preparing, xóa khỏi danh sách
+              // Nếu order không còn confirmed/preparing/ready (ví dụ: paid, cancelled), xóa khỏi danh sách
               setOrders((prevOrders) => {
                 if (!Array.isArray(prevOrders)) return [];
                 return prevOrders.filter((o) => o._id !== lastMessage.data._id);
               });
               console.log(
-                "🗑️ Removed order from queue (not confirmed/preparing):",
+                "🗑️ Removed order from queue (not confirmed/preparing/ready):",
                 lastMessage.data._id
               );
             }
@@ -378,22 +586,6 @@ export default function KitchenDashboard() {
             <h1 className="text-2xl font-bold text-gray-900">
               Hệ thống Quản lý Bếp - KDS
             </h1>
-            {/* WebSocket Connection Status */}
-            <div
-              className={`ml-4 px-3 py-1 rounded-full text-xs font-medium ${
-                connectionState === "connected"
-                  ? "bg-green-100 text-green-700"
-                  : connectionState === "connecting" ||
-                    connectionState === "reconnecting"
-                  ? "bg-yellow-100 text-yellow-700"
-                  : "bg-red-100 text-red-700"
-              }`}
-            >
-              {connectionState === "connected" && "🟢 Realtime"}
-              {connectionState === "connecting" && "🟡 Đang kết nối..."}
-              {connectionState === "reconnecting" && "🟡 Đang kết nối lại..."}
-              {connectionState === "disconnected" && "🔴 Mất kết nối"}
-            </div>
           </div>
 
           <div className="flex items-center space-x-4">

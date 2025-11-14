@@ -13,19 +13,19 @@ import {
   Printer,
   Grid3x3,
   Calendar,
-  User,
-  ChevronDown,
 } from "lucide-react"
 import { useNavigate } from "react-router-dom"
 import { toast } from "react-toastify"
 import "./CashierDashboard.css"
 import UnpaidOrdersList from "./Unpaid-orders-list"
 import TableManagement from "./table-management"
+import OrderPayment from "./order-payment"
 import Client from "../../api/Client"
 import useCashierSocket from "../../hooks/useCashierSocket"
 import adminApi from "../../api/adminApi"
 import useAdminWebSocket from "../../hooks/useAdminWebSocket"
 import { useAuth } from "../../context/AuthContext"
+import CashierUserBadge from "./CashierUserBadge"
 
 /**
  * Props hỗ trợ cả phiên bản cũ và mới:
@@ -46,14 +46,12 @@ export default function CashierDashboard({
   // ====== Điều hướng màn con ======
   const [showPaymentHistory, setShowPaymentHistory] = useState(false)
   const [showTableManagement, setShowTableManagement] = useState(false)
+  const [selectedReceiptOrder, setSelectedReceiptOrder] = useState(null) // Order để xem hóa đơn từ lịch sử
 
-  // ====== User menu (tên thu ngân + Profile + Logout) ======
-  const [isUserMenuOpen, setIsUserMenuOpen] = useState(false)
-  const userMenuRef = useRef(null)
+  // ====== User menu đã được tách ra thành CashierUserBadge component ======
 
   // ====== Preorders (đơn đặt trước) ======
   const [pendingPreordersCount, setPendingPreordersCount] = useState(0)
-  const [todaysPreordersCount, setTodaysPreordersCount] = useState(0)
   const [loadingPreorders, setLoadingPreorders] = useState(true)
 
   // WebSocket để nhận thông báo preorder mới
@@ -99,41 +97,52 @@ export default function CashierDashboard({
   const [pageSize, setPageSize] = useState(5)
 
   // ====== Formatter ======
-  const formatCurrency = (amount) =>
-    new Intl.NumberFormat("vi-VN", { style: "currency", currency: "VND" }).format(amount)
-
-  const formatTime = (dateString) =>
-    new Intl.DateTimeFormat("vi-VN", { hour: "2-digit", minute: "2-digit" }).format(new Date(dateString))
-
-  const formatDate = (dateString) =>
-    new Intl.DateTimeFormat("vi-VN", { day: "2-digit", month: "2-digit", year: "numeric" }).format(
-      new Date(dateString)
-    )
-
-  // ====== Thông tin thu ngân (badge) ======
-  const cashierName = user?.name || "Thu Ngân"
-  const cashierInitials = useMemo(() => {
-    if (!cashierName) return "TN"
-    const parts = cashierName.trim().split(/\s+/)
-    const letters = parts.map((p) => p[0]).join("")
-    return letters.slice(-2).toUpperCase()
-  }, [cashierName])
-
-  // Đóng dropdown khi click ra ngoài
-  useEffect(() => {
-    const handleClickOutside = (e) => {
-      if (userMenuRef.current && !userMenuRef.current.contains(e.target)) {
-        setIsUserMenuOpen(false)
-      }
+  const formatCurrency = (amount) => {
+    if (amount === undefined || amount === null || isNaN(amount)) {
+      return "0 ₫"
     }
-    document.addEventListener("mousedown", handleClickOutside)
-    return () => document.removeEventListener("mousedown", handleClickOutside)
-  }, [])
+    return new Intl.NumberFormat("vi-VN", { style: "currency", currency: "VND" }).format(amount)
+  }
+
+  const formatTime = (dateString) => {
+    if (!dateString) {
+      return "--:--"
+    }
+    try {
+      const date = new Date(dateString)
+      if (isNaN(date.getTime())) {
+        return "--:--"
+      }
+      return new Intl.DateTimeFormat("vi-VN", { hour: "2-digit", minute: "2-digit" }).format(date)
+    } catch (error) {
+      console.error("Error formatting time:", error)
+      return "--:--"
+    }
+  }
+
+  const formatDate = (dateString) => {
+    if (!dateString) {
+      return "--/--/----"
+    }
+    try {
+      const date = new Date(dateString)
+      if (isNaN(date.getTime())) {
+        return "--/--/----"
+      }
+      return new Intl.DateTimeFormat("vi-VN", { day: "2-digit", month: "2-digit", year: "numeric" }).format(date)
+    } catch (error) {
+      console.error("Error formatting date:", error)
+      return "--/--/----"
+    }
+  }
+
+  // ====== Thông tin thu ngân đã được tách ra thành CashierUserBadge component ======
 
   // ====== Callback từ UnpaidOrdersList khi thanh toán xong ======
   const handlePaymentCompleteFromUnpaid = (payment) => {
     const newPayment = {
       id: Date.now(),
+      orderId: payment.orderId, // Lưu orderId để có thể fetch lại order
       orderNumber: payment.orderNumber,
       amount: payment.amount,
       method: payment.method, // "Tiền mặt" | "QR Code"
@@ -210,37 +219,13 @@ export default function CashierDashboard({
     try {
       setLoadingPreorders(true)
 
-      // 1. Đơn đang chờ duyệt
+      // Đơn đang chờ duyệt
       const pendingResponse = await adminApi.getPreOrders({ waiterResponseStatus: "pending" })
       const pendingOrders = Array.isArray(pendingResponse?.data) ? pendingResponse.data : []
       setPendingPreordersCount(pendingOrders.length)
-
-      // 2. Đơn đã duyệt, scheduledTime trong hôm nay
-      const today = new Date()
-      today.setHours(0, 0, 0, 0)
-      const tomorrow = new Date(today)
-      tomorrow.setDate(tomorrow.getDate() + 1)
-
-      const todaysResponse = await adminApi.getPreOrders({
-        waiterResponseStatus: "approved",
-        fromDate: today.toISOString(),
-        toDate: tomorrow.toISOString(),
-        filterBy: "scheduledTime",
-      })
-      const todaysOrders = Array.isArray(todaysResponse?.data) ? todaysResponse.data : []
-
-      const filteredTodaysOrders = todaysOrders.filter((order) => {
-        if (!order.scheduledTime) return false
-        const d = new Date(order.scheduledTime)
-        d.setHours(0, 0, 0, 0)
-        return d.getTime() === today.getTime()
-      })
-
-      setTodaysPreordersCount(filteredTodaysOrders.length)
     } catch (error) {
       console.error("Không thể tải số lượng đơn đặt trước:", error)
       setPendingPreordersCount(0)
-      setTodaysPreordersCount(0)
     } finally {
       setLoadingPreorders(false)
     }
@@ -270,8 +255,8 @@ export default function CashierDashboard({
   const handlePaymentRequested = useCallback((data) => {
     console.log("💳 Payment requested:", data)
     const tableNumber = data.tableNumber || "N/A"
-    const totalAmount = data.totalAmount?.toLocaleString("vi-VN") || "0"
-    toast.warning(`💳 Khách hàng tại bàn ${tableNumber} yêu cầu thanh toán! Tổng tiền: ${totalAmount}đ`, {
+    const totalAmount = data.totalAmount ? formatCurrency(data.totalAmount) : "0 ₫"
+    toast.warning(`💳 Khách hàng tại bàn ${tableNumber} yêu cầu thanh toán! Tổng tiền: ${totalAmount}`, {
       autoClose: 8000,
       position: "top-right",
     })
@@ -337,16 +322,18 @@ export default function CashierDashboard({
   const pageItems = useMemo(() => payments.slice(start, end), [payments, start, end])
   const goTo = (p) => setPage(Math.min(totalPages, Math.max(1, p)))
 
-  // ====== Handler Profile + Logout ======
-  const handleGoProfile = () => {
-    setIsUserMenuOpen(false)
-    navigate("/admin/profile")
-  }
+  // ====== Handler Profile + Logout đã được tách ra thành CashierUserBadge component ======
 
-  const handleDashboardLogoutClick = () => {
-    setIsUserMenuOpen(false)
-    logout()
-    navigate("/login") // đổi thành "/" nếu login nằm ở "/"
+  // ====== Màn xem hóa đơn từ lịch sử ======
+  if (selectedReceiptOrder) {
+    return (
+      <OrderPayment
+        order={selectedReceiptOrder}
+        onBack={() => setSelectedReceiptOrder(null)}
+        onPaymentComplete={null} // Không cho thanh toán lại từ hóa đơn
+        viewOnly={true} // Chỉ xem, không cho thanh toán
+      />
+    )
   }
 
   // ====== Màn lịch sử thanh toán ======
@@ -405,6 +392,7 @@ export default function CashierDashboard({
                       <th className="history-table-header">Số tiền</th>
                       <th className="history-table-header">Phương thức</th>
                       <th className="history-table-header">Thời gian</th>
+                      <th className="history-table-header">Hành động</th>
                     </tr>
                   </thead>
                   <tbody className="history-table-body">
@@ -427,13 +415,68 @@ export default function CashierDashboard({
                           </span>
                         </td>
                         <td className="history-table-cell history-time">{formatTime(payment.time)}</td>
+                        <td className="history-table-cell">
+                          <button
+                            onClick={async () => {
+                              if (!payment.orderId) {
+                                alert("Không tìm thấy thông tin đơn hàng")
+                                return
+                              }
+                              try {
+                                // Fetch order details từ customer endpoint (cashier có thể dùng)
+                                const res = await Client.get(`/customer/orders/${payment.orderId}`)
+                                const orderData = res.data || res
+                                // Lấy paymentMethod từ paymentIds hoặc paymentId
+                                let paymentMethodFromOrder = "cash" // default
+                                if (orderData.paymentIds && orderData.paymentIds.length > 0) {
+                                  // Tìm payment cuối cùng (thanh toán cuối)
+                                  const lastPayment = orderData.paymentIds
+                                    .filter(p => p.status === "paid" && !p.isDeposit)
+                                    .sort((a, b) => new Date(b.payTime || b.createdAt) - new Date(a.payTime || a.createdAt))[0]
+                                  if (lastPayment) {
+                                    paymentMethodFromOrder = lastPayment.paymentMethod || "cash"
+                                  }
+                                } else if (orderData.paymentId) {
+                                  paymentMethodFromOrder = orderData.paymentId.paymentMethod || "cash"
+                                }
+                                
+                                // Format order để phù hợp với OrderPayment component
+                                const formattedOrder = {
+                                  id: orderData._id || orderData.id,
+                                  orderNumber: orderData.orderNumber || payment.orderNumber,
+                                  tableNumber: orderData.tableId?.tableNumber || orderData.tableNumber || "N/A",
+                                  orderTime: orderData.createdAt || orderData.orderTime || payment.time,
+                                  items: (orderData.orderItems || []).map(item => ({
+                                    id: item._id || item.orderItemId || item.id,
+                                    name: item.itemName || item.name || "N/A",
+                                    quantity: item.quantity || 0,
+                                    price: item.price || 0,
+                                    notes: item.note || item.notes || null
+                                  })),
+                                  remainingAmount: orderData.remainingAmount || payment.amount,
+                                  totalPaid: orderData.totalPaid || 0,
+                                  paymentMethod: paymentMethodFromOrder // Thêm paymentMethod vào order
+                                }
+                                setSelectedReceiptOrder(formattedOrder)
+                              } catch (error) {
+                                console.error("Error fetching order:", error)
+                                alert("Không thể tải thông tin đơn hàng")
+                              }
+                            }}
+                            className="button button-secondary"
+                            style={{ padding: "0.375rem 0.75rem", fontSize: "0.75rem" }}
+                          >
+                            <Printer className="button-icon" style={{ width: "0.875rem", height: "0.875rem" }} />
+                            Xem hóa đơn
+                          </button>
+                        </td>
                       </tr>
                     ))}
                     {pageItems.length === 0 && (
                       <tr>
                         <td
                           className="history-table-cell"
-                          colSpan={4}
+                          colSpan={5}
                           style={{ textAlign: "center", color: "var(--muted-foreground)" }}
                         >
                           Không có dữ liệu
@@ -542,35 +585,8 @@ export default function CashierDashboard({
               </button>
             </div>
 
-            {/* Badge tên thu ngân + menu */}
-            <div className="dashboard-user-wrapper" ref={userMenuRef}>
-              <button
-                type="button"
-                className="user-badge-button"
-                onClick={() => setIsUserMenuOpen((v) => !v)}
-              >
-                <div className="user-avatar-circle">{cashierInitials}</div>
-                <div className="user-badge-info">
-                  <p className="user-badge-name">{cashierName}</p>
-                  <p className="user-badge-role">Thu ngân</p>
-                </div>
-                <ChevronDown className="user-badge-chevron" />
-              </button>
-
-              {isUserMenuOpen && (
-                <div className="user-menu-dropdown">
-                  <button className="user-menu-item" onClick={handleGoProfile}>
-                    <User className="user-menu-item-icon" />
-                    <span>Hồ sơ cá nhân</span>
-                  </button>
-                  <div className="user-menu-separator" />
-                  <button className="user-menu-item logout" onClick={handleDashboardLogoutClick}>
-                    <LogOut className="user-menu-item-icon" />
-                    <span>Đăng xuất</span>
-                  </button>
-                </div>
-              )}
-            </div>
+            {/* Badge tên thu ngân + menu - tái sử dụng component */}
+            <CashierUserBadge />
           </div>
         </div>
       </div>
@@ -662,7 +678,7 @@ export default function CashierDashboard({
           </div>
         </div>
 
-        {/* Card 1: Đơn đặt trước đang chờ duyệt */}
+        {/* Card: Đơn đặt trước đang chờ duyệt */}
         <div
           className="revenue-card revenue-card-preorder-pending"
           style={{
@@ -697,59 +713,6 @@ export default function CashierDashboard({
               }}
             >
               Xem đơn chờ duyệt
-            </button>
-          </div>
-        </div>
-
-        {/* Card 2: Đơn đặt trước hôm nay */}
-        <div
-          className="revenue-card revenue-card-preorder-today"
-          style={{
-            cursor: "pointer",
-            transition: "transform 0.2s, box-shadow 0.2s",
-          }}
-          onMouseEnter={(e) => {
-            e.currentTarget.style.transform = "translateY(-2px)"
-            e.currentTarget.style.boxShadow = "0 4px 12px rgba(0,0,0,0.15)"
-          }}
-          onMouseLeave={(e) => {
-            e.currentTarget.style.transform = "translateY(0)"
-            e.currentTarget.style.boxShadow = ""
-          }}
-          onClick={() => {
-            const today = new Date()
-            today.setHours(0, 0, 0, 0)
-            const tomorrow = new Date(today)
-            tomorrow.setDate(tomorrow.getDate() + 1)
-            navigate(
-              `/admin/cashier/preorders?waiterResponseStatus=approved&fromDate=${today.toISOString()}&toDate=${tomorrow.toISOString()}&filterBy=scheduledTime`
-            )
-          }}
-        >
-          <div className="revenue-card-header">
-            <div className="revenue-icon-wrapper" style={{ backgroundColor: "rgba(251, 146, 60, 0.1)" }}>
-              <Clock className="revenue-icon" style={{ color: "#fb923c" }} />
-            </div>
-            <span className="revenue-label">Đơn đặt trước hôm nay</span>
-          </div>
-          <div className="revenue-amount" style={{ color: "#fb923c", fontSize: "2rem", fontWeight: "bold" }}>
-            {loadingPreorders ? "..." : todaysPreordersCount}
-          </div>
-          <div className="revenue-footer">
-            <button
-              className="button button-view-orders"
-              onClick={(e) => {
-                e.stopPropagation()
-                const today = new Date()
-                today.setHours(0, 0, 0, 0)
-                const tomorrow = new Date(today)
-                tomorrow.setDate(tomorrow.getDate() + 1)
-                navigate(
-                  `/admin/cashier/preorders?waiterResponseStatus=approved&fromDate=${today.toISOString()}&toDate=${tomorrow.toISOString()}&filterBy=scheduledTime`
-                )
-              }}
-            >
-              Xem đơn hôm nay
             </button>
           </div>
         </div>

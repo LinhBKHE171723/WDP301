@@ -31,6 +31,10 @@ const populateOrderItemDetails = async (orderItems) => {
         if (!orderItem.itemName && item.name) {
           orderItem.itemName = item.name;
         }
+        // Đảm bảo price luôn có (ưu tiên từ database, nếu không có thì lấy từ item)
+        if (!orderItem.price && item.price) {
+          orderItem.price = item.price;
+        }
       }
     }
     
@@ -926,12 +930,15 @@ const groupSplitOrderItemsForCustomer = (orderItems) => {
     // Kiểm tra xem có phải là OrderItem document không
     // Nếu có các field của OrderItem (quantity, price, itemId, status, itemName), thì là OrderItem
     // Nếu chỉ có _id và không có field nào khác, có thể là ObjectId
+    // LƯU Ý: Sau khi toObject(), một số field có thể là undefined nhưng vẫn là OrderItem hợp lệ
     const hasOrderItemFields = item.quantity !== undefined || 
                                item.price !== undefined || 
                                item.itemId !== undefined || 
                                item.status !== undefined ||
                                item.itemName !== undefined ||
-                               item.toObject !== undefined; // Mongoose document có toObject
+                               item.toObject !== undefined || // Mongoose document có toObject
+                               item.itemType !== undefined || // Có thể có itemType
+                               (item._id && Object.keys(item).length > 1); // Có _id và ít nhất 1 field khác
     
     if (!hasOrderItemFields) {
       // Nếu không có field nào của OrderItem, có thể là ObjectId
@@ -961,9 +968,10 @@ const groupSplitOrderItemsForCustomer = (orderItems) => {
       return;
     }
     
-    // Đảm bảo có các field cần thiết (ít nhất phải có _id hoặc quantity để xác định là OrderItem)
-    if (!plainItem || (!plainItem._id && !plainItem.quantity)) {
-      console.warn(`⚠️ PlainItem missing required fields:`, plainItem ? Object.keys(plainItem) : 'null');
+    // Đảm bảo có các field cần thiết (ít nhất phải có _id để xác định là OrderItem)
+    // LƯU Ý: quantity có thể là 0 hoặc undefined, nhưng vẫn là OrderItem hợp lệ
+    if (!plainItem || !plainItem._id) {
+      console.warn(`⚠️ PlainItem missing _id:`, plainItem ? Object.keys(plainItem) : 'null');
       return;
     }
     
@@ -1000,7 +1008,19 @@ const groupSplitOrderItemsForCustomer = (orderItems) => {
     
     if (!groupedMap.has(key)) {
       // Lần đầu gặp → giữ nguyên tất cả field từ item này (dùng spread)
-      groupedMap.set(key, { ...plainItem });
+      // Đảm bảo itemName và price luôn có giá trị
+      const itemToAdd = { ...plainItem };
+      if (!itemToAdd.itemName && itemToAdd.itemId) {
+        if (typeof itemToAdd.itemId === 'object' && itemToAdd.itemId !== null) {
+          itemToAdd.itemName = itemToAdd.itemId.name || itemToAdd.itemName || '';
+        }
+      }
+      if (!itemToAdd.price && itemToAdd.itemId) {
+        if (typeof itemToAdd.itemId === 'object' && itemToAdd.itemId !== null) {
+          itemToAdd.price = itemToAdd.itemId.price || itemToAdd.price || 0;
+        }
+      }
+      groupedMap.set(key, itemToAdd);
     } else {
       // Đã có item cùng key → chỉ cộng quantity
       const groupedItem = groupedMap.get(key);
@@ -1011,8 +1031,20 @@ const groupSplitOrderItemsForCustomer = (orderItems) => {
   // Trả về array các item đã group
   const result = Array.from(groupedMap.values());
   
-  // Debug log
-  if (orderItems.length > 1 && result.length < orderItems.length) {
+  // Debug log - luôn log để debug
+  console.log(`📦 [groupSplitOrderItemsForCustomer] Input: ${orderItems.length} items, Output: ${result.length} items`);
+  if (result.length === 0 && orderItems.length > 0) {
+    console.error(`❌ [groupSplitOrderItemsForCustomer] WARNING: All items were filtered out!`);
+    console.error(`❌ Input items sample:`, orderItems.slice(0, 2).map(item => ({
+      _id: item?._id,
+      itemName: item?.itemName,
+      quantity: item?.quantity,
+      price: item?.price,
+      itemId: item?.itemId,
+      hasToObject: typeof item?.toObject === 'function',
+      keys: item ? Object.keys(item) : []
+    })));
+  } else if (orderItems.length > 1 && result.length < orderItems.length) {
     console.log(`✅ Grouped ${orderItems.length} items into ${result.length} items`);
     result.forEach(item => {
       console.log(`   - ${item.itemName || 'N/A'}: quantity=${item.quantity}, price=${item.price || 'N/A'}`);

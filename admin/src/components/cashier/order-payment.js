@@ -2,10 +2,12 @@ import { useState } from "react"
 import { ArrowLeft, CreditCard, Wallet, Printer, Download, CheckCircle } from "lucide-react"
 import "./order-payment.css"
 
-function OrderPayment({ order, onBack, onPaymentComplete }) {
-  const [paymentMethod, setPaymentMethod] = useState(null) // "cash" | "qr" | null
-  const [showReceipt, setShowReceipt] = useState(false)
+function OrderPayment({ order, onBack, onPaymentComplete, viewOnly = false }) {
+  // Nếu order có paymentMethod (từ lịch sử thanh toán), dùng nó; nếu không thì null
+  const [paymentMethod, setPaymentMethod] = useState(order.paymentMethod || null) // "cash" | "qr" | null
+  const [showReceipt, setShowReceipt] = useState(viewOnly) // Nếu viewOnly thì hiển thị receipt ngay
   const [showPaymentSuccess, setShowPaymentSuccess] = useState(false)
+  const [isProcessing, setIsProcessing] = useState(false)
 
   const subtotal = order.items.reduce((sum, item) => sum + item.price * item.quantity, 0)
   const totalAmount = subtotal // Tổng tiền đơn hàng
@@ -26,13 +28,33 @@ function OrderPayment({ order, onBack, onPaymentComplete }) {
       year: "numeric",
     }).format(new Date(dateString))
 
-  const handlePayment = () => {
+  const handlePayment = async () => {
     if (!paymentMethod) return
-    setShowPaymentSuccess(true)
-    setTimeout(() => {
+    if (viewOnly) return // Không cho thanh toán nếu đang xem hóa đơn
+    
+    try {
+      setIsProcessing(true)
+      setShowPaymentSuccess(true)
+      
+      // Gọi API thanh toán ngay khi bấm "Thanh toán"
+      const finalPaymentMethod = paymentMethod || "cash"
+      await onPaymentComplete(order.id, finalPaymentMethod)
+      
+      // Sau khi thanh toán thành công, cập nhật paymentMethod state và order
+      setPaymentMethod(finalPaymentMethod)
+      order.paymentMethod = finalPaymentMethod
+      
+      setTimeout(() => {
+        setShowPaymentSuccess(false)
+        setShowReceipt(true)
+      }, 1500)
+    } catch (error) {
+      console.error("Error processing payment:", error)
       setShowPaymentSuccess(false)
-      setShowReceipt(true)
-    }, 1500)
+      alert("Có lỗi xảy ra khi thanh toán. Vui lòng thử lại.")
+    } finally {
+      setIsProcessing(false)
+    }
   }
 
   const handlePrintReceipt = () => window.print()
@@ -41,8 +63,11 @@ function OrderPayment({ order, onBack, onPaymentComplete }) {
     alert("Tính năng tải PDF sẽ được triển khai với thư viện jsPDF hoặc tương tự")
   }
 
+  // handleCompletePayment không còn cần thiết vì đã gọi trong handlePayment
+  // Giữ lại để tương thích với code cũ, nhưng chỉ đóng receipt
   const handleCompletePayment = () => {
-    onPaymentComplete(order.id, paymentMethod || "cash")
+    // Đơn hàng đã được thanh toán trong handlePayment, chỉ cần đóng receipt
+    onBack()
   }
 
   if (showReceipt) {
@@ -64,7 +89,7 @@ function OrderPayment({ order, onBack, onPaymentComplete }) {
             </button>
             <button onClick={handleCompletePayment} className="receipt-complete-button">
               <CheckCircle className="button-icon" />
-              Hoàn tất
+              Đóng
             </button>
           </div>
         </div>
@@ -286,9 +311,13 @@ function OrderPayment({ order, onBack, onPaymentComplete }) {
         </div>
 
         <div className="payment-action">
-          <button onClick={handlePayment} disabled={!paymentMethod} className="payment-submit-button">
+          <button 
+            onClick={handlePayment} 
+            disabled={!paymentMethod || isProcessing} 
+            className="payment-submit-button"
+          >
             <CheckCircle className="button-icon" />
-            Thanh toán {formatCurrency(remainingAmount)}
+            {isProcessing ? "Đang xử lý..." : `Thanh toán ${formatCurrency(remainingAmount)}`}
           </button>
         </div>
       </div>

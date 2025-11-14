@@ -32,6 +32,7 @@ import CashierDashboard from "../components/cashier/CashierDashboard";
 import OrderPayment from "../components/cashier/order-payment";
 import TableManagement from "../components/cashier/table-management";
 import UnpaidOrdersList from "../components/cashier/Unpaid-orders-list";
+import CashierLayout from "../components/cashier/CashierLayout";
 
 // auth
 import ForgotPassword from "../pages/ForgotPassword";
@@ -139,7 +140,14 @@ function CashierApp() {
       <Route path="orderpayment" element={<AdminCashierOrderPaymentRoute />} />
       <Route path="unpaid" element={<AdminCashierUnpaidOrdersRoute />} />
       <Route path="tables" element={<AdminCashierTableManagementRoute />} />
-      <Route path="preorders" element={<PreOrderPage />} />
+      <Route 
+        path="preorders" 
+        element={
+          <CashierLayout>
+            <PreOrderPage />
+          </CashierLayout>
+        } 
+      />
       <Route path="*" element={<Navigate to="dashboard" replace />} />
     </Routes>
   );
@@ -186,7 +194,7 @@ export default function AppRouter() {
           !isLoggedIn || !token ? (
             <Navigate to="/auth/login" replace />
           ) : user?.role === "admin" ? (
-            <Navigate to="/admin" replace />
+            <Navigate to="/admin/preorders" replace />
           ) : user?.role === "cashier" ? (
             <Navigate to="/admin/cashier/shift" replace />
           ) : user?.role === "kitchen_manager" ? (
@@ -209,10 +217,11 @@ export default function AppRouter() {
                 <AdminPreOrderNotification />
                 <div className="flex">
                   <Sidebar />
-                  <main className="flex-1 p-6 space-y-6 ml-64">
+                  <main className="flex-1 p-4 lg:p-6 space-y-6 lg:ml-64 mt-16 lg:mt-0">
                     <Header />
                     <div className="container-page">
                       <Routes>
+                        <Route path="/" element={<Navigate to="/admin/preorders" replace />} />
                         <Route path="/preorders" element={<PreOrderPage />} />
                         <Route path="/orders" element={<OrderHistoryPage />} />
                         <Route path="/analytics" element={<AnalyticsPage />} />

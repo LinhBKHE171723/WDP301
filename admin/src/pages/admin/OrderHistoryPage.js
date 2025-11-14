@@ -148,11 +148,12 @@ export default function OrderHistoryPage() {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-bold">Lịch sử đơn hàng</h1>
+      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+        <h1 className="text-xl sm:text-2xl font-bold">Lịch sử đơn hàng</h1>
         <Button
           variant="outline"
           onClick={() => setShowFilters(!showFilters)}
+          className="w-full sm:w-auto"
         >
           {showFilters ? "Ẩn bộ lọc" : "Hiện bộ lọc"}
         </Button>
@@ -161,7 +162,7 @@ export default function OrderHistoryPage() {
       {/* Search and Filters */}
       <Card>
         <div className="p-4 space-y-4">
-          <div className="flex gap-2">
+          <div className="flex flex-col sm:flex-row gap-2">
             <Input
               placeholder="Tìm theo mã đơn, tên khách, email, SĐT..."
               value={search}
@@ -169,14 +170,16 @@ export default function OrderHistoryPage() {
               onKeyPress={(e) => e.key === "Enter" && handleSearch()}
               className="flex-1"
             />
-            <Button onClick={handleSearch}>Tìm kiếm</Button>
-            <Button variant="outline" onClick={resetFilters}>
-              Xóa bộ lọc
-            </Button>
+            <div className="flex gap-2">
+              <Button onClick={handleSearch} className="flex-1 sm:flex-none">Tìm kiếm</Button>
+              <Button variant="outline" onClick={resetFilters} className="flex-1 sm:flex-none">
+                Xóa bộ lọc
+              </Button>
+            </div>
           </div>
 
           {showFilters && (
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-4 pt-4 border-t">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 pt-4 border-t">
               <div>
                 <label className="block text-sm font-medium mb-1">Trạng thái</label>
                 <select
@@ -254,37 +257,37 @@ export default function OrderHistoryPage() {
           </div>
         ) : (
           <>
-            <div className="overflow-x-auto">
-              <table className="w-full">
+            <div className="overflow-x-auto -mx-4 sm:mx-0">
+              <table className="w-full min-w-[800px]">
                 <thead className="bg-gray-50">
                   <tr>
-                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Mã đơn</th>
-                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Khách hàng</th>
-                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Bàn</th>
-                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Loại</th>
-                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Trạng thái</th>
-                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Thanh toán</th>
-                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Tổng tiền</th>
-                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Thời gian tạo</th>
-                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Thao tác</th>
+                    <th className="px-2 sm:px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Mã đơn</th>
+                    <th className="px-2 sm:px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Khách hàng</th>
+                    <th className="px-2 sm:px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase hidden sm:table-cell">Bàn</th>
+                    <th className="px-2 sm:px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase hidden md:table-cell">Loại</th>
+                    <th className="px-2 sm:px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Trạng thái</th>
+                    <th className="px-2 sm:px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase hidden lg:table-cell">Thanh toán</th>
+                    <th className="px-2 sm:px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Tổng tiền</th>
+                    <th className="px-2 sm:px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase hidden xl:table-cell">Thời gian tạo</th>
+                    <th className="px-2 sm:px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Thao tác</th>
                   </tr>
                 </thead>
                 <tbody className="bg-white divide-y divide-gray-200">
                   {orders.map((order) => (
                     <tr key={order._id} className="hover:bg-gray-50">
-                      <td className="px-4 py-3 text-sm">
+                      <td className="px-2 sm:px-4 py-3 text-sm">
                         <span className="font-mono text-xs">
                           {String(order._id).slice(-8)}
                         </span>
                       </td>
-                      <td className="px-4 py-3 text-sm">
+                      <td className="px-2 sm:px-4 py-3 text-sm">
                         {order.userId ? (
                           <div>
                             <div className="font-medium">{order.userId.name || "-"}</div>
-                            <div className="text-xs text-gray-500">
+                            <div className="text-xs text-gray-500 hidden sm:block">
                               {order.userId.email || "-"}
                             </div>
-                            <div className="text-xs text-gray-500">
+                            <div className="text-xs text-gray-500 hidden sm:block">
                               {order.userId.phone || "-"}
                             </div>
                           </div>
@@ -292,14 +295,14 @@ export default function OrderHistoryPage() {
                           <span className="text-gray-400">Khách vãng lai</span>
                         )}
                       </td>
-                      <td className="px-4 py-3 text-sm">
+                      <td className="px-2 sm:px-4 py-3 text-sm hidden sm:table-cell">
                         {order.tableId ? (
                           <span className="font-medium">Bàn {order.tableId.tableNumber}</span>
                         ) : (
                           <span className="text-gray-400">-</span>
                         )}
                       </td>
-                      <td className="px-4 py-3 text-sm">
+                      <td className="px-2 sm:px-4 py-3 text-sm hidden md:table-cell">
                         {(() => {
                           // Xác định isPreOrder:
                           // 1. Nếu status = "preorder" → chắc chắn là preorder
@@ -322,12 +325,12 @@ export default function OrderHistoryPage() {
                           );
                         })()}
                       </td>
-                      <td className="px-4 py-3 text-sm">
+                      <td className="px-2 sm:px-4 py-3 text-sm">
                         <span className={`inline-flex items-center px-2 py-1 rounded text-xs font-medium ${getStatusBadge(order.status)}`}>
                           {getStatusText(order.status)}
                         </span>
                       </td>
-                      <td className="px-4 py-3 text-sm">
+                      <td className="px-2 sm:px-4 py-3 text-sm hidden lg:table-cell">
                         {(() => {
                           // Xác định paymentStatus: ưu tiên từ backend, nếu không có thì tính toán
                           let paymentStatus = order.paymentStatus;
@@ -374,15 +377,15 @@ export default function OrderHistoryPage() {
                           );
                         })()}
                       </td>
-                      <td className="px-4 py-3 text-sm">
+                      <td className="px-2 sm:px-4 py-3 text-sm">
                         <div className="font-medium">{formatCurrency(order.totalAmount || 0)}</div>
                         {order.remainingAmount > 0 && (
-                          <div className="text-xs text-red-500">
+                          <div className="text-xs text-red-500 hidden sm:block">
                             Còn lại: {formatCurrency(order.remainingAmount)}
                           </div>
                         )}
                       </td>
-                      <td className="px-4 py-3 text-sm">
+                      <td className="px-2 sm:px-4 py-3 text-sm hidden xl:table-cell">
                         <div>{formatDate(order.createdAt)}</div>
                         {order.isPreOrder && order.scheduledTime && (
                           <div className="text-xs text-blue-600 mt-1">
@@ -390,7 +393,7 @@ export default function OrderHistoryPage() {
                           </div>
                         )}
                       </td>
-                      <td className="px-4 py-3 text-sm">
+                      <td className="px-2 sm:px-4 py-3 text-sm">
                         <Button
                           variant="outline"
                           size="sm"

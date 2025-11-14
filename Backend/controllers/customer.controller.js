@@ -2373,22 +2373,34 @@ exports.requestPayment = async (req, res) => {
     const webSocketService = req.app.get("webSocketService");
     if (webSocketService) {
       const notificationData = {
-        orderId: order._id,
+        orderId: order._id.toString(),
         order: order,
-        tableNumber: order.tableId?.tableNumber || null,
-        totalAmount: order.totalAmount,
-        requestedAt: new Date()
+        tableNumber: order.tableId?.tableNumber || order.tableId?.number || null,
+        totalAmount: order.totalAmount || 0,
+        requestedAt: new Date().toISOString()
       };
 
+      console.log(`💳 [requestPayment] Preparing to broadcast payment request:`, {
+        orderId: notificationData.orderId,
+        tableNumber: notificationData.tableNumber,
+        totalAmount: notificationData.totalAmount
+      });
+
       // Gửi thông báo yêu cầu thanh toán cho tất cả cashier
-      webSocketService.broadcastToAllCashiers("payment:requested", notificationData);
-      console.log(`💳 Payment request broadcasted to all cashiers for order ${order._id}`);
+      if (webSocketService.broadcastToAllCashiers) {
+        webSocketService.broadcastToAllCashiers("payment:requested", notificationData);
+        console.log(`✅ [requestPayment] Payment request broadcasted to all cashiers for order ${order._id}`);
+      } else {
+        console.error(`❌ [requestPayment] broadcastToAllCashiers method not found!`);
+      }
 
       // Cũng broadcast cho order để customer biết yêu cầu đã được gửi
       webSocketService.broadcastToOrder(order._id, "payment:request_sent", {
-        orderId: order._id,
-        requestedAt: new Date()
+        orderId: order._id.toString(),
+        requestedAt: new Date().toISOString()
       });
+    } else {
+      console.error(`❌ [requestPayment] WebSocket service not available!`);
     }
 
     res.status(200).json({
