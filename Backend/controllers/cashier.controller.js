@@ -227,6 +227,20 @@ exports.completeOrderPayment = async (req, res) => {
       order.status = "paid";
       await order.save();
       
+      // ✅ Đồng bộ paymentId.status với order.status khi order chuyển sang "paid"
+      if (order.paymentId) {
+        await Payment.findByIdAndUpdate(
+          order.paymentId._id || order.paymentId,
+          { 
+            status: 'paid',
+            payTime: new Date(),
+            amountPaid: order.totalAmount
+          },
+          { new: true }
+        );
+        console.log(`✅ Đã cập nhật paymentId.status = 'paid' cho order ${orderId}`);
+      }
+      
       // Cập nhật trạng thái bàn: xóa order khỏi table.orderNow và đổi status về "available" nếu không còn order nào
       // Xử lý cả tableId và tableIds (merged tables)
       const { cleanupTablesForOrder } = require("../utils/customerHelpers");

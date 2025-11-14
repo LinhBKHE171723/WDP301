@@ -324,14 +324,26 @@ const OrderHistory = ({ onBack }) => {
                     </div>
                     <div className="order-detail-item">
                       <span className="detail-label">Tình trạng:</span>
-                      {order.paymentId && (
+                      {/* Ưu tiên hiển thị order.status nếu là "paid", nếu không thì hiển thị paymentId.status */}
+                      {order.status === 'paid' ? (
+                        <span className="payment-status paid">
+                          Đã thanh toán
+                        </span>
+                      ) : order.paymentId ? (
                         <span className={`payment-status ${order.paymentId.status}`}>
                           {order.paymentId.status === 'paid' ? 'Đã thanh toán' : 'Chưa thanh toán'}
                         </span>
+                      ) : (
+                        <span className="payment-status unpaid">
+                          Chưa thanh toán
+                        </span>
                       )}
-                      <span className={`status-badge ${getStatusClass(order.status)}`}>
-                        {getStatusText(order.status)}
-                      </span>
+                      {/* Chỉ hiển thị order status nếu không phải "paid" để tránh trùng lặp */}
+                      {order.status !== 'paid' && (
+                        <span className={`status-badge ${getStatusClass(order.status)}`}>
+                          {getStatusText(order.status)}
+                        </span>
+                      )}
                     </div>
                   </div>
                   <div className="order-actions">

@@ -591,32 +591,6 @@ export default function CashierDashboard({
         </div>
       </div>
 
-      {/* Shift Info Bar */}
-      <div className="shift-info-bar">
-        <div className="shift-info-item">
-          <Clock className="shift-info-icon" />
-          <div className="shift-info-content">
-            <span className="shift-info-label">Giờ bắt đầu</span>
-            <span className="shift-info-value">{formatTime(shiftInfo.startTime)}</span>
-          </div>
-        </div>
-        <div className="shift-info-divider"></div>
-        <div className="shift-info-item">
-          <DollarSign className="shift-info-icon" />
-          <div className="shift-info-content">
-            <span className="shift-info-label">Tiền đầu ca</span>
-            <span className="shift-info-value">{formatCurrency(shiftInfo.openingCash)}</span>
-          </div>
-        </div>
-        <div className="shift-info-divider"></div>
-        <div className="shift-info-item">
-          <TrendingUp className="shift-info-icon" />
-          <div className="shift-info-content">
-            <span className="shift-info-label">Thời gian làm việc</span>
-            <span className="shift-info-value">{currentShiftDuration} phút</span>
-          </div>
-        </div>
-      </div>
 
       {/* Revenue Cards */}
       <div className="revenue-grid">
