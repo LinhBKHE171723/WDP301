@@ -5,6 +5,7 @@ import FeedbackForm from './FeedbackForm';
 import { useOrderWebSocket } from '../hooks/useOrderWebSocket';
 import { groupOrderItems, getStatusText, getStatusColor, getItemStatusText } from '../utils/orderUtils';
 import { API_ENDPOINTS } from '../utils/apiConfig';
+import { showDialog, showConfirm, showError, showSuccess, showInfo, showWarning } from '../utils/dialog';
 import './OrderStatus.css';
 
 const OrderStatus = React.memo(({ orderId, onBack }) => {
@@ -535,7 +536,7 @@ const OrderStatus = React.memo(({ orderId, onBack }) => {
           setCanEditOrder(false); // Also disable edit mode
           // Show cancellation notification only once
           if (!hasShownCancellationAlertRef.current) {
-            alert('Đơn hàng đã bị hủy!');
+            showError('Đơn hàng đã bị hủy!', 'Thông báo');
             hasShownCancellationAlertRef.current = true;
           }
         }
@@ -585,7 +586,7 @@ const OrderStatus = React.memo(({ orderId, onBack }) => {
       
       // Show cancellation notification only once
       if (!hasShownCancellationAlertRef.current) {
-        alert('❌ Đơn hàng đã bị hủy!');
+        showError('Đơn hàng đã bị hủy!', 'Thông báo');
         hasShownCancellationAlertRef.current = true;
       }
     } else if (lastMessage && lastMessage.type === 'order:not_found' && lastMessage.orderId === orderId) {
@@ -685,7 +686,7 @@ const OrderStatus = React.memo(({ orderId, onBack }) => {
   // Thêm tất cả món đã chọn vào pending changes (chưa gửi lên server)
   const handleAddSelectedItemsToOrder = () => {
     if (selectedItems.length === 0) {
-      alert('Vui lòng chọn ít nhất một món!');
+      showWarning('Vui lòng chọn ít nhất một món!', 'Cảnh báo');
       return;
     }
     
@@ -705,14 +706,15 @@ const OrderStatus = React.memo(({ orderId, onBack }) => {
       pendingChanges: newChanges
     }), 1);
     
-    alert(`Đã thêm ${selectedItems.length} món vào danh sách sửa đổi!`);
-        setShowAddItemModal(false);
+    showSuccess(`Đã thêm ${selectedItems.length} món vào danh sách sửa đổi!`, 'Thành công');
+    setShowAddItemModal(false);
     setSelectedItems([]);
   };
 
 
   const handleCancelOrder = async () => {
-    if (!window.confirm('Bạn có chắc chắn muốn hủy đơn hàng này?')) {
+    const confirmed = await showConfirm('Bạn có chắc chắn muốn hủy đơn hàng này?', 'Xác nhận hủy đơn hàng');
+    if (!confirmed) {
       return;
     }
 
@@ -735,18 +737,18 @@ const OrderStatus = React.memo(({ orderId, onBack }) => {
         fetchOrderStatus(); // Refresh order status
         // Note: Alert will be shown via WebSocket event
       } else {
-        alert(`Lỗi: ${data.message || 'Không thể hủy đơn hàng'}`);
+        showError(data.message || 'Không thể hủy đơn hàng', 'Lỗi');
       }
     } catch (error) {
       console.error('Error cancelling order:', error);
-      alert('Có lỗi xảy ra khi hủy đơn hàng');
+      showError('Có lỗi xảy ra khi hủy đơn hàng', 'Lỗi');
     }
   };
 
   const handleFeedbackSubmitted = (feedbackData) => {
     console.log('Feedback submitted:', feedbackData);
     setShowFeedbackModal(false);
-    alert('Cảm ơn bạn đã đánh giá dịch vụ!');
+    showSuccess('Cảm ơn bạn đã đánh giá dịch vụ!', 'Thành công');
   };
 
   const handleShowFeedback = () => {
@@ -756,7 +758,7 @@ const OrderStatus = React.memo(({ orderId, onBack }) => {
   // Handle request payment
   const handleRequestPayment = async () => {
     if (!orderId) {
-      alert('Không tìm thấy ID đơn hàng');
+      showError('Không tìm thấy ID đơn hàng', 'Lỗi');
       return;
     }
 
@@ -772,15 +774,15 @@ const OrderStatus = React.memo(({ orderId, onBack }) => {
       const data = await response.json();
 
       if (data.success) {
-        alert(data.message);
+        showSuccess(data.message, 'Thành công');
         // Refresh order status
         fetchOrderStatus();
       } else {
-        alert(`${data.message || 'Không thể gửi yêu cầu thanh toán'}`);
+        showError(data.message || 'Không thể gửi yêu cầu thanh toán', 'Lỗi');
       }
     } catch (error) {
       console.error('Error requesting payment:', error);
-      alert('Có lỗi xảy ra khi gửi yêu cầu thanh toán');
+      showError('Có lỗi xảy ra khi gửi yêu cầu thanh toán', 'Lỗi');
     } finally {
       setIsRefreshing(false);
     }
@@ -828,11 +830,11 @@ const OrderStatus = React.memo(({ orderId, onBack }) => {
         // Refresh order status
         fetchOrderStatus();
       } else {
-        alert(`Lỗi: ${data.message || 'Không thể bắt đầu sửa đơn hàng'}`);
+        showError(data.message || 'Không thể bắt đầu sửa đơn hàng', 'Lỗi');
       }
     } catch (error) {
       console.error('Error starting edit order:', error);
-      alert('Có lỗi xảy ra khi bắt đầu sửa đơn hàng');
+      showError('Có lỗi xảy ra khi bắt đầu sửa đơn hàng', 'Lỗi');
     }
   };
 
@@ -848,23 +850,24 @@ const OrderStatus = React.memo(({ orderId, onBack }) => {
       const data = await response.json();
 
       if (data.success) {
-        alert('Đã xác nhận đơn hàng thành công!');
+        showSuccess('Đã xác nhận đơn hàng thành công!', 'Thành công');
         // Đóng popup modal
         setShowWaiterResponseModal(false);
         setWaiterResponseData(null);
         // Refresh order status
         fetchOrderStatus();
       } else {
-        alert(`Lỗi: ${data.message || 'Không thể xác nhận đơn hàng'}`);
+        showError(data.message || 'Không thể xác nhận đơn hàng', 'Lỗi');
       }
     } catch (error) {
       console.error('Error confirming order:', error);
-      alert('Có lỗi xảy ra khi xác nhận đơn hàng');
+      showError('Có lỗi xảy ra khi xác nhận đơn hàng', 'Lỗi');
     }
   };
 
-  const handleRemoveItem = (orderItemId) => {
-    if (!window.confirm('Bạn có chắc chắn muốn xóa món này?')) {
+  const handleRemoveItem = async (orderItemId) => {
+    const confirmed = await showConfirm('Bạn có chắc chắn muốn xóa món này?', 'Xác nhận xóa món');
+    if (!confirmed) {
       return;
     }
 
@@ -892,7 +895,7 @@ const OrderStatus = React.memo(({ orderId, onBack }) => {
         pendingChanges: newChanges
       }), 1);
       
-      alert('Đã xóa món khỏi danh sách!');
+      showSuccess('Đã xóa món khỏi danh sách!', 'Thành công');
     } else {
       // Nếu là món thật, thêm vào itemsToRemove
       setPendingChanges(prev => ({
@@ -910,7 +913,7 @@ const OrderStatus = React.memo(({ orderId, onBack }) => {
         pendingChanges: newChanges
       }), 1);
       
-      alert('Đã thêm món vào danh sách xóa!');
+      showSuccess('Đã thêm món vào danh sách xóa!', 'Thành công');
     }
   };
 
@@ -1038,7 +1041,7 @@ const OrderStatus = React.memo(({ orderId, onBack }) => {
         
         const data = await response.json();
         if (!data.success) {
-          alert('Lỗi khi cập nhật đơn hàng: ' + data.message);
+          showError('Lỗi khi cập nhật đơn hàng: ' + data.message, 'Lỗi');
           return;
         }
       }
@@ -1048,12 +1051,12 @@ const OrderStatus = React.memo(({ orderId, onBack }) => {
       setPendingChanges({ itemsToAdd: [], itemsToRemove: [] });
       setCanEditOrder(false);
       
-      alert('Đã cập nhật đơn hàng thành công! Waiter sẽ xác nhận lại.');
+      showSuccess('Đã cập nhật đơn hàng thành công! Waiter sẽ xác nhận lại.', 'Thành công');
       fetchOrderStatus(); // Refresh order status
       
     } catch (error) {
       console.error('Error updating order:', error);
-      alert('Có lỗi xảy ra khi cập nhật đơn hàng');
+      showError('Có lỗi xảy ra khi cập nhật đơn hàng', 'Lỗi');
     } finally {
       setIsRefreshing(false);
     }

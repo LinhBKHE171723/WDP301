@@ -1,4 +1,4 @@
-import React from "react"
+import React, { useState } from "react"
 import { BrowserRouter as Router, Routes, Route, Navigate, useNavigate } from "react-router-dom"
 import { AuthProvider } from "./context/AuthContext"
 
@@ -9,6 +9,8 @@ import OrderStatus from "./components/OrderStatus"
 import PreOrder from "./components/PreOrder"
 import ResetPassword from "./components/ResetPassword"
 import LoyaltyInfo from "./components/LoyaltyInfo"
+import ConfirmDialog from "./components/ConfirmDialog"
+import { initDialog } from "./utils/dialog"
 
 import "./App.css"
 
@@ -47,11 +49,39 @@ function OrderStatusRoute() {
 function App() {
   // Table sẽ được waiter nhập sau trên hệ thống
   const defaultTable = null
+  
+  // State cho ConfirmDialog
+  const [dialogState, setDialogState] = useState({
+    show: false,
+    title: "",
+    message: "",
+    type: "info",
+    onConfirm: null,
+    onCancel: null,
+    confirmText: "OK",
+    cancelText: "Huỷ"
+  });
+
+  // Khởi tạo dialog utility
+  React.useEffect(() => {
+    initDialog(setDialogState);
+  }, []);
 
   return (
     <AuthProvider>
       <Router>
         <div className="App">
+          {/* Global ConfirmDialog */}
+          <ConfirmDialog
+            show={dialogState.show}
+            title={dialogState.title}
+            message={dialogState.message}
+            type={dialogState.type}
+            onConfirm={dialogState.onConfirm}
+            onCancel={dialogState.onCancel}
+            confirmText={dialogState.confirmText}
+            cancelText={dialogState.cancelText}
+          />
           <Routes>
             {/* Redirect root */}
             <Route path="/" element={<Navigate to="/reservation" replace />} />
