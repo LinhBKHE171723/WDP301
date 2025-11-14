@@ -165,7 +165,7 @@ function OrderPayment({ order, onBack, onPaymentComplete, viewOnly = false }) {
             </div>
             {totalPaid > 0 && (
               <div className="receipt-summary-row">
-                <span className="receipt-summary-label">Đã cọc:</span>
+                <span className="receipt-summary-label">Đã thanh toán:</span>
                 <span className="receipt-summary-value">-{formatCurrency(totalPaid)}</span>
               </div>
             )}
@@ -273,7 +273,7 @@ function OrderPayment({ order, onBack, onPaymentComplete, viewOnly = false }) {
               <>
                 <div className="summary-divider"></div>
                 <div className="summary-row">
-                  <span className="summary-label">Đã cọc:</span>
+                  <span className="summary-label">Đã thanh toán:</span>
                   <span className="summary-value" style={{ color: '#3b82f6' }}>
                     -{formatCurrency(totalPaid)}
                   </span>

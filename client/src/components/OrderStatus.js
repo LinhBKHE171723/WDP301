@@ -1161,7 +1161,7 @@ const OrderStatus = React.memo(({ orderId, onBack }) => {
           {(order.status === 'preorder' || order.scheduledTime) && order.totalDeposit > 0 && (
             <>
               <div className="info-row" style={{ color: '#007bff', fontWeight: 'bold' }}>
-                <span className="label">Tiền đã cọc:</span>
+                <span className="label">Tiền đã thanh toán:</span>
                 <span className="value">{(order.totalDeposit || 0).toLocaleString('vi-VN')} VNĐ</span>
               </div>
               {order.remainingAmount !== undefined && order.remainingAmount > 0 && (
