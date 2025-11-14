@@ -123,7 +123,7 @@ export default function CashierShiftManager() {
   const handleCheckOut = async () => {
     try {
       await userApi.checkOut()
-      toast.success("✅ Check-out thành công!")
+      toast.success("Check-out thành công!")
       
       // Cập nhật shiftData
       const now = new Date().toISOString()
@@ -251,7 +251,7 @@ export default function CashierShiftManager() {
                   className="button button-full"
                   style={{ marginTop: "1rem" }}
                 >
-                  🔄 Tải lại
+                  Tải lại
                 </button>
               </div>
             </div>

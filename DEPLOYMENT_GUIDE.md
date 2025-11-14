@@ -259,7 +259,7 @@ nano .env
 
 ```env
 REACT_APP_API_URL=http://YOUR_DOMAIN.com/api
-REACT_APP_SOCKET_URL=http://YOUR_DOMAIN.com
+REACT_APP_WS_URL=ws://YOUR_DOMAIN.com/ws
 ```
 
 **Lưu file: Ctrl+X → Y → Enter**
@@ -298,7 +298,7 @@ nano .env
 
 ```env
 REACT_APP_API_URL=http://YOUR_DOMAIN.com/api
-REACT_APP_SOCKET_URL=http://YOUR_DOMAIN.com
+REACT_APP_WS_URL=ws://YOUR_DOMAIN.com/ws
 ```
 
 **Lưu file: Ctrl+X → Y → Enter**
@@ -372,13 +372,17 @@ server {
     }
 
     # WebSocket Support
-    location /socket.io {
+    location /ws {
         proxy_pass http://localhost:5000;
         proxy_http_version 1.1;
         proxy_set_header Upgrade $http_upgrade;
         proxy_set_header Connection "upgrade";
         proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
         proxy_cache_bypass $http_upgrade;
+        proxy_read_timeout 86400; # 24 hours for long-lived connections
     }
 
     # Static files caching
@@ -424,13 +428,17 @@ server {
     }
 
     # WebSocket Support
-    location /socket.io {
+    location /ws {
         proxy_pass http://localhost:5000;
         proxy_http_version 1.1;
         proxy_set_header Upgrade $http_upgrade;
         proxy_set_header Connection "upgrade";
         proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
         proxy_cache_bypass $http_upgrade;
+        proxy_read_timeout 86400; # 24 hours for long-lived connections
     }
 
     # Static files caching
@@ -577,7 +585,7 @@ nano .env
 
 ```env
 REACT_APP_API_URL=https://YOUR_DOMAIN.com/api
-REACT_APP_SOCKET_URL=https://YOUR_DOMAIN.com
+REACT_APP_WS_URL=wss://YOUR_DOMAIN.com/ws
 ```
 
 ```bash
@@ -590,7 +598,7 @@ nano .env
 
 ```env
 REACT_APP_API_URL=https://YOUR_DOMAIN.com/api
-REACT_APP_SOCKET_URL=https://YOUR_DOMAIN.com
+REACT_APP_WS_URL=wss://YOUR_DOMAIN.com/ws
 ```
 
 **Rebuild frontend:**
@@ -797,6 +805,30 @@ sudo systemctl restart nginx
 # Xem logs
 sudo tail -f /var/log/nginx/error.log
 ```
+
+### WebSocket không kết nối được
+
+```bash
+# Kiểm tra Nginx config có location /ws chưa
+sudo cat /etc/nginx/sites-available/restaurant | grep -A 10 "location /ws"
+
+# Kiểm tra backend có chạy WebSocket không
+pm2 logs restaurant-backend | grep -i websocket
+
+# Test WebSocket connection từ server
+curl -i -N -H "Connection: Upgrade" -H "Upgrade: websocket" -H "Sec-WebSocket-Version: 13" -H "Sec-WebSocket-Key: test" http://localhost:5000/ws
+
+# Kiểm tra Nginx error logs
+sudo tail -f /var/log/nginx/error.log
+
+# Kiểm tra firewall có chặn WebSocket không
+sudo ufw status
+
+# Restart Nginx sau khi sửa config
+sudo nginx -t && sudo systemctl restart nginx
+```
+
+**Lưu ý:** Đảm bảo Nginx config có location `/ws` với đầy đủ WebSocket upgrade headers như trong hướng dẫn.
 
 ---
 
